@@ -71,7 +71,7 @@ src/
     │   ├── schema.ts                       # Drizzle schema (all 6 tables)
     │   ├── index.ts                        # Lazy DB connection via Proxy
     │   └── seed.ts                         # Seeds admin user + default site settings
-    ├── (no cloudinary.ts — uses @vercel/blob directly in API routes)
+    ├── (image uploads use @vercel/blob directly in API routes)
     └── resend.ts                           # (planned)
 ```
 
