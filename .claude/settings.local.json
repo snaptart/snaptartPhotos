@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm -rf c:/Users/Dad/Documents/Web/snaptart-new)",
+      "Read(//c/Users/Dad/Documents/Web/**)",
+      "Bash(npx create-next-app@latest snaptart-new --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm --no-turbopack)",
+      "Skill(update-config)",
+      "Skill(update-config:*)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\Dad\\.claude"
+    ]
+  }
+}
