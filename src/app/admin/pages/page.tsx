@@ -1,0 +1,334 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { SortableItem } from "@/components/admin/SortableItem";
+import { useRouter } from "next/navigation";
+
+interface Page {
+  id: string;
+  title: string;
+  slug: string;
+  pageType: string;
+  isPublished: boolean;
+  position: number;
+  metaTitle: string | null;
+  metaDescription: string | null;
+}
+
+export default function PagesPage() {
+  const [pages, setPages] = useState<Page[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [message, setMessage] = useState("");
+  const [editMeta, setEditMeta] = useState<string | null>(null);
+  const router = useRouter();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const fetchPages = useCallback(async () => {
+    const res = await fetch("/api/pages");
+    const data = await res.json();
+    setPages(data);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchPages();
+  }, [fetchPages]);
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = pages.findIndex((p) => p.id === active.id);
+    const newIndex = pages.findIndex((p) => p.id === over.id);
+    const reordered = arrayMove(pages, oldIndex, newIndex);
+    setPages(reordered);
+
+    await fetch("/api/pages", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        items: reordered.map((p, index) => ({ id: p.id, position: index })),
+      }),
+    });
+  }
+
+  async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+
+    const res = await fetch("/api/pages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: form.get("title"),
+        pageType: form.get("pageType"),
+        position: pages.length,
+      }),
+    });
+
+    if (res.ok) {
+      const page = await res.json();
+      router.push(`/admin/pages/${page.id}/edit`);
+    } else {
+      setMessage("Failed to create page");
+    }
+  }
+
+  async function handleUpdateMeta(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+
+    const res = await fetch("/api/pages", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: editMeta,
+        title: form.get("title"),
+        pageType: form.get("pageType"),
+        metaTitle: form.get("metaTitle") || null,
+        metaDescription: form.get("metaDescription") || null,
+      }),
+    });
+
+    if (res.ok) {
+      setEditMeta(null);
+      setMessage("Page updated!");
+      fetchPages();
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Delete this page?")) return;
+    await fetch(`/api/pages?id=${id}`, { method: "DELETE" });
+    setMessage("Page deleted");
+    fetchPages();
+  }
+
+  async function togglePublish(page: Page) {
+    await fetch("/api/pages", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: page.id, isPublished: !page.isPublished }),
+    });
+    fetchPages();
+  }
+
+  if (loading) return <div className="text-neutral-500">Loading...</div>;
+
+  const editingPage = pages.find((p) => p.id === editMeta);
+
+  return (
+    <div>
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Pages</h1>
+        <button
+          onClick={() => setShowNewForm(true)}
+          className="rounded bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700"
+        >
+          New Page
+        </button>
+      </div>
+
+      {message && (
+        <div className={`mb-4 rounded px-3 py-2 text-sm ${message.includes("Failed") ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600"}`}>
+          {message}
+        </div>
+      )}
+
+      {/* New page form */}
+      {showNewForm && (
+        <form
+          onSubmit={handleCreate}
+          className="mb-6 rounded-lg border border-neutral-200 bg-white p-4"
+        >
+          <h2 className="mb-3 text-sm font-medium">New Page</h2>
+          <div className="space-y-3">
+            <input
+              name="title"
+              placeholder="Page title"
+              required
+              autoFocus
+              className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+            />
+            <select
+              name="pageType"
+              defaultValue="custom"
+              className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+            >
+              <option value="custom">Custom</option>
+              <option value="about">About</option>
+              <option value="contact">Contact</option>
+              <option value="story">Story</option>
+            </select>
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                className="rounded bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700"
+              >
+                Create &amp; Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowNewForm(false)}
+                className="rounded border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
+
+      {/* Edit metadata form */}
+      {editMeta && editingPage && (
+        <form
+          onSubmit={handleUpdateMeta}
+          className="mb-6 rounded-lg border border-neutral-200 bg-white p-4"
+        >
+          <h2 className="mb-3 text-sm font-medium">Edit Page Settings</h2>
+          <div className="space-y-3">
+            <input
+              name="title"
+              placeholder="Page title"
+              defaultValue={editingPage.title}
+              required
+              className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+            />
+            <select
+              name="pageType"
+              defaultValue={editingPage.pageType}
+              className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+            >
+              <option value="custom">Custom</option>
+              <option value="about">About</option>
+              <option value="contact">Contact</option>
+              <option value="story">Story</option>
+            </select>
+            <details className="rounded border border-neutral-200 p-3">
+              <summary className="cursor-pointer text-sm font-medium text-neutral-600">SEO Settings</summary>
+              <div className="mt-3 space-y-3">
+                <input
+                  name="metaTitle"
+                  placeholder="Meta title (optional)"
+                  defaultValue={editingPage.metaTitle ?? ""}
+                  className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+                />
+                <textarea
+                  name="metaDescription"
+                  placeholder="Meta description (optional)"
+                  defaultValue={editingPage.metaDescription ?? ""}
+                  rows={2}
+                  className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+                />
+              </div>
+            </details>
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                className="rounded bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700"
+              >
+                Save Settings
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditMeta(null)}
+                className="rounded border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
+
+      {pages.length === 0 ? (
+        <p className="text-sm text-neutral-500">No pages yet. Create one to get started.</p>
+      ) : (
+        <div className="rounded-lg border border-neutral-200 bg-white">
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={pages.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+              {pages.map((page) => (
+                <SortableItem key={page.id} id={page.id}>
+                  <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-3 last:border-0">
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <span className="font-medium">{page.title}</span>
+                        <span className="ml-2 text-sm text-neutral-400">/{page.slug}</span>
+                        <span className={`ml-2 rounded px-1.5 py-0.5 text-xs ${
+                          page.pageType !== "custom"
+                            ? "bg-blue-50 text-blue-600"
+                            : "bg-neutral-50 text-neutral-400"
+                        }`}>
+                          {page.pageType}
+                        </span>
+                        <span
+                          className={`ml-2 rounded px-1.5 py-0.5 text-xs ${
+                            page.isPublished
+                              ? "bg-green-50 text-green-600"
+                              : "bg-neutral-100 text-neutral-500"
+                          }`}
+                        >
+                          {page.isPublished ? "Published" : "Draft"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => togglePublish(page)}
+                        className="text-sm text-neutral-500 hover:text-neutral-900"
+                      >
+                        {page.isPublished ? "Unpublish" : "Publish"}
+                      </button>
+                      <button
+                        onClick={() => router.push(`/admin/pages/${page.id}/edit`)}
+                        className="text-sm text-neutral-500 hover:text-neutral-900"
+                      >
+                        Edit Content
+                      </button>
+                      <button
+                        onClick={() => { setEditMeta(page.id); setShowNewForm(false); }}
+                        className="text-sm text-neutral-500 hover:text-neutral-900"
+                      >
+                        Settings
+                      </button>
+                      <button
+                        onClick={() => handleDelete(page.id)}
+                        className="text-sm text-red-500 hover:text-red-700"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </SortableItem>
+              ))}
+            </SortableContext>
+          </DndContext>
+        </div>
+      )}
+    </div>
+  );
+}
