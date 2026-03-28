@@ -5,7 +5,7 @@ import { asc } from "drizzle-orm";
 
 export async function Navbar() {
   let items: { id: string; label: string; url: string; targetType: string }[] = [];
-  let settings: { siteTitle: string; instagramUrl: string | null } | null = null;
+  let settings: { siteTitle: string; logoUrl: string | null; instagramUrl: string | null } | null = null;
 
   try {
     items = await db.select().from(menuItems).orderBy(asc(menuItems.position));
@@ -16,13 +16,18 @@ export async function Navbar() {
   }
 
   const siteTitle = settings?.siteTitle ?? "SnaptArt";
+  const logoUrl = settings?.logoUrl;
   const instagramUrl = settings?.instagramUrl;
 
   return (
     <header className="border-b border-neutral-200 bg-white">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-        <Link href="/" className="text-2xl font-light tracking-widest">
-          {siteTitle}
+        <Link href="/" className="flex items-center gap-3">
+          {logoUrl ? (
+            <img src={logoUrl} alt={siteTitle} className="h-10 w-auto" />
+          ) : (
+            <span className="text-2xl font-light tracking-widest">{siteTitle}</span>
+          )}
         </Link>
         <div className="flex items-center gap-8 text-sm tracking-wide">
           {items.map((item) => (
