@@ -26,6 +26,7 @@ interface Photo {
   blobUrl: string;
   url: string;
   thumbnailUrl: string;
+  filename: string | null;
   title: string | null;
   description: string | null;
   location: string | null;
@@ -122,7 +123,7 @@ export default function PhotosPage() {
           thumbnailUrl: url,
           width: dimensions.width,
           height: dimensions.height,
-          title: file.name.replace(/\.[^.]+$/, ""),
+          filename: file.name,
           position: photos.length + uploaded,
         }),
       });
@@ -163,6 +164,7 @@ export default function PhotosPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         id: editingId,
+        filename: form.get("filename") || null,
         title: form.get("title") || null,
         description: form.get("description") || null,
         location: form.get("location") || null,
@@ -250,6 +252,26 @@ export default function PhotosPage() {
           <div className="flex gap-4">
             <img src={editingPhoto.thumbnailUrl} alt="" className="h-20 w-20 rounded object-cover" />
             <div className="flex-1 space-y-3">
+              <div className="flex items-center gap-2 rounded border border-neutral-200 bg-neutral-50 px-3 py-2">
+                <span className="shrink-0 text-xs font-medium text-neutral-500">URL</span>
+                <code className="flex-1 truncate text-xs text-neutral-600">{editingPhoto.url}</code>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(editingPhoto.url);
+                    setMessage("URL copied!");
+                  }}
+                  className="shrink-0 rounded bg-neutral-200 px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-300"
+                >
+                  Copy
+                </button>
+              </div>
+              <input
+                name="filename"
+                placeholder="Filename"
+                defaultValue={editingPhoto.filename ?? ""}
+                className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+              />
               <input
                 name="title"
                 placeholder="Title"
@@ -305,13 +327,28 @@ export default function PhotosPage() {
                         className="h-12 w-12 rounded object-cover"
                       />
                       <div>
-                        <span className="font-medium">{photo.title ?? "Untitled"}</span>
+                        <span className="font-medium">{photo.title || photo.filename || "Untitled"}</span>
                         <span className="ml-2 text-sm text-neutral-400">
                           {photo.width}x{photo.height}
                         </span>
                         {photo.location && (
                           <span className="ml-2 text-sm text-neutral-400">{photo.location}</span>
                         )}
+                        <div className="mt-0.5 flex items-center gap-1">
+                          <code className="text-xs text-neutral-400 truncate max-w-xs">{photo.url}</code>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(photo.url);
+                              setMessage("URL copied!");
+                            }}
+                            className="shrink-0 text-xs text-neutral-400 hover:text-neutral-700"
+                            title="Copy URL"
+                          >
+                            Copy
+                          </button>
+                        </div>
                       </div>
                     </div>
                     <div className="flex gap-2">

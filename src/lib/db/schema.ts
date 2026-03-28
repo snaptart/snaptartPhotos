@@ -74,6 +74,7 @@ export const photos = pgTable("photos", {
   blobUrl: text("blob_url").notNull(),
   url: text("url").notNull(),
   thumbnailUrl: text("thumbnail_url").notNull(),
+  filename: text("filename"),
   title: text("title"),
   description: text("description"),
   location: text("location"),

@@ -44,3 +44,6 @@ drizzle/meta
 
 # old site assets
 /_old
+
+.vercel
+.env*.local

@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { AdminSidebar } from "@/components/admin/Sidebar";
 
 export default async function AdminLayout({
@@ -10,8 +10,16 @@ export default async function AdminLayout({
   const session = await auth();
 
   // Login page renders without the admin layout
-  // This layout only wraps authenticated admin pages
   if (!session) {
+    return <>{children}</>;
+  }
+
+  // Puck editor gets a full-screen layout (no sidebar)
+  const headerList = await headers();
+  const pathname = headerList.get("x-pathname") ?? "";
+  const isPuckEditor = /\/admin\/pages\/[^/]+\/edit/.test(pathname);
+
+  if (isPuckEditor) {
     return <>{children}</>;
   }
 

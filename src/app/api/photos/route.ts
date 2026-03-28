@@ -1,19 +1,34 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { photos } from "@/lib/db/schema";
+import { photos, galleries } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { del } from "@vercel/blob";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const galleryId = searchParams.get("galleryId");
+  const gallerySlug = searchParams.get("gallerySlug");
 
   if (galleryId) {
     const items = await db
       .select()
       .from(photos)
       .where(eq(photos.galleryId, galleryId))
+      .orderBy(asc(photos.position));
+    return NextResponse.json(items);
+  }
+
+  if (gallerySlug) {
+    const [gallery] = await db
+      .select({ id: galleries.id })
+      .from(galleries)
+      .where(eq(galleries.slug, gallerySlug));
+    if (!gallery) return NextResponse.json([]);
+    const items = await db
+      .select()
+      .from(photos)
+      .where(eq(photos.galleryId, gallery.id))
       .orderBy(asc(photos.position));
     return NextResponse.json(items);
   }
