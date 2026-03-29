@@ -1516,10 +1516,26 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
           );
         };
 
+        const touchStart = { x: 0, y: 0 };
+        const handleTouchStart = (e: React.TouchEvent) => {
+          touchStart.x = e.touches[0].clientX;
+          touchStart.y = e.touches[0].clientY;
+        };
+        const handleTouchEnd = (e: React.TouchEvent) => {
+          const dx = e.changedTouches[0].clientX - touchStart.x;
+          const dy = e.changedTouches[0].clientY - touchStart.y;
+          if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+            if (dx < 0) navigateTo((lightboxIndex + 1) % photos.length);
+            else navigateTo((lightboxIndex - 1 + photos.length) % photos.length);
+          }
+        };
+
         return (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/95"
             style={{ opacity: lightboxVisible ? 1 : 0, transition: fadeMs > 0 ? `opacity ${fadeMs}ms ease` : undefined }}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
           >
             {/* Close */}
             <button onClick={closeLightbox} className="absolute right-4 top-4 text-3xl text-white/70 hover:text-white z-10">
@@ -1529,7 +1545,7 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
             {/* Prev */}
             <button
               onClick={(e) => { e.stopPropagation(); navigateTo((lightboxIndex - 1 + photos.length) % photos.length); }}
-              className="absolute left-4 text-4xl text-white/70 hover:text-white z-10"
+              className="absolute left-4 text-4xl text-white/70 hover:text-white z-10 hidden sm:block"
             >
               &#8249;
             </button>
@@ -1547,7 +1563,7 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
             {/* Next */}
             <button
               onClick={(e) => { e.stopPropagation(); navigateTo((lightboxIndex + 1) % photos.length); }}
-              className="absolute right-4 text-4xl text-white/70 hover:text-white z-10"
+              className="absolute right-4 text-4xl text-white/70 hover:text-white z-10 hidden sm:block"
             >
               &#8250;
             </button>

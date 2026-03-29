@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import Image from "next/image";
 
 interface Photo {
@@ -103,42 +103,62 @@ export default function GalleryGrid({ photos }: { photos: Photo[] }) {
       </div>
 
       {/* Lightbox */}
-      {selectedIndex !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90">
-          {/* Close button */}
-          <button
-            onClick={() => setSelectedIndex(null)}
-            className="absolute right-4 top-4 text-3xl text-white/70 hover:text-white"
-          >
-            &times;
-          </button>
+      {selectedIndex !== null && (() => {
+        const touchStart = { x: 0, y: 0 };
+        const handleTouchStart = (e: React.TouchEvent) => {
+          touchStart.x = e.touches[0].clientX;
+          touchStart.y = e.touches[0].clientY;
+        };
+        const handleTouchEnd = (e: React.TouchEvent) => {
+          const dx = e.changedTouches[0].clientX - touchStart.x;
+          const dy = e.changedTouches[0].clientY - touchStart.y;
+          if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+            if (dx < 0) navigateTo((selectedIndex + 1) % photos.length);
+            else navigateTo((selectedIndex - 1 + photos.length) % photos.length);
+          }
+        };
 
-          {/* Prev */}
-          <button
-            onClick={(e) => { e.stopPropagation(); navigateTo((selectedIndex - 1 + photos.length) % photos.length); }}
-            className="absolute left-4 text-4xl text-white/70 hover:text-white"
-          >
-            &#8249;
-          </button>
-
-          {/* Image + info */}
+        return (
           <div
-            className="grid max-h-[90vh] max-w-[90vw] place-items-center"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
           >
-            {outgoingIndex !== null && photoSlot(outgoingIndex, true)}
-            {photoSlot(displayIndex, false)}
-          </div>
+            {/* Close button */}
+            <button
+              onClick={() => setSelectedIndex(null)}
+              className="absolute right-4 top-4 text-3xl text-white/70 hover:text-white"
+            >
+              &times;
+            </button>
 
-          {/* Next */}
-          <button
-            onClick={(e) => { e.stopPropagation(); navigateTo((selectedIndex + 1) % photos.length); }}
-            className="absolute right-4 text-4xl text-white/70 hover:text-white"
-          >
-            &#8250;
-          </button>
-        </div>
-      )}
+            {/* Prev */}
+            <button
+              onClick={(e) => { e.stopPropagation(); navigateTo((selectedIndex - 1 + photos.length) % photos.length); }}
+              className="absolute left-4 text-4xl text-white/70 hover:text-white hidden sm:block"
+            >
+              &#8249;
+            </button>
+
+            {/* Image + info */}
+            <div
+              className="grid max-h-[90vh] max-w-[90vw] place-items-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {outgoingIndex !== null && photoSlot(outgoingIndex, true)}
+              {photoSlot(displayIndex, false)}
+            </div>
+
+            {/* Next */}
+            <button
+              onClick={(e) => { e.stopPropagation(); navigateTo((selectedIndex + 1) % photos.length); }}
+              className="absolute right-4 text-4xl text-white/70 hover:text-white hidden sm:block"
+            >
+              &#8250;
+            </button>
+          </div>
+        );
+      })()}
     </>
   );
 }
