@@ -116,7 +116,7 @@ export default async function DynamicPage({ params }: Props) {
     return (
       <div className="mx-auto max-w-5xl px-4 py-12">
         {page.showTitle && (
-          <h1 className="mb-8 text-center font-serif text-4xl font-semibold tracking-tight">
+          <h1 className="mb-8 text-center text-4xl font-semibold tracking-tight" style={{ fontFamily: "var(--theme-font-headings)" }}>
             {page.title}
           </h1>
         )}

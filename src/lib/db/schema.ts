@@ -22,6 +22,7 @@ export const siteSettings = pgTable("site_settings", {
   logoUrl: text("logo_url"),
   instagramUrl: text("instagram_url"),
   footerText: text("footer_text"),
+  footerAlignment: text("footer_alignment").notNull().default("center"),
   contactEmail: text("contact_email"),
   homepageId: uuid("homepage_id"),
   // Global lightbox defaults
@@ -30,6 +31,15 @@ export const siteSettings = pgTable("site_settings", {
   lightboxCaptionPosition: text("lightbox_caption_position").default("below"),
   lightboxFadeSpeed: text("lightbox_fade_speed").default("medium"),
   lightboxCaptionAlignment: text("lightbox_caption_alignment").default("left"),
+  activeThemeId: uuid("active_theme_id"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const themes = pgTable("themes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull().default("Default"),
+  themeSettings: jsonb("theme_settings").notNull().default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

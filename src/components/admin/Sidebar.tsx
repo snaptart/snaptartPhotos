@@ -12,6 +12,7 @@ const navItems = [
   { label: "Pages", href: "/admin/pages" },
   { label: "Stories", href: "/admin/stories" },
   { label: "Menus", href: "/admin/menus" },
+  { label: "Themes", href: "/admin/themes" },
   { label: "Settings", href: "/admin/settings" },
 ];
 

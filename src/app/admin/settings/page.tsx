@@ -9,6 +9,7 @@ interface SiteSettings {
   logoUrl: string | null;
   instagramUrl: string | null;
   footerText: string | null;
+  footerAlignment: string;
   contactEmail: string | null;
   lightboxMetadataFields: string[] | null;
   lightboxCornerRadius: number | null;
@@ -19,6 +20,7 @@ interface SiteSettings {
 
 interface SettingsDraft {
   logoUrl: string;
+  footerAlignment: string;
   lbMetadataFields: string[];
   lbCornerRadius: number;
   lbCaptionPosition: string;
@@ -37,6 +39,7 @@ const LIGHTBOX_METADATA_OPTIONS = [
 function draftFromSettings(data: SiteSettings): SettingsDraft {
   return {
     logoUrl: data.logoUrl ?? "",
+    footerAlignment: data.footerAlignment ?? "center",
     lbMetadataFields: data.lightboxMetadataFields ?? ["title", "location"],
     lbCornerRadius: data.lightboxCornerRadius ?? 0,
     lbCaptionPosition: data.lightboxCaptionPosition ?? "below",
@@ -49,6 +52,7 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [draft, setDraft] = useState<SettingsDraft>({
     logoUrl: "",
+    footerAlignment: "center",
     lbMetadataFields: ["title", "location"],
     lbCornerRadius: 0,
     lbCaptionPosition: "below",
@@ -84,6 +88,7 @@ export default function SettingsPage() {
       logoUrl: draft.logoUrl || null,
       instagramUrl: form.get("instagramUrl") || null,
       footerText: form.get("footerText") || null,
+      footerAlignment: draft.footerAlignment,
       contactEmail: form.get("contactEmail") || null,
       lightboxMetadataFields: draft.lbMetadataFields,
       lightboxCornerRadius: draft.lbCornerRadius,
@@ -111,7 +116,7 @@ export default function SettingsPage() {
 
   async function handlePasswordChange(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const formEl = e.currentTarget; // capture before any await — React nulls this after the event
+    const formEl = e.currentTarget;
     setPwSaving(true);
     setPwMessage("");
 
@@ -163,6 +168,18 @@ export default function SettingsPage() {
             rows={3}
             className="input-base"
           />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-neutral-700">Footer Alignment</label>
+          <select
+            value={draft.footerAlignment}
+            onChange={(e) => updateDraft("footerAlignment", e.target.value)}
+            className="input-base"
+          >
+            <option value="left">Left</option>
+            <option value="center">Center</option>
+            <option value="right">Right</option>
+          </select>
         </div>
 
         {/* Lightbox Defaults */}

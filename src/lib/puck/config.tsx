@@ -11,6 +11,7 @@ import Underline from "@tiptap/extension-underline";
 import type { JSONContent } from "@tiptap/react";
 import TiptapEditor from "@/components/admin/TiptapEditor";
 import ImagePicker from "@/components/admin/ImagePicker";
+import { parseLinks } from "@/lib/parseLinks";
 
 // Tiptap extensions for HTML generation
 const tiptapExtensions = [
@@ -237,12 +238,12 @@ export const puckConfig: Config<Components> = {
           )}
           <div className="relative z-10 text-center px-4">
             {title && (
-              <h1 className="font-serif text-4xl md:text-6xl font-semibold text-white tracking-tight mb-4">
+              <h1 className="text-4xl md:text-6xl font-semibold text-white tracking-tight mb-4" style={{ fontFamily: "var(--theme-font-headings)" }}>
                 {title}
               </h1>
             )}
             {subtitle && (
-              <p className="font-serif text-xl md:text-2xl text-white/90">
+              <p className="text-xl md:text-2xl text-white/90" style={{ fontFamily: "var(--theme-font-overlay)" }}>
                 {subtitle}
               </p>
             )}
@@ -455,7 +456,7 @@ export const puckConfig: Config<Components> = {
               <div className="relative overflow-visible">
                 {imageEl}
                 {caption && (
-                  <figcaption className="font-serif" style={captionStyle}>
+                  <figcaption style={{ ...captionStyle, fontFamily: "var(--theme-font-captions)" }}>
                     {caption}
                   </figcaption>
                 )}
@@ -1210,24 +1211,6 @@ function HeroSlideshowClient({
 
 // ----- Gallery embed renderer -----
 
-// Parse [text](url) markdown links into React elements
-// Tolerates optional space between ] and (, and auto-prefixes URLs missing a protocol
-function parseLinks(text: string): React.ReactNode {
-  const parts = text.split(/(\[[^\]]+\]\s*\([^)]+\))/g);
-  return parts.map((part, i) => {
-    const match = part.match(/^\[([^\]]+)\]\s*\(([^)]+)\)$/);
-    if (match) {
-      let href = match[2].trim();
-      if (!/^https?:\/\//i.test(href)) href = `https://${href}`;
-      return (
-        <a key={i} href={href} className="underline hover:opacity-70" target="_blank" rel="noopener noreferrer">
-          {match[1]}
-        </a>
-      );
-    }
-    return part;
-  });
-}
 
 export interface EmbedPhoto {
   id: string;
@@ -1389,7 +1372,7 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
     return (
       <div className="mt-1.5 space-y-0.5 text-sm text-neutral-600">
         {metadataFields.includes("title") && photo.title && (
-          <p className="font-serif font-medium">{parseLinks(photo.title)}</p>
+          <p className="font-medium" style={{ fontFamily: "var(--theme-font-captions)" }}>{parseLinks(photo.title)}</p>
         )}
         {metadataFields.includes("filename") && photo.filename && (
           <p className="text-neutral-400 text-xs">{photo.filename}</p>
@@ -1481,7 +1464,7 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
           );
           const captionContent = hasCaption && (
             <>
-              {lb.metadataFields.includes("title") && p.title && <p className="text-base font-serif">{parseLinks(p.title)}</p>}
+              {lb.metadataFields.includes("title") && p.title && <p className="text-base" style={{ fontFamily: "var(--theme-font-captions)" }}>{parseLinks(p.title)}</p>}
               {lb.metadataFields.includes("description") && p.description && <p className="text-sm text-white/80">{parseLinks(p.description)}</p>}
               {lb.metadataFields.includes("location") && p.location && <p className="text-sm text-white/60">{parseLinks(p.location)}</p>}
               {lb.metadataFields.includes("camera") && p.cameraSettings && (
