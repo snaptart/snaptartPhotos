@@ -1260,8 +1260,8 @@ interface GalleryEmbedRendererProps {
 }
 
 const aspectRatioValues: Record<string, string | undefined> = { square: "1/1", natural: undefined, "4:3": "4/3", "16:9": "16/9" };
-const gridColClasses = { "2": "grid-cols-2", "3": "grid-cols-2 md:grid-cols-3", "4": "grid-cols-2 md:grid-cols-3 lg:grid-cols-4" };
-const masonryColClasses = { "2": "columns-2", "3": "columns-2 sm:columns-3", "4": "columns-2 sm:columns-3 lg:columns-4" };
+const gridColClasses = { "2": "grid-cols-1 sm:grid-cols-2", "3": "grid-cols-1 sm:grid-cols-2 md:grid-cols-3", "4": "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4" };
+const masonryColClasses = { "2": "columns-1 sm:columns-2", "3": "columns-1 sm:columns-2 md:columns-3", "4": "columns-1 sm:columns-2 md:columns-3 lg:columns-4" };
 
 function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, imageMaxWidth, borderRadius, showMetadata, metadataFields, useGlobalLightbox, lightboxMetadataFields, lightboxCornerRadius, lightboxCaptionPosition, lightboxFadeSpeed, lightboxCaptionAlignment, globalLightbox, serverPhotos }: GalleryEmbedRendererProps) {
   const lbBase = globalLightbox ?? DEFAULT_LIGHTBOX;
