@@ -102,8 +102,11 @@ export default async function HomePage() {
         }));
     }
 
+    const firstItem = (page.content.content ?? [])[0] as { type: string } | undefined;
+    const heroFirst = firstItem?.type === "HeroSlideshow";
+
     return (
-      <div className="mx-auto max-w-5xl px-4 py-12">
+      <div className={`mx-auto max-w-5xl px-4 ${heroFirst ? "pt-0 pb-12" : "py-12"}`}>
         {page.showTitle && (
           <h1 className="mb-8 text-center text-4xl font-semibold tracking-tight" style={{ fontFamily: "var(--theme-font-headings)" }}>
             {page.title}

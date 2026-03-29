@@ -528,11 +528,11 @@ export const puckConfig: Config<Components> = {
           type: "select",
           label: "Height (or min-height when aspect ratio is set)",
           options: [
-            { label: "Full Screen (100vh)", value: "100vh" },
-            { label: "90%", value: "90vh" },
-            { label: "80%", value: "80vh" },
-            { label: "70%", value: "70vh" },
-            { label: "60%", value: "60vh" },
+            { label: "Full Screen (100dvh)", value: "100dvh" },
+            { label: "90%", value: "90dvh" },
+            { label: "80%", value: "80dvh" },
+            { label: "70%", value: "70dvh" },
+            { label: "60%", value: "60dvh" },
             { label: "700px", value: "700px" },
             { label: "500px", value: "500px" },
             { label: "400px", value: "400px" },
@@ -635,7 +635,7 @@ export const puckConfig: Config<Components> = {
       defaultProps: {
         gallerySlug: "",
         maxPhotos: 5,
-        height: "100vh",
+        height: "100dvh",
         aspectRatio: "none",
         autoPlay: true,
         interval: 5,
@@ -1087,6 +1087,9 @@ function HeroSlideshowClient({
   objectFit,
   overlayOpacity,
 }: HeroSlideshowClientProps) {
+  // Normalize legacy vh values to dvh for correct mobile viewport sizing
+  const normalizedHeight = height.replace(/(\d+)vh$/, "$1dvh");
+
   const [fetchedPhotos, setFetchedPhotos] = useState<EmbedPhoto[]>([]);
   const [current, setCurrent] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
@@ -1123,8 +1126,8 @@ function HeroSlideshowClient({
   const containerStyle: React.CSSProperties = {
     ...fullBleedStyle,
     ...(aspectRatio !== "none"
-      ? { aspectRatio: arMap[aspectRatio], minHeight: height }
-      : { height }),
+      ? { aspectRatio: arMap[aspectRatio], minHeight: normalizedHeight }
+      : { height: normalizedHeight }),
   };
 
   if (photos.length === 0) {
