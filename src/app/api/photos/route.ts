@@ -6,11 +6,20 @@ import { eq, asc } from "drizzle-orm";
 import { del } from "@vercel/blob";
 
 export async function GET(req: Request) {
+  const session = await auth();
   const { searchParams } = new URL(req.url);
   const galleryId = searchParams.get("galleryId");
   const gallerySlug = searchParams.get("gallerySlug");
 
   if (galleryId) {
+    if (!session) {
+      // Verify the gallery is published before returning its photos
+      const [gallery] = await db
+        .select({ isPublished: galleries.isPublished })
+        .from(galleries)
+        .where(eq(galleries.id, galleryId));
+      if (!gallery?.isPublished) return NextResponse.json([]);
+    }
     const items = await db
       .select()
       .from(photos)
@@ -21,10 +30,10 @@ export async function GET(req: Request) {
 
   if (gallerySlug) {
     const [gallery] = await db
-      .select({ id: galleries.id })
+      .select({ id: galleries.id, isPublished: galleries.isPublished })
       .from(galleries)
       .where(eq(galleries.slug, gallerySlug));
-    if (!gallery) return NextResponse.json([]);
+    if (!gallery || (!session && !gallery.isPublished)) return NextResponse.json([]);
     const items = await db
       .select()
       .from(photos)
@@ -57,12 +66,14 @@ export async function PUT(req: Request) {
 
   // Bulk reorder
   if (body.items && Array.isArray(body.items)) {
-    for (const item of body.items) {
-      await db
-        .update(photos)
-        .set({ position: item.position })
-        .where(eq(photos.id, item.id));
-    }
+    await db.transaction(async (tx) => {
+      for (const item of body.items) {
+        await tx
+          .update(photos)
+          .set({ position: item.position })
+          .where(eq(photos.id, item.id));
+      }
+    });
     const galleryId = body.galleryId;
     const updated = galleryId
       ? await db

@@ -7,7 +7,8 @@ import { useState, Suspense } from "react";
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/admin";
+  const raw = searchParams.get("callbackUrl") || "/admin";
+  const callbackUrl = raw.startsWith("/") && !raw.startsWith("//") ? raw : "/admin";
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 

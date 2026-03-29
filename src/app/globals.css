@@ -4,3 +4,8 @@
   --font-serif: "EB Garamond", Georgia, serif;
   --font-sans: "Inter", system-ui, sans-serif;
 }
+
+/* Prevent 100vw from causing horizontal scroll due to scrollbar width */
+body {
+  overflow-x: clip;
+}

@@ -5,10 +5,10 @@ import { galleries } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
 
 export async function GET() {
-  const items = await db
-    .select()
-    .from(galleries)
-    .orderBy(asc(galleries.position));
+  const session = await auth();
+  const items = session
+    ? await db.select().from(galleries).orderBy(asc(galleries.position))
+    : await db.select().from(galleries).where(eq(galleries.isPublished, true)).orderBy(asc(galleries.position));
   return NextResponse.json(items);
 }
 
@@ -37,12 +37,14 @@ export async function PUT(req: Request) {
 
   // Bulk reorder
   if (body.items && Array.isArray(body.items)) {
-    for (const item of body.items) {
-      await db
-        .update(galleries)
-        .set({ position: item.position })
-        .where(eq(galleries.id, item.id));
-    }
+    await db.transaction(async (tx) => {
+      for (const item of body.items) {
+        await tx
+          .update(galleries)
+          .set({ position: item.position })
+          .where(eq(galleries.id, item.id));
+      }
+    });
     const updated = await db
       .select()
       .from(galleries)

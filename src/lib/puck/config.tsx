@@ -118,6 +118,7 @@ type HeroSlideshowProps = {
   showArrows: boolean;
   showDots: boolean;
   fullBleed: boolean;
+  maxWidth: string;
   objectFit: "cover" | "contain";
   overlayOpacity: number;
 };
@@ -556,6 +557,18 @@ export const puckConfig: Config<Components> = {
             { label: "No", value: false },
           ],
         },
+        maxWidth: {
+          type: "select",
+          label: "Max Width (when Full Bleed is off)",
+          options: [
+            { label: "100%", value: "100%" },
+            { label: "90%", value: "90%" },
+            { label: "80%", value: "80%" },
+            { label: "70%", value: "70%" },
+            { label: "60%", value: "60%" },
+            { label: "50%", value: "50%" },
+          ],
+        },
         objectFit: {
           type: "select",
           label: "Image Fit",
@@ -630,10 +643,11 @@ export const puckConfig: Config<Components> = {
         showArrows: true,
         showDots: true,
         fullBleed: true,
+        maxWidth: "100%",
         objectFit: "cover",
         overlayOpacity: 0,
       },
-      render: ({ gallerySlug, maxPhotos, height, aspectRatio, autoPlay, interval, pauseOnHover, transitionDuration, showArrows, showDots, fullBleed, objectFit, overlayOpacity, puck }) => {
+      render: ({ gallerySlug, maxPhotos, height, aspectRatio, autoPlay, interval, pauseOnHover, transitionDuration, showArrows, showDots, fullBleed, maxWidth, objectFit, overlayOpacity, puck }) => {
         if (!gallerySlug) {
           return (
             <div className="rounded border-2 border-dashed border-neutral-300 p-8 text-center text-neutral-400">
@@ -656,6 +670,7 @@ export const puckConfig: Config<Components> = {
             showArrows={showArrows}
             showDots={showDots}
             fullBleed={fullBleed}
+            maxWidth={maxWidth}
             objectFit={objectFit}
             overlayOpacity={overlayOpacity}
           />
@@ -1049,6 +1064,7 @@ interface HeroSlideshowClientProps {
   showArrows: boolean;
   showDots: boolean;
   fullBleed: boolean;
+  maxWidth: string;
   objectFit: "cover" | "contain";
   overlayOpacity: number;
 }
@@ -1066,6 +1082,7 @@ function HeroSlideshowClient({
   showArrows,
   showDots,
   fullBleed,
+  maxWidth,
   objectFit,
   overlayOpacity,
 }: HeroSlideshowClientProps) {
@@ -1099,7 +1116,7 @@ function HeroSlideshowClient({
 
   const fullBleedStyle: React.CSSProperties = fullBleed
     ? { marginLeft: "calc(-50vw + 50%)", marginRight: "calc(-50vw + 50%)", width: "100vw" }
-    : {};
+    : { width: maxWidth, marginLeft: "auto", marginRight: "auto" };
 
   const arMap: Record<string, string> = { "16:9": "16/9", "3:2": "3/2", "4:3": "4/3", "1:1": "1/1" };
   const containerStyle: React.CSSProperties = {
