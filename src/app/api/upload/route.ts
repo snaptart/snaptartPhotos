@@ -19,14 +19,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "File too large (max 20MB)" }, { status: 400 });
   }
 
-  const folder = (formData.get("folder") as string) || "snaptart";
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const filename = `${folder}/${Date.now()}-${safeName}`;
+  try {
+    const folder = (formData.get("folder") as string) || "snaptart";
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const filename = `${folder}/${Date.now()}-${safeName}`;
 
-  const blob = await put(filename, file, { access: "public" });
+    const blob = await put(filename, file, { access: "public" });
 
-  return NextResponse.json({
-    blobUrl: blob.url,
-    url: blob.url,
-  });
+    return NextResponse.json({
+      blobUrl: blob.url,
+      url: blob.url,
+    });
+  } catch {
+    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+  }
 }

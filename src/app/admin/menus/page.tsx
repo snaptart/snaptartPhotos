@@ -74,22 +74,8 @@ export default function MenusPage() {
     ]);
     const pagesData = await pagesRes.json();
     const galleriesData = await galleriesRes.json();
-    setPageOptions(
-      pagesData.map((p: Record<string, unknown>) => ({
-        id: p.id,
-        title: p.title,
-        slug: p.slug,
-        isPublished: p.isPublished,
-      }))
-    );
-    setGalleryOptions(
-      galleriesData.map((g: Record<string, unknown>) => ({
-        id: g.id,
-        title: g.title,
-        slug: g.slug,
-        isPublished: g.isPublished,
-      }))
-    );
+    setPageOptions(pagesData as LinkOption[]);
+    setGalleryOptions(galleriesData as LinkOption[]);
   }, []);
 
   useEffect(() => {
@@ -142,13 +128,14 @@ export default function MenusPage() {
 
     setItems(reordered);
 
-    await fetch("/api/menu-items", {
+    const res = await fetch("/api/menu-items", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         items: reordered.map((item, index) => ({ id: item.id, position: index })),
       }),
     });
+    if (!res.ok) setMessage("Failed to save order. Refresh to sync.");
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -170,14 +157,20 @@ export default function MenusPage() {
       setForm(emptyForm);
       setMessage(editingId ? "Menu item updated!" : "Menu item added!");
       fetchItems();
+    } else {
+      setMessage("Failed to save menu item");
     }
   }
 
   async function handleDelete(id: string) {
     if (!confirm("Delete this menu item?")) return;
-    await fetch(`/api/menu-items?id=${id}`, { method: "DELETE" });
-    setMessage("Menu item deleted");
-    fetchItems();
+    const res = await fetch(`/api/menu-items?id=${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setMessage("Menu item deleted");
+      fetchItems();
+    } else {
+      setMessage("Failed to delete menu item");
+    }
   }
 
   if (loading) return <div className="text-neutral-500">Loading...</div>;
@@ -191,16 +184,14 @@ export default function MenusPage() {
         <h1 className="text-2xl font-semibold">Menu Management</h1>
         <button
           onClick={openAddForm}
-          className="rounded bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700"
+          className="btn-primary"
         >
           Add Menu Item
         </button>
       </div>
 
       {message && (
-        <div className="mb-4 rounded bg-green-50 px-3 py-2 text-sm text-green-600">
-          {message}
-        </div>
+        <div className="alert-success">{message}</div>
       )}
 
       {/* Add / Edit Form */}
@@ -271,14 +262,14 @@ export default function MenusPage() {
             <div className="flex gap-3">
               <button
                 type="submit"
-                className="rounded bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700"
+                className="btn-primary"
               >
                 {editingId ? "Update" : "Add"}
               </button>
               <button
                 type="button"
                 onClick={() => { setShowForm(false); setEditingId(null); setForm(emptyForm); }}
-                className="rounded border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-50"
+                className="btn-secondary"
               >
                 Cancel
               </button>
@@ -311,7 +302,7 @@ export default function MenusPage() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => openEditForm(item)}
-                        className="text-sm text-neutral-500 hover:text-neutral-900"
+                        className="btn-text"
                       >
                         Edit
                       </button>

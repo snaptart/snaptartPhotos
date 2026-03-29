@@ -62,13 +62,14 @@ export default function GalleriesPage() {
     const reordered = arrayMove(galleries, oldIndex, newIndex);
     setGalleries(reordered);
 
-    await fetch("/api/galleries", {
+    const res = await fetch("/api/galleries", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         items: reordered.map((g, index) => ({ id: g.id, position: index })),
       }),
     });
+    if (!res.ok) setMessage("Failed to save order. Refresh to sync.");
   }
 
   async function handleAdd(e: React.FormEvent<HTMLFormElement>) {
@@ -119,18 +120,26 @@ export default function GalleriesPage() {
 
   async function handleDelete(id: string) {
     if (!confirm("Delete this gallery and all its photos?")) return;
-    await fetch(`/api/galleries?id=${id}`, { method: "DELETE" });
-    setMessage("Gallery deleted");
-    fetchGalleries();
+    const res = await fetch(`/api/galleries?id=${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setMessage("Gallery deleted");
+      fetchGalleries();
+    } else {
+      setMessage("Failed to delete gallery");
+    }
   }
 
   async function togglePublish(gallery: Gallery) {
-    await fetch("/api/galleries", {
+    const res = await fetch("/api/galleries", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: gallery.id, isPublished: !gallery.isPublished }),
     });
-    fetchGalleries();
+    if (res.ok) {
+      fetchGalleries();
+    } else {
+      setMessage("Failed to update gallery");
+    }
   }
 
   if (loading) return <div className="text-neutral-500">Loading...</div>;
@@ -143,14 +152,14 @@ export default function GalleriesPage() {
         <h1 className="text-2xl font-semibold">Galleries</h1>
         <button
           onClick={() => { setShowForm(true); setEditingId(null); }}
-          className="rounded bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700"
+          className="btn-primary"
         >
           New Gallery
         </button>
       </div>
 
       {message && (
-        <div className={`mb-4 rounded px-3 py-2 text-sm ${message.includes("Failed") ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600"}`}>
+        <div className={message.includes("Failed") ? "alert-error" : "alert-success"}>
           {message}
         </div>
       )}
@@ -169,14 +178,14 @@ export default function GalleriesPage() {
               placeholder="Gallery title"
               defaultValue={editingGallery?.title ?? ""}
               required
-              className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+              className="input-base"
             />
             <textarea
               name="description"
               placeholder="Description (optional)"
               defaultValue={editingGallery?.description ?? ""}
               rows={2}
-              className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+              className="input-base"
             />
             <label className="flex items-center gap-2 text-sm">
               <input
@@ -187,16 +196,13 @@ export default function GalleriesPage() {
               Published
             </label>
             <div className="flex gap-2">
-              <button
-                type="submit"
-                className="rounded bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700"
-              >
+              <button type="submit" className="btn-primary">
                 {editingId ? "Update" : "Create"}
               </button>
               <button
                 type="button"
                 onClick={() => { setShowForm(false); setEditingId(null); }}
-                className="rounded border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-50"
+                className="btn-secondary"
               >
                 Cancel
               </button>
@@ -247,19 +253,16 @@ export default function GalleriesPage() {
                     <div className="flex gap-2">
                       <Link
                         href={`/admin/photos?galleryId=${gallery.id}`}
-                        className="text-sm text-neutral-500 hover:text-neutral-900"
+                        className="btn-text"
                       >
                         Photos
                       </Link>
-                      <button
-                        onClick={() => togglePublish(gallery)}
-                        className="text-sm text-neutral-500 hover:text-neutral-900"
-                      >
+                      <button onClick={() => togglePublish(gallery)} className="btn-text">
                         {gallery.isPublished ? "Unpublish" : "Publish"}
                       </button>
                       <button
                         onClick={() => { setEditingId(gallery.id); setShowForm(false); }}
-                        className="text-sm text-neutral-500 hover:text-neutral-900"
+                        className="btn-text"
                       >
                         Edit
                       </button>

@@ -123,8 +123,7 @@ export default function GalleryGrid({ photos }: { photos: Photo[] }) {
 
           {/* Image + info */}
           <div
-            className="max-h-[90vh] max-w-[90vw]"
-            style={{ display: "grid", placeItems: "center" }}
+            className="grid max-h-[90vh] max-w-[90vw] place-items-center"
             onClick={(e) => e.stopPropagation()}
           >
             {outgoingIndex !== null && photoSlot(outgoingIndex, true)}

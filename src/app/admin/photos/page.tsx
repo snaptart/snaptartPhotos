@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   DndContext,
@@ -18,6 +18,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "@/components/admin/SortableItem";
+import FocalPointPicker from "@/components/admin/FocalPointPicker";
 import Link from "next/link";
 
 interface Photo {
@@ -35,57 +36,6 @@ interface Photo {
   focalX: number;
   focalY: number;
   position: number;
-}
-
-function FocalPointPicker({
-  imageUrl,
-  focalX,
-  focalY,
-  onChange,
-}: {
-  imageUrl: string;
-  focalX: number;
-  focalY: number;
-  onChange: (x: number, y: number) => void;
-}) {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  function handlePointer(e: React.MouseEvent<HTMLDivElement>) {
-    const rect = containerRef.current!.getBoundingClientRect();
-    const x = Math.round(Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)));
-    const y = Math.round(Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100)));
-    onChange(x, y);
-  }
-
-  return (
-    <div className="space-y-1.5">
-      <p className="text-xs text-neutral-500">Click image to set focal point</p>
-      <div
-        ref={containerRef}
-        className="relative cursor-crosshair overflow-hidden rounded border border-neutral-200"
-        style={{ aspectRatio: "16/9" }}
-        onClick={handlePointer}
-      >
-        <img
-          src={imageUrl}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover"
-          style={{ objectPosition: `${focalX}% ${focalY}%` }}
-          draggable={false}
-        />
-        {/* crosshair lines */}
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute top-0 bottom-0 w-px bg-white/60" style={{ left: `${focalX}%` }} />
-          <div className="absolute left-0 right-0 h-px bg-white/60" style={{ top: `${focalY}%` }} />
-          <div
-            className="absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow"
-            style={{ left: `${focalX}%`, top: `${focalY}%`, backgroundColor: "rgba(255,255,255,0.35)" }}
-          />
-        </div>
-      </div>
-      <p className="text-xs text-neutral-400 tabular-nums">{focalX}% / {focalY}%</p>
-    </div>
-  );
 }
 
 interface Gallery {
@@ -167,7 +117,7 @@ export default function PhotosPage() {
 
       const { blobUrl, url } = await uploadRes.json();
 
-      await fetch("/api/photos", {
+      const photoRes = await fetch("/api/photos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -181,6 +131,10 @@ export default function PhotosPage() {
           position: photos.length + uploaded,
         }),
       });
+      if (!photoRes.ok) {
+        setMessage(`Failed to save ${file.name}`);
+        continue;
+      }
       uploaded++;
     }
 
@@ -199,7 +153,7 @@ export default function PhotosPage() {
     const reordered = arrayMove(photos, oldIndex, newIndex);
     setPhotos(reordered);
 
-    await fetch("/api/photos", {
+    const res = await fetch("/api/photos", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -207,6 +161,7 @@ export default function PhotosPage() {
         items: reordered.map((p, index) => ({ id: p.id, position: index })),
       }),
     });
+    if (!res.ok) setMessage("Failed to save order. Refresh to sync.");
   }
 
   async function handleUpdate(e: React.FormEvent<HTMLFormElement>) {
@@ -236,18 +191,26 @@ export default function PhotosPage() {
 
   async function handleDelete(id: string) {
     if (!confirm("Delete this photo?")) return;
-    await fetch(`/api/photos?id=${id}`, { method: "DELETE" });
-    setMessage("Photo deleted");
-    fetchPhotos();
+    const res = await fetch(`/api/photos?id=${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setMessage("Photo deleted");
+      fetchPhotos();
+    } else {
+      setMessage("Failed to delete photo");
+    }
   }
 
   async function setCover(photo: Photo) {
-    await fetch("/api/galleries", {
+    const res = await fetch("/api/galleries", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: selectedGallery, coverImageUrl: photo.thumbnailUrl }),
     });
-    setMessage("Cover image updated!");
+    if (res.ok) {
+      setMessage("Cover image updated!");
+    } else {
+      setMessage("Failed to set cover image");
+    }
   }
 
   const editingPhoto = photos.find((p) => p.id === editingId);
@@ -294,7 +257,7 @@ export default function PhotosPage() {
       </div>
 
       {message && (
-        <div className={`mb-4 rounded px-3 py-2 text-sm ${message.includes("Failed") ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600"}`}>
+        <div className={message.includes("Failed") ? "alert-error" : "alert-success"}>
           {message}
         </div>
       )}
@@ -333,31 +296,29 @@ export default function PhotosPage() {
                 name="filename"
                 placeholder="Filename"
                 defaultValue={editingPhoto.filename ?? ""}
-                className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+                className="input-base"
               />
               <input
                 name="title"
                 placeholder="Title"
                 defaultValue={editingPhoto.title ?? ""}
-                className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+                className="input-base"
               />
               <input
                 name="description"
                 placeholder="Description"
                 defaultValue={editingPhoto.description ?? ""}
-                className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+                className="input-base"
               />
               <input
                 name="location"
                 placeholder="Location"
                 defaultValue={editingPhoto.location ?? ""}
-                className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+                className="input-base"
               />
               <div className="flex gap-2">
-                <button type="submit" className="rounded bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700">
-                  Update
-                </button>
-                <button type="button" onClick={() => setEditingId(null)} className="rounded border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-50">
+                <button type="submit" className="btn-primary">Update</button>
+                <button type="button" onClick={() => setEditingId(null)} className="btn-secondary">
                   Cancel
                 </button>
               </div>
@@ -417,7 +378,7 @@ export default function PhotosPage() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => setCover(photo)}
-                        className="text-sm text-neutral-500 hover:text-neutral-900"
+                        className="btn-text"
                         title="Set as gallery cover"
                       >
                         Cover
@@ -427,7 +388,7 @@ export default function PhotosPage() {
                           setEditingId(photo.id);
                           setEditingFocal({ x: photo.focalX ?? 50, y: photo.focalY ?? 50 });
                         }}
-                        className="text-sm text-neutral-500 hover:text-neutral-900"
+                        className="btn-text"
                       >
                         Edit
                       </button>

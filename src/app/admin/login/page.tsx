@@ -1,11 +1,10 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useState, Suspense } from "react";
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const raw = searchParams.get("callbackUrl") || "/admin";
   const callbackUrl = raw.startsWith("/") && !raw.startsWith("//") ? raw : "/admin";
@@ -28,7 +27,7 @@ function LoginForm() {
       setError("Invalid email or password");
       setLoading(false);
     } else {
-      router.push(callbackUrl);
+      window.location.href = callbackUrl;
     }
   }
 
@@ -47,7 +46,7 @@ function LoginForm() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="email" className="mb-1 block text-sm text-neutral-600">
+            <label htmlFor="email" className="mb-1 block text-sm font-medium text-neutral-700">
               Email
             </label>
             <input
@@ -55,11 +54,11 @@ function LoginForm() {
               name="email"
               type="email"
               required
-              className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+              className="input-base"
             />
           </div>
           <div>
-            <label htmlFor="password" className="mb-1 block text-sm text-neutral-600">
+            <label htmlFor="password" className="mb-1 block text-sm font-medium text-neutral-700">
               Password
             </label>
             <input
@@ -67,13 +66,13 @@ function LoginForm() {
               name="password"
               type="password"
               required
-              className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+              className="input-base"
             />
           </div>
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded bg-neutral-900 py-2 text-sm text-white transition-colors hover:bg-neutral-700 disabled:opacity-50"
+            className="btn-primary w-full"
           >
             {loading ? "Signing in..." : "Sign In"}
           </button>

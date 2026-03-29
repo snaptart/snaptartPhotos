@@ -63,12 +63,16 @@ export default function PagesPage() {
 
   async function handleSetHomepage(id: string) {
     const newId = homepageId === id ? null : id;
-    await fetch("/api/settings", {
+    const res = await fetch("/api/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ homepageId: newId }),
     });
-    setHomepageId(newId);
+    if (res.ok) {
+      setHomepageId(newId);
+    } else {
+      setMessage("Failed to update homepage");
+    }
   }
 
   async function handleDragEnd(event: DragEndEvent) {
@@ -80,13 +84,14 @@ export default function PagesPage() {
     const reordered = arrayMove(pages, oldIndex, newIndex);
     setPages(reordered);
 
-    await fetch("/api/pages", {
+    const res = await fetch("/api/pages", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         items: reordered.map((p, index) => ({ id: p.id, position: index })),
       }),
     });
+    if (!res.ok) setMessage("Failed to save order. Refresh to sync.");
   }
 
   async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
@@ -137,18 +142,26 @@ export default function PagesPage() {
 
   async function handleDelete(id: string) {
     if (!confirm("Delete this page?")) return;
-    await fetch(`/api/pages?id=${id}`, { method: "DELETE" });
-    setMessage("Page deleted");
-    fetchPages();
+    const res = await fetch(`/api/pages?id=${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setMessage("Page deleted");
+      fetchPages();
+    } else {
+      setMessage("Failed to delete page");
+    }
   }
 
   async function togglePublish(page: Page) {
-    await fetch("/api/pages", {
+    const res = await fetch("/api/pages", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: page.id, isPublished: !page.isPublished }),
     });
-    fetchPages();
+    if (res.ok) {
+      fetchPages();
+    } else {
+      setMessage("Failed to update page");
+    }
   }
 
   if (loading) return <div className="text-neutral-500">Loading...</div>;
@@ -159,16 +172,13 @@ export default function PagesPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Pages</h1>
-        <button
-          onClick={() => setShowNewForm(true)}
-          className="rounded bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700"
-        >
+        <button onClick={() => setShowNewForm(true)} className="btn-primary">
           New Page
         </button>
       </div>
 
       {message && (
-        <div className={`mb-4 rounded px-3 py-2 text-sm ${message.includes("Failed") ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600"}`}>
+        <div className={message.includes("Failed") ? "alert-error" : "alert-success"}>
           {message}
         </div>
       )}
@@ -186,30 +196,17 @@ export default function PagesPage() {
               placeholder="Page title"
               required
               autoFocus
-              className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+              className="input-base"
             />
-            <select
-              name="pageType"
-              defaultValue="custom"
-              className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
-            >
+            <select name="pageType" defaultValue="custom" className="input-base">
               <option value="custom">Custom</option>
               <option value="about">About</option>
               <option value="contact">Contact</option>
               <option value="story">Story</option>
             </select>
             <div className="flex gap-2">
-              <button
-                type="submit"
-                className="rounded bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700"
-              >
-                Create &amp; Edit
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowNewForm(false)}
-                className="rounded border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-50"
-              >
+              <button type="submit" className="btn-primary">Create &amp; Edit</button>
+              <button type="button" onClick={() => setShowNewForm(false)} className="btn-secondary">
                 Cancel
               </button>
             </div>
@@ -230,13 +227,9 @@ export default function PagesPage() {
               placeholder="Page title"
               defaultValue={editingPage.title}
               required
-              className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+              className="input-base"
             />
-            <select
-              name="pageType"
-              defaultValue={editingPage.pageType}
-              className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
-            >
+            <select name="pageType" defaultValue={editingPage.pageType} className="input-base">
               <option value="custom">Custom</option>
               <option value="about">About</option>
               <option value="contact">Contact</option>
@@ -258,29 +251,20 @@ export default function PagesPage() {
                   name="metaTitle"
                   placeholder="Meta title (optional)"
                   defaultValue={editingPage.metaTitle ?? ""}
-                  className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+                  className="input-base"
                 />
                 <textarea
                   name="metaDescription"
                   placeholder="Meta description (optional)"
                   defaultValue={editingPage.metaDescription ?? ""}
                   rows={2}
-                  className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+                  className="input-base"
                 />
               </div>
             </details>
             <div className="flex gap-2">
-              <button
-                type="submit"
-                className="rounded bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700"
-              >
-                Save Settings
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditMeta(null)}
-                className="rounded border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-50"
-              >
+              <button type="submit" className="btn-primary">Save Settings</button>
+              <button type="button" onClick={() => setEditMeta(null)} className="btn-secondary">
                 Cancel
               </button>
             </div>
@@ -335,21 +319,18 @@ export default function PagesPage() {
                       >
                         {homepageId === page.id ? "Unset Homepage" : "Set as Homepage"}
                       </button>
-                      <button
-                        onClick={() => togglePublish(page)}
-                        className="text-sm text-neutral-500 hover:text-neutral-900"
-                      >
+                      <button onClick={() => togglePublish(page)} className="btn-text">
                         {page.isPublished ? "Unpublish" : "Publish"}
                       </button>
                       <button
                         onClick={() => router.push(`/admin/pages/${page.id}/edit`)}
-                        className="text-sm text-neutral-500 hover:text-neutral-900"
+                        className="btn-text"
                       >
                         Edit Content
                       </button>
                       <button
                         onClick={() => { setEditMeta(page.id); setShowNewForm(false); }}
-                        className="text-sm text-neutral-500 hover:text-neutral-900"
+                        className="btn-text"
                       >
                         Settings
                       </button>
