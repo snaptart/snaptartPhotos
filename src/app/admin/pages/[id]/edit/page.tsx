@@ -64,7 +64,7 @@ export default function PuckEditorPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center text-neutral-500">
+      <div className="flex h-64 items-center justify-center text-neutral-500">
         Loading editor...
       </div>
     );
@@ -72,7 +72,7 @@ export default function PuckEditorPage() {
 
   if (!page) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center gap-4">
+      <div className="flex h-64 flex-col items-center justify-center gap-4">
         <p className="text-neutral-500">Page not found</p>
         <button
           onClick={() => router.push("/admin/pages")}
@@ -84,13 +84,14 @@ export default function PuckEditorPage() {
     );
   }
 
-  // Determine initial data: use saved Puck data or start fresh
-  const initialData: Data = page.content && "root" in page.content
-    ? (page.content as Data)
-    : EMPTY_DATA;
+  const initialData: Data =
+    page.content && "root" in page.content
+      ? (page.content as Data)
+      : EMPTY_DATA;
 
+  // -m-8 cancels the <main> p-8 padding so Puck fills the content area
   return (
-    <div className="puck-editor-fullscreen">
+    <div className="-m-8">
       <Puck
         config={puckConfig}
         data={initialData}

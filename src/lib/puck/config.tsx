@@ -45,11 +45,14 @@ type HeroProps = {
   subtitle: string;
   height: string;
   overlay: boolean;
+  focalX: number;
+  focalY: number;
 };
 
 type ImageBlockProps = {
   url: string;
   alt: string;
+  aspectRatio: "natural" | "square" | "4:3" | "3:2" | "16:9";
   caption: string;
   width: number;
   captionX: number;
@@ -63,6 +66,8 @@ type ImageBlockProps = {
   borderRadius: number;
   linkUrl: string;
   linkTarget: "_self" | "_blank";
+  focalX: number;
+  focalY: number;
 };
 
 type SpacerProps = {
@@ -72,6 +77,14 @@ type SpacerProps = {
 type ColumnsProps = {
   columns: "2" | "3";
   gap: string;
+};
+
+export type GlobalLightboxSettings = {
+  metadataFields: string[];
+  cornerRadius: number;
+  captionPosition: "below" | "overlay-top" | "overlay-bottom";
+  fadeSpeed: "none" | "fast" | "medium" | "slow";
+  captionAlignment: "left" | "center" | "right";
 };
 
 type GalleryEmbedProps = {
@@ -85,11 +98,34 @@ type GalleryEmbedProps = {
   borderRadius: number;
   showMetadata: boolean;
   metadataFields: string[];
+  useGlobalLightbox: boolean;
+  lightboxMetadataFields: string[] | null;
+  lightboxCornerRadius: number | null;
+  lightboxCaptionPosition: "below" | "overlay-top" | "overlay-bottom" | null;
+  lightboxFadeSpeed: "none" | "fast" | "medium" | "slow" | null;
+  lightboxCaptionAlignment: "left" | "center" | "right" | null;
+};
+
+type HeroSlideshowProps = {
+  gallerySlug: string;
+  maxPhotos: number;
+  height: string;
+  aspectRatio: "none" | "16:9" | "3:2" | "4:3" | "1:1";
+  autoPlay: boolean;
+  interval: number;
+  pauseOnHover: boolean;
+  transitionDuration: number;
+  showArrows: boolean;
+  showDots: boolean;
+  fullBleed: boolean;
+  objectFit: "cover" | "contain";
+  overlayOpacity: number;
 };
 
 type Components = {
   RichText: RichTextProps;
   Hero: HeroProps;
+  HeroSlideshow: HeroSlideshowProps;
   ImageBlock: ImageBlockProps;
   Spacer: SpacerProps;
   Columns: ColumnsProps;
@@ -102,7 +138,7 @@ export const puckConfig: Config<Components> = {
   categories: {
     content: { components: ["RichText", "ImageBlock", "GalleryEmbed"] },
     layout: { components: ["Columns", "Spacer"] },
-    hero: { components: ["Hero"] },
+    hero: { components: ["Hero", "HeroSlideshow"] },
   },
   components: {
     RichText: {
@@ -162,6 +198,20 @@ export const puckConfig: Config<Components> = {
           { label: "Yes", value: true },
           { label: "No", value: false },
         ]},
+        focalX: {
+          type: "custom",
+          label: "Focal Point — Horizontal (0=left, 50=center, 100=right)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={100} step={1} unit="%" label="Horizontal" />
+          ),
+        },
+        focalY: {
+          type: "custom",
+          label: "Focal Point — Vertical (0=top, 50=center, 100=bottom)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={100} step={1} unit="%" label="Vertical" />
+          ),
+        },
       },
       defaultProps: {
         imageUrl: "",
@@ -169,12 +219,15 @@ export const puckConfig: Config<Components> = {
         subtitle: "",
         height: "500px",
         overlay: true,
+        focalX: 50,
+        focalY: 50,
       },
-      render: ({ imageUrl, title, subtitle, height, overlay }) => (
+      render: ({ imageUrl, title, subtitle, height, overlay, focalX, focalY }) => (
         <div
-          className="relative flex items-center justify-center bg-neutral-200 bg-cover bg-center"
+          className="relative flex items-center justify-center bg-neutral-200 bg-cover"
           style={{
             backgroundImage: imageUrl ? `url(${imageUrl})` : undefined,
+            backgroundPosition: `${focalX ?? 50}% ${focalY ?? 50}%`,
             minHeight: height,
           }}
         >
@@ -211,6 +264,17 @@ export const puckConfig: Config<Components> = {
           ),
         },
         alt: { type: "text", label: "Alt Text" },
+        aspectRatio: {
+          type: "select",
+          label: "Aspect Ratio",
+          options: [
+            { label: "Natural", value: "natural" },
+            { label: "Square (1:1)", value: "square" },
+            { label: "3:2", value: "3:2" },
+            { label: "4:3", value: "4:3" },
+            { label: "16:9", value: "16:9" },
+          ],
+        },
         width: {
           type: "custom",
           label: "Width (%)",
@@ -299,10 +363,25 @@ export const puckConfig: Config<Components> = {
             { label: "New Tab", value: "_blank" },
           ],
         },
+        focalX: {
+          type: "custom",
+          label: "Focal Point — Horizontal (0=left, 50=center, 100=right)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={100} step={1} unit="%" label="Horizontal" />
+          ),
+        },
+        focalY: {
+          type: "custom",
+          label: "Focal Point — Vertical (0=top, 50=center, 100=bottom)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={100} step={1} unit="%" label="Vertical" />
+          ),
+        },
       },
       defaultProps: {
         url: "",
         alt: "",
+        aspectRatio: "natural",
         caption: "",
         width: 60,
         captionX: 50,
@@ -316,9 +395,14 @@ export const puckConfig: Config<Components> = {
         borderRadius: 4,
         linkUrl: "",
         linkTarget: "_self",
+        focalX: 50,
+        focalY: 50,
       },
-      render: ({ url, alt, caption, width, captionX, captionY, captionFontSize, captionColor, captionBold, captionItalic, captionBgColor, captionBgOpacity, borderRadius, linkUrl, linkTarget }) => {
+      render: ({ url, alt, aspectRatio, caption, width, captionX, captionY, captionFontSize, captionColor, captionBold, captionItalic, captionBgColor, captionBgOpacity, borderRadius, linkUrl, linkTarget, focalX, focalY }) => {
         const isOverlay = captionY >= 0 && captionY <= 100;
+        const arMap: Record<string, string> = { square: "1/1", "4:3": "4/3", "3:2": "3/2", "16:9": "16/9" };
+        const arValue = arMap[aspectRatio];
+        const focalPos = `${focalX ?? 50}% ${focalY ?? 50}%`;
         const captionStyle: React.CSSProperties = {
           position: "absolute",
           left: `${captionX}%`,
@@ -337,7 +421,13 @@ export const puckConfig: Config<Components> = {
         };
 
         const imageEl = url ? (
-          <img src={url} alt={alt} className="w-full" style={{ borderRadius: `${borderRadius}px` }} />
+          arValue ? (
+            <div className="relative overflow-hidden w-full" style={{ aspectRatio: arValue, borderRadius: `${borderRadius}px` }}>
+              <img src={url} alt={alt} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: focalPos }} />
+            </div>
+          ) : (
+            <img src={url} alt={alt} className="w-full" style={{ borderRadius: `${borderRadius}px`, objectPosition: focalPos }} />
+          )
         ) : (
           <div className="flex h-48 items-center justify-center rounded bg-neutral-100 text-neutral-400">
             Set an image URL
@@ -421,6 +511,158 @@ export const puckConfig: Config<Components> = {
       },
     },
 
+    HeroSlideshow: {
+      label: "Hero Slideshow",
+      fields: {
+        gallerySlug: {
+          type: "custom",
+          label: "Gallery",
+          render: ({ value, onChange }) => (
+            <GalleryPicker value={value} onChange={onChange} />
+          ),
+        },
+        maxPhotos: { type: "number", label: "Max Photos", min: 1, max: 20 },
+        height: {
+          type: "select",
+          label: "Height (or min-height when aspect ratio is set)",
+          options: [
+            { label: "Full Screen (100vh)", value: "100vh" },
+            { label: "90%", value: "90vh" },
+            { label: "80%", value: "80vh" },
+            { label: "70%", value: "70vh" },
+            { label: "60%", value: "60vh" },
+            { label: "700px", value: "700px" },
+            { label: "500px", value: "500px" },
+            { label: "400px", value: "400px" },
+            { label: "300px", value: "300px" },
+          ],
+        },
+        aspectRatio: {
+          type: "select",
+          label: "Aspect Ratio",
+          options: [
+            { label: "None (use height only)", value: "none" },
+            { label: "16:9", value: "16:9" },
+            { label: "3:2", value: "3:2" },
+            { label: "4:3", value: "4:3" },
+            { label: "1:1 (square)", value: "1:1" },
+          ],
+        },
+        fullBleed: {
+          type: "radio",
+          label: "Full Bleed (edge-to-edge)",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        objectFit: {
+          type: "select",
+          label: "Image Fit",
+          options: [
+            { label: "Cover (fill & crop)", value: "cover" },
+            { label: "Contain (letterbox)", value: "contain" },
+          ],
+        },
+        overlayOpacity: {
+          type: "custom",
+          label: "Dark Overlay Opacity",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={80} step={5} unit="%" label="Overlay Opacity" />
+          ),
+        },
+        autoPlay: {
+          type: "radio",
+          label: "Auto-play",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        interval: {
+          type: "custom",
+          label: "Interval (seconds)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={1} max={15} step={1} unit="s" label="Interval" />
+          ),
+        },
+        pauseOnHover: {
+          type: "radio",
+          label: "Pause on Hover",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        transitionDuration: {
+          type: "custom",
+          label: "Fade Duration (ms)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={100} max={2000} step={100} unit="ms" label="Fade Duration" />
+          ),
+        },
+        showArrows: {
+          type: "radio",
+          label: "Show Arrows",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        showDots: {
+          type: "radio",
+          label: "Show Dots",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+      },
+      defaultProps: {
+        gallerySlug: "",
+        maxPhotos: 5,
+        height: "100vh",
+        aspectRatio: "none",
+        autoPlay: true,
+        interval: 5,
+        pauseOnHover: true,
+        transitionDuration: 1000,
+        showArrows: true,
+        showDots: true,
+        fullBleed: true,
+        objectFit: "cover",
+        overlayOpacity: 0,
+      },
+      render: ({ gallerySlug, maxPhotos, height, aspectRatio, autoPlay, interval, pauseOnHover, transitionDuration, showArrows, showDots, fullBleed, objectFit, overlayOpacity, puck }) => {
+        if (!gallerySlug) {
+          return (
+            <div className="rounded border-2 border-dashed border-neutral-300 p-8 text-center text-neutral-400">
+              Select a gallery to use as slideshow
+            </div>
+          );
+        }
+        const serverPhotos = (puck?.metadata as Record<string, unknown>)?.galleryPhotos as Record<string, EmbedPhoto[]> | undefined;
+        return (
+          <HeroSlideshowClient
+            slug={gallerySlug}
+            maxPhotos={maxPhotos}
+            serverPhotos={serverPhotos?.[gallerySlug]}
+            height={height}
+            aspectRatio={aspectRatio}
+            autoPlay={autoPlay}
+            interval={interval}
+            pauseOnHover={pauseOnHover}
+            transitionDuration={transitionDuration}
+            showArrows={showArrows}
+            showDots={showDots}
+            fullBleed={fullBleed}
+            objectFit={objectFit}
+            overlayOpacity={overlayOpacity}
+          />
+        );
+      },
+    },
+
     GalleryEmbed: {
       label: "Gallery Embed",
       fields: {
@@ -495,6 +737,56 @@ export const puckConfig: Config<Components> = {
             <MetadataFieldsPicker value={value} onChange={onChange} />
           ),
         },
+        useGlobalLightbox: {
+          type: "radio",
+          label: "Lightbox Settings",
+          options: [
+            { label: "Use global defaults", value: true },
+            { label: "Customize for this embed", value: false },
+          ],
+        },
+        lightboxMetadataFields: {
+          type: "custom",
+          label: "Lightbox: Metadata to Show",
+          render: ({ value, onChange }) => (
+            <MetadataFieldsPicker value={value ?? ["title", "location"]} onChange={onChange} />
+          ),
+        },
+        lightboxCornerRadius: {
+          type: "custom",
+          label: "Lightbox: Corner Radius (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value ?? 0} onChange={onChange} min={0} max={32} step={1} unit="px" label="Corner Radius" />
+          ),
+        },
+        lightboxCaptionPosition: {
+          type: "select",
+          label: "Lightbox: Caption Position",
+          options: [
+            { label: "Below image", value: "below" },
+            { label: "Overlay — top", value: "overlay-top" },
+            { label: "Overlay — bottom", value: "overlay-bottom" },
+          ],
+        },
+        lightboxFadeSpeed: {
+          type: "select",
+          label: "Lightbox: Fade Speed",
+          options: [
+            { label: "None (instant)", value: "none" },
+            { label: "Fast (150ms)", value: "fast" },
+            { label: "Medium (300ms)", value: "medium" },
+            { label: "Slow (500ms)", value: "slow" },
+          ],
+        },
+        lightboxCaptionAlignment: {
+          type: "select",
+          label: "Lightbox: Caption Alignment",
+          options: [
+            { label: "Left", value: "left" },
+            { label: "Center", value: "center" },
+            { label: "Right", value: "right" },
+          ],
+        },
       },
       defaultProps: {
         gallerySlug: "",
@@ -507,8 +799,14 @@ export const puckConfig: Config<Components> = {
         borderRadius: 8,
         showMetadata: false,
         metadataFields: ["title"],
+        useGlobalLightbox: true,
+        lightboxMetadataFields: ["title", "location"],
+        lightboxCornerRadius: 0,
+        lightboxCaptionPosition: "below",
+        lightboxFadeSpeed: "medium",
+        lightboxCaptionAlignment: "left",
       },
-      render: ({ gallerySlug, maxPhotos, layout, columns, aspectRatio, gap, imageMaxWidth, borderRadius, showMetadata, metadataFields, puck }) => {
+      render: ({ gallerySlug, maxPhotos, layout, columns, aspectRatio, gap, imageMaxWidth, borderRadius, showMetadata, metadataFields, useGlobalLightbox, lightboxMetadataFields, lightboxCornerRadius, lightboxCaptionPosition, lightboxFadeSpeed, lightboxCaptionAlignment, puck }) => {
         if (!gallerySlug) {
           return (
             <div className="rounded border-2 border-dashed border-neutral-300 p-8 text-center text-neutral-400">
@@ -529,6 +827,13 @@ export const puckConfig: Config<Components> = {
             borderRadius={borderRadius}
             showMetadata={showMetadata}
             metadataFields={metadataFields}
+            useGlobalLightbox={useGlobalLightbox}
+            lightboxMetadataFields={lightboxMetadataFields}
+            lightboxCornerRadius={lightboxCornerRadius}
+            lightboxCaptionPosition={lightboxCaptionPosition}
+            lightboxFadeSpeed={lightboxFadeSpeed}
+            lightboxCaptionAlignment={lightboxCaptionAlignment}
+            globalLightbox={(puck?.metadata as Record<string, unknown>)?.globalLightbox as GlobalLightboxSettings | undefined}
             serverPhotos={serverPhotos?.[gallerySlug]}
           />
         );
@@ -539,7 +844,7 @@ export const puckConfig: Config<Components> = {
 
 // ----- Gallery picker (custom Puck field) -----
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 type GalleryOption = { id: string; title: string; slug: string };
 
@@ -729,6 +1034,163 @@ function MetadataFieldsPicker({ value, onChange }: { value: string[]; onChange: 
   );
 }
 
+// ----- Hero slideshow client -----
+
+interface HeroSlideshowClientProps {
+  slug: string;
+  maxPhotos: number;
+  serverPhotos?: EmbedPhoto[];
+  height: string;
+  aspectRatio: "none" | "16:9" | "3:2" | "4:3" | "1:1";
+  autoPlay: boolean;
+  interval: number;
+  pauseOnHover: boolean;
+  transitionDuration: number;
+  showArrows: boolean;
+  showDots: boolean;
+  fullBleed: boolean;
+  objectFit: "cover" | "contain";
+  overlayOpacity: number;
+}
+
+function HeroSlideshowClient({
+  slug,
+  maxPhotos,
+  serverPhotos,
+  height,
+  aspectRatio,
+  autoPlay,
+  interval,
+  pauseOnHover,
+  transitionDuration,
+  showArrows,
+  showDots,
+  fullBleed,
+  objectFit,
+  overlayOpacity,
+}: HeroSlideshowClientProps) {
+  const [fetchedPhotos, setFetchedPhotos] = useState<EmbedPhoto[]>([]);
+  const [current, setCurrent] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
+
+  useEffect(() => {
+    if (serverPhotos) return;
+    let cancelled = false;
+    fetch(`/api/photos?gallerySlug=${slug}`)
+      .then((r) => r.json())
+      .then((data: EmbedPhoto[]) => { if (!cancelled) setFetchedPhotos(data.slice(0, maxPhotos)); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [slug, maxPhotos, serverPhotos]);
+
+  const photos = serverPhotos ?? fetchedPhotos;
+
+  useEffect(() => {
+    if (!autoPlay || photos.length < 2) return;
+    if (pauseOnHover && isHovered) return;
+    const timer = setInterval(() => {
+      setCurrent((prev) => (prev + 1) % photos.length);
+    }, interval * 1000);
+    return () => clearInterval(timer);
+  }, [autoPlay, interval, pauseOnHover, isHovered, photos.length]);
+
+  const prev = () => setCurrent((c) => (c - 1 + photos.length) % photos.length);
+  const next = () => setCurrent((c) => (c + 1) % photos.length);
+
+  const fullBleedStyle: React.CSSProperties = fullBleed
+    ? { marginLeft: "calc(-50vw + 50%)", marginRight: "calc(-50vw + 50%)", width: "100vw" }
+    : {};
+
+  const arMap: Record<string, string> = { "16:9": "16/9", "3:2": "3/2", "4:3": "4/3", "1:1": "1/1" };
+  const containerStyle: React.CSSProperties = {
+    ...fullBleedStyle,
+    ...(aspectRatio !== "none"
+      ? { aspectRatio: arMap[aspectRatio], minHeight: height }
+      : { height }),
+  };
+
+  if (photos.length === 0) {
+    return (
+      <div
+        className="flex items-center justify-center bg-neutral-100 text-neutral-400"
+        style={containerStyle}
+      >
+        No photos found in this gallery
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="relative overflow-hidden"
+      style={containerStyle}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {photos.map((photo, i) => (
+        <div
+          key={photo.id}
+          className="absolute inset-0"
+          style={{
+            opacity: i === current ? 1 : 0,
+            transition: `opacity ${transitionDuration}ms ease-in-out`,
+            zIndex: i === current ? 1 : 0,
+          }}
+        >
+          <img
+            src={photo.url}
+            alt={photo.title ?? ""}
+            className="h-full w-full"
+            style={{ objectFit, objectPosition: `${photo.focalX ?? 50}% ${photo.focalY ?? 50}%` }}
+          />
+        </div>
+      ))}
+      {overlayOpacity > 0 && (
+        <div
+          className="absolute inset-0"
+          style={{ backgroundColor: `rgba(0,0,0,${overlayOpacity / 100})`, zIndex: 2 }}
+        />
+      )}
+      {showArrows && photos.length > 1 && (
+        <>
+          <button
+            onClick={prev}
+            aria-label="Previous slide"
+            className="absolute left-4 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/30 text-white hover:bg-black/50 transition-colors"
+            style={{ zIndex: 3 }}
+          >
+            ‹
+          </button>
+          <button
+            onClick={next}
+            aria-label="Next slide"
+            className="absolute right-4 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/30 text-white hover:bg-black/50 transition-colors"
+            style={{ zIndex: 3 }}
+          >
+            ›
+          </button>
+        </>
+      )}
+      {showDots && photos.length > 1 && (
+        <div
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2"
+          style={{ zIndex: 3 }}
+        >
+          {photos.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setCurrent(i)}
+              aria-label={`Go to slide ${i + 1}`}
+              className="h-2 w-2 rounded-full transition-colors"
+              style={{ backgroundColor: i === current ? "white" : "rgba(255,255,255,0.45)" }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ----- Gallery embed renderer -----
 
 // Parse [text](url) markdown links into React elements
@@ -761,7 +1223,17 @@ export interface EmbedPhoto {
   cameraSettings: { camera?: string; lens?: string; iso?: string; aperture?: string; shutter?: string } | null;
   width: number;
   height: number;
+  focalX: number;
+  focalY: number;
 }
+
+const DEFAULT_LIGHTBOX: GlobalLightboxSettings = {
+  metadataFields: ["title", "location"],
+  cornerRadius: 0,
+  captionPosition: "below",
+  fadeSpeed: "medium",
+  captionAlignment: "left",
+};
 
 interface GalleryEmbedRendererProps {
   slug: string;
@@ -774,6 +1246,13 @@ interface GalleryEmbedRendererProps {
   borderRadius: number;
   showMetadata: boolean;
   metadataFields: string[];
+  useGlobalLightbox: boolean;
+  lightboxMetadataFields: string[] | null;
+  lightboxCornerRadius: number | null;
+  lightboxCaptionPosition: "below" | "overlay-top" | "overlay-bottom" | null;
+  lightboxFadeSpeed: "none" | "fast" | "medium" | "slow" | null;
+  lightboxCaptionAlignment: "left" | "center" | "right" | null;
+  globalLightbox?: GlobalLightboxSettings;
   serverPhotos?: EmbedPhoto[];
 }
 
@@ -781,11 +1260,27 @@ const aspectRatioValues: Record<string, string | undefined> = { square: "1/1", n
 const gridColClasses = { "2": "grid-cols-2", "3": "grid-cols-2 md:grid-cols-3", "4": "grid-cols-2 md:grid-cols-3 lg:grid-cols-4" };
 const masonryColClasses = { "2": "columns-2", "3": "columns-2 sm:columns-3", "4": "columns-2 sm:columns-3 lg:columns-4" };
 
-function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, imageMaxWidth, borderRadius, showMetadata, metadataFields, serverPhotos }: GalleryEmbedRendererProps) {
+function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, imageMaxWidth, borderRadius, showMetadata, metadataFields, useGlobalLightbox, lightboxMetadataFields, lightboxCornerRadius, lightboxCaptionPosition, lightboxFadeSpeed, lightboxCaptionAlignment, globalLightbox, serverPhotos }: GalleryEmbedRendererProps) {
+  const lbBase = globalLightbox ?? DEFAULT_LIGHTBOX;
+  const lb: GlobalLightboxSettings = useGlobalLightbox ? lbBase : {
+    metadataFields: lightboxMetadataFields ?? lbBase.metadataFields,
+    cornerRadius: lightboxCornerRadius ?? lbBase.cornerRadius,
+    captionPosition: (lightboxCaptionPosition ?? lbBase.captionPosition) as GlobalLightboxSettings["captionPosition"],
+    fadeSpeed: (lightboxFadeSpeed ?? lbBase.fadeSpeed) as GlobalLightboxSettings["fadeSpeed"],
+    captionAlignment: (lightboxCaptionAlignment ?? lbBase.captionAlignment) as GlobalLightboxSettings["captionAlignment"],
+  };
   // Use server-provided photos on public pages; fall back to client fetch in admin editor
   const [fetchedPhotos, setFetchedPhotos] = useState<EmbedPhoto[]>([]);
   const [loading, setLoading] = useState(!serverPhotos);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [lightboxVisible, setLightboxVisible] = useState(false);
+  const [displayIndex, setDisplayIndex] = useState(0);
+  const [outgoingIndex, setOutgoingIndex] = useState<number | null>(null);
+  const [crossfading, setCrossfading] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const navTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fadeMs = { none: 0, fast: 150, medium: 300, slow: 500 }[lb.fadeSpeed] ?? 300;
 
   useEffect(() => {
     if (serverPhotos) return;
@@ -806,14 +1301,56 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
     return () => { cancelled = true; };
   }, [slug, max, serverPhotos]);
 
+  useEffect(() => {
+    return () => {
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+      if (navTimer.current) clearTimeout(navTimer.current);
+    };
+  }, []);
+
   const photos = serverPhotos ?? fetchedPhotos;
+
+  const openLightbox = (index: number) => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setLightboxIndex(index);
+    setDisplayIndex(index);
+    setOutgoingIndex(null);
+    setCrossfading(false);
+    requestAnimationFrame(() => setLightboxVisible(true));
+  };
+
+  const closeLightbox = useCallback(() => {
+    setLightboxVisible(false);
+    closeTimer.current = setTimeout(() => setLightboxIndex(null), fadeMs);
+  }, [fadeMs]);
+
+  const navigateTo = useCallback((index: number) => {
+    if (navTimer.current) clearTimeout(navTimer.current);
+    if (fadeMs === 0) {
+      setLightboxIndex(index);
+      setDisplayIndex(index);
+      return;
+    }
+    const prev = displayIndex;
+    setOutgoingIndex(prev);
+    setCrossfading(false);   // outgoing=1, incoming=0
+    setDisplayIndex(index);
+    setLightboxIndex(index);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      setCrossfading(true);  // trigger both transitions
+    }));
+    navTimer.current = setTimeout(() => {
+      setOutgoingIndex(null);
+      setCrossfading(false);
+    }, fadeMs + 50);
+  }, [fadeMs, displayIndex]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (lightboxIndex === null) return;
-    if (e.key === "Escape") setLightboxIndex(null);
-    if (e.key === "ArrowLeft" && lightboxIndex > 0) setLightboxIndex(lightboxIndex - 1);
-    if (e.key === "ArrowRight" && lightboxIndex < photos.length - 1) setLightboxIndex(lightboxIndex + 1);
-  }, [lightboxIndex, photos.length]);
+    if (e.key === "Escape") closeLightbox();
+    if (e.key === "ArrowLeft") navigateTo((lightboxIndex - 1 + photos.length) % photos.length);
+    if (e.key === "ArrowRight") navigateTo((lightboxIndex + 1) % photos.length);
+  }, [lightboxIndex, photos.length, closeLightbox, navigateTo]);
 
   useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
@@ -862,7 +1399,7 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
   const photoCard = (photo: EmbedPhoto, index: number, useAspect: boolean) => (
     <div key={photo.id} style={{ maxWidth: imageMaxWidth }}>
       <button
-        onClick={() => setLightboxIndex(index)}
+        onClick={() => openLightbox(index)}
         className="block w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-neutral-400"
         style={{ borderRadius: radius }}
       >
@@ -872,6 +1409,7 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
               src={photo.url}
               alt={photo.title ?? ""}
               className="absolute inset-0 h-full w-full object-cover"
+              style={{ objectPosition: `${photo.focalX ?? 50}% ${photo.focalY ?? 50}%` }}
             />
           </div>
         ) : (
@@ -881,7 +1419,7 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
             width={photo.width}
             height={photo.height}
             className="w-full object-cover"
-            style={{ borderRadius: radius }}
+            style={{ borderRadius: radius, objectPosition: `${photo.focalX ?? 50}% ${photo.focalY ?? 50}%` }}
           />
         )}
       </button>
@@ -910,71 +1448,109 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
       )}
 
       {/* Lightbox */}
-      {lightboxIndex !== null && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
-          onClick={() => setLightboxIndex(null)}
-        >
-          {/* Close */}
-          <button
-            onClick={() => setLightboxIndex(null)}
-            className="absolute right-4 top-4 text-3xl text-white/70 hover:text-white z-10"
-          >
-            &times;
-          </button>
+      {lightboxIndex !== null && (() => {
+        const lbRadius = lb.cornerRadius;
+        const isOverlay = lb.captionPosition === "overlay-top" || lb.captionPosition === "overlay-bottom";
+        const incomingOpacity = outgoingIndex === null || crossfading ? 1 : 0;
 
-          {/* Prev */}
-          {lightboxIndex > 0 && (
+        const renderSlot = (idx: number, isOutgoing: boolean) => {
+          const p = photos[idx];
+          const hasCaption = lb.metadataFields.length > 0 && (
+            (lb.metadataFields.includes("title") && p.title) ||
+            (lb.metadataFields.includes("description") && p.description) ||
+            (lb.metadataFields.includes("location") && p.location) ||
+            (lb.metadataFields.includes("camera") && p.cameraSettings) ||
+            (lb.metadataFields.includes("filename") && p.filename)
+          );
+          const captionContent = hasCaption && (
+            <>
+              {lb.metadataFields.includes("title") && p.title && <p className="text-base font-serif">{parseLinks(p.title)}</p>}
+              {lb.metadataFields.includes("description") && p.description && <p className="text-sm text-white/80">{parseLinks(p.description)}</p>}
+              {lb.metadataFields.includes("location") && p.location && <p className="text-sm text-white/60">{parseLinks(p.location)}</p>}
+              {lb.metadataFields.includes("camera") && p.cameraSettings && (
+                <p className="text-xs text-white/40">
+                  {[p.cameraSettings.camera, p.cameraSettings.lens, p.cameraSettings.aperture, p.cameraSettings.shutter, p.cameraSettings.iso ? `ISO ${p.cameraSettings.iso}` : null].filter(Boolean).join(" \u00b7 ")}
+                </p>
+              )}
+              {lb.metadataFields.includes("filename") && p.filename && <p className="text-xs text-white/40">{p.filename}</p>}
+            </>
+          );
+          return (
+            <div
+              key={`${isOutgoing ? "out" : "in"}-${idx}`}
+              style={{
+                gridArea: "1/1",
+                opacity: isOutgoing ? (crossfading ? 0 : 1) : incomingOpacity,
+                transition: outgoingIndex !== null && fadeMs > 0 ? `opacity ${fadeMs}ms ease` : undefined,
+                pointerEvents: isOutgoing ? "none" : "auto",
+              }}
+              className="flex flex-col items-center"
+            >
+              <div className="relative group">
+                <img
+                  src={p.url}
+                  alt={p.title ?? ""}
+                  className="max-h-[80vh] w-auto object-contain"
+                  style={{ borderRadius: lbRadius }}
+                />
+                {isOverlay && hasCaption && (
+                  <div
+                    className={`absolute left-0 right-0 px-4 py-3 text-white space-y-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${{ left: "text-left", center: "text-center", right: "text-right" }[lb.captionAlignment]} ${
+                      lb.captionPosition === "overlay-top"
+                        ? "top-0 bg-gradient-to-b from-black/70 to-transparent"
+                        : "bottom-0 bg-gradient-to-t from-black/70 to-transparent"
+                    }`}
+                    style={lb.captionPosition === "overlay-top" ? { borderRadius: `${lbRadius}px ${lbRadius}px 0 0` } : { borderRadius: `0 0 ${lbRadius}px ${lbRadius}px` }}
+                  >
+                    {captionContent}
+                  </div>
+                )}
+              </div>
+              {!isOverlay && hasCaption && (
+                <div className={`mt-3 text-white space-y-0.5 w-full ${{ left: "text-left", center: "text-center", right: "text-right" }[lb.captionAlignment]}`}>{captionContent}</div>
+              )}
+            </div>
+          );
+        };
+
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/95"
+            style={{ opacity: lightboxVisible ? 1 : 0, transition: fadeMs > 0 ? `opacity ${fadeMs}ms ease` : undefined }}
+          >
+            {/* Close */}
+            <button onClick={closeLightbox} className="absolute right-4 top-4 text-3xl text-white/70 hover:text-white z-10">
+              &times;
+            </button>
+
+            {/* Prev */}
             <button
-              onClick={(e) => { e.stopPropagation(); setLightboxIndex(lightboxIndex - 1); }}
-              className="absolute left-4 text-4xl text-white/70 hover:text-white"
+              onClick={(e) => { e.stopPropagation(); navigateTo((lightboxIndex - 1 + photos.length) % photos.length); }}
+              className="absolute left-4 text-4xl text-white/70 hover:text-white z-10"
             >
               &#8249;
             </button>
-          )}
 
-          {/* Image + info */}
-          <div
-            className="flex max-h-[90vh] max-w-[90vw] flex-col items-center"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <img
-              src={photos[lightboxIndex].url}
-              alt={photos[lightboxIndex].title ?? ""}
-              className="max-h-[75vh] w-auto object-contain rounded"
-            />
-            <div className="mt-3 text-center text-white space-y-1">
-              {photos[lightboxIndex].title && (
-                <p className="text-lg font-serif">{photos[lightboxIndex].title}</p>
-              )}
-              {photos[lightboxIndex].location && (
-                <p className="text-sm text-white/60">{photos[lightboxIndex].location}</p>
-              )}
-              {photos[lightboxIndex].cameraSettings && (
-                <p className="text-xs text-white/40">
-                  {[photos[lightboxIndex].cameraSettings!.camera, photos[lightboxIndex].cameraSettings!.lens, photos[lightboxIndex].cameraSettings!.aperture, photos[lightboxIndex].cameraSettings!.shutter, photos[lightboxIndex].cameraSettings!.iso ? `ISO ${photos[lightboxIndex].cameraSettings!.iso}` : null].filter(Boolean).join(" \u00b7 ")}
-                </p>
-              )}
-              <a
-                href={`/gallery/${slug}`}
-                className="inline-block mt-3 px-4 py-2 text-sm font-medium text-white/90 border border-white/30 rounded hover:bg-white/10 transition-colors"
-              >
-                View Full Gallery &rarr;
-              </a>
+            {/* Image + caption */}
+            <div
+              className="max-h-[90vh] max-w-[90vw]"
+              style={{ display: "grid", placeItems: "center" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {outgoingIndex !== null && renderSlot(outgoingIndex, true)}
+              {renderSlot(displayIndex, false)}
             </div>
-          </div>
 
-          {/* Next */}
-          {lightboxIndex < photos.length - 1 && (
+            {/* Next */}
             <button
-              onClick={(e) => { e.stopPropagation(); setLightboxIndex(lightboxIndex + 1); }}
-              className="absolute right-4 text-4xl text-white/70 hover:text-white"
+              onClick={(e) => { e.stopPropagation(); navigateTo((lightboxIndex + 1) % photos.length); }}
+              className="absolute right-4 text-4xl text-white/70 hover:text-white z-10"
             >
               &#8250;
             </button>
-          )}
-        </div>
-      )}
+          </div>
+        );
+      })()}
     </>
   );
 }

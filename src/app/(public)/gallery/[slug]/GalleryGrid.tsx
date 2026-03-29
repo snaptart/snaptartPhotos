@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Image from "next/image";
 
 interface Photo {
@@ -14,8 +14,71 @@ interface Photo {
   height: number;
 }
 
+const FADE_MS = 200;
+
 export default function GalleryGrid({ photos }: { photos: Photo[] }) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [displayIndex, setDisplayIndex] = useState(0);
+  const [outgoingIndex, setOutgoingIndex] = useState<number | null>(null);
+  const [crossfading, setCrossfading] = useState(false);
+  const navTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function openLightbox(index: number) {
+    if (navTimer.current) clearTimeout(navTimer.current);
+    setSelectedIndex(index);
+    setDisplayIndex(index);
+    setOutgoingIndex(null);
+    setCrossfading(false);
+  }
+
+  function navigateTo(index: number) {
+    if (navTimer.current) clearTimeout(navTimer.current);
+    const prev = displayIndex;
+    setOutgoingIndex(prev);
+    setCrossfading(false);   // outgoing=1, incoming=0
+    setDisplayIndex(index);
+    setSelectedIndex(index);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      setCrossfading(true);  // trigger both transitions
+    }));
+    navTimer.current = setTimeout(() => {
+      setOutgoingIndex(null);
+      setCrossfading(false);
+    }, FADE_MS + 50);
+  }
+
+  const incomingOpacity = outgoingIndex === null || crossfading ? 1 : 0;
+
+  const photoSlot = (index: number, isOutgoing: boolean) => {
+    const photo = photos[index];
+    return (
+      <div
+        style={{
+          gridArea: "1/1",
+          opacity: isOutgoing ? (crossfading ? 0 : 1) : incomingOpacity,
+          transition: outgoingIndex !== null ? `opacity ${FADE_MS}ms ease` : undefined,
+          pointerEvents: isOutgoing ? "none" : "auto",
+        }}
+        className="flex flex-col items-center"
+      >
+        <Image
+          src={photo.url}
+          alt={photo.title ?? ""}
+          width={photo.width}
+          height={photo.height}
+          className="max-h-[80vh] w-auto object-contain"
+          sizes="90vw"
+          priority={!isOutgoing}
+        />
+        {(photo.title || photo.location) && (
+          <div className="mt-3 text-center text-white">
+            {photo.title && <p className="text-lg">{photo.title}</p>}
+            {photo.location && <p className="text-sm text-white/60">{photo.location}</p>}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -24,7 +87,7 @@ export default function GalleryGrid({ photos }: { photos: Photo[] }) {
         {photos.map((photo, index) => (
           <button
             key={photo.id}
-            onClick={() => setSelectedIndex(index)}
+            onClick={() => openLightbox(index)}
             className="mb-4 block w-full overflow-hidden rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-400"
           >
             <Image
@@ -41,10 +104,7 @@ export default function GalleryGrid({ photos }: { photos: Photo[] }) {
 
       {/* Lightbox */}
       {selectedIndex !== null && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
-          onClick={() => setSelectedIndex(null)}
-        >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90">
           {/* Close button */}
           <button
             onClick={() => setSelectedIndex(null)}
@@ -54,50 +114,30 @@ export default function GalleryGrid({ photos }: { photos: Photo[] }) {
           </button>
 
           {/* Prev */}
-          {selectedIndex > 0 && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setSelectedIndex(selectedIndex - 1); }}
-              className="absolute left-4 text-4xl text-white/70 hover:text-white"
-            >
-              &#8249;
-            </button>
-          )}
+          <button
+            onClick={(e) => { e.stopPropagation(); navigateTo((selectedIndex - 1 + photos.length) % photos.length); }}
+            className="absolute left-4 text-4xl text-white/70 hover:text-white"
+          >
+            &#8249;
+          </button>
 
           {/* Image + info */}
           <div
-            className="flex max-h-[90vh] max-w-[90vw] flex-col items-center"
+            className="max-h-[90vh] max-w-[90vw]"
+            style={{ display: "grid", placeItems: "center" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <Image
-              src={photos[selectedIndex].url}
-              alt={photos[selectedIndex].title ?? ""}
-              width={photos[selectedIndex].width}
-              height={photos[selectedIndex].height}
-              className="max-h-[80vh] w-auto object-contain"
-              sizes="90vw"
-              priority
-            />
-            {(photos[selectedIndex].title || photos[selectedIndex].location) && (
-              <div className="mt-3 text-center text-white">
-                {photos[selectedIndex].title && (
-                  <p className="text-lg">{photos[selectedIndex].title}</p>
-                )}
-                {photos[selectedIndex].location && (
-                  <p className="text-sm text-white/60">{photos[selectedIndex].location}</p>
-                )}
-              </div>
-            )}
+            {outgoingIndex !== null && photoSlot(outgoingIndex, true)}
+            {photoSlot(displayIndex, false)}
           </div>
 
           {/* Next */}
-          {selectedIndex < photos.length - 1 && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setSelectedIndex(selectedIndex + 1); }}
-              className="absolute right-4 text-4xl text-white/70 hover:text-white"
-            >
-              &#8250;
-            </button>
-          )}
+          <button
+            onClick={(e) => { e.stopPropagation(); navigateTo((selectedIndex + 1) % photos.length); }}
+            className="absolute right-4 text-4xl text-white/70 hover:text-white"
+          >
+            &#8250;
+          </button>
         </div>
       )}
     </>

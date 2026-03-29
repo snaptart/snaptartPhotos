@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   DndContext,
@@ -32,7 +32,60 @@ interface Photo {
   location: string | null;
   width: number;
   height: number;
+  focalX: number;
+  focalY: number;
   position: number;
+}
+
+function FocalPointPicker({
+  imageUrl,
+  focalX,
+  focalY,
+  onChange,
+}: {
+  imageUrl: string;
+  focalX: number;
+  focalY: number;
+  onChange: (x: number, y: number) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  function handlePointer(e: React.MouseEvent<HTMLDivElement>) {
+    const rect = containerRef.current!.getBoundingClientRect();
+    const x = Math.round(Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)));
+    const y = Math.round(Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100)));
+    onChange(x, y);
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs text-neutral-500">Click image to set focal point</p>
+      <div
+        ref={containerRef}
+        className="relative cursor-crosshair overflow-hidden rounded border border-neutral-200"
+        style={{ aspectRatio: "16/9" }}
+        onClick={handlePointer}
+      >
+        <img
+          src={imageUrl}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+          style={{ objectPosition: `${focalX}% ${focalY}%` }}
+          draggable={false}
+        />
+        {/* crosshair lines */}
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute top-0 bottom-0 w-px bg-white/60" style={{ left: `${focalX}%` }} />
+          <div className="absolute left-0 right-0 h-px bg-white/60" style={{ top: `${focalY}%` }} />
+          <div
+            className="absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow"
+            style={{ left: `${focalX}%`, top: `${focalY}%`, backgroundColor: "rgba(255,255,255,0.35)" }}
+          />
+        </div>
+      </div>
+      <p className="text-xs text-neutral-400 tabular-nums">{focalX}% / {focalY}%</p>
+    </div>
+  );
 }
 
 interface Gallery {
@@ -51,6 +104,7 @@ export default function PhotosPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingFocal, setEditingFocal] = useState<{ x: number; y: number }>({ x: 50, y: 50 });
   const [message, setMessage] = useState("");
 
   const sensors = useSensors(
@@ -168,6 +222,8 @@ export default function PhotosPage() {
         title: form.get("title") || null,
         description: form.get("description") || null,
         location: form.get("location") || null,
+        focalX: editingFocal.x,
+        focalY: editingFocal.y,
       }),
     });
 
@@ -250,7 +306,14 @@ export default function PhotosPage() {
         >
           <h2 className="mb-3 text-sm font-medium">Edit Photo</h2>
           <div className="flex gap-4">
-            <img src={editingPhoto.thumbnailUrl} alt="" className="h-20 w-20 rounded object-cover" />
+            <div className="w-48 shrink-0">
+              <FocalPointPicker
+                imageUrl={editingPhoto.thumbnailUrl}
+                focalX={editingFocal.x}
+                focalY={editingFocal.y}
+                onChange={(x, y) => setEditingFocal({ x, y })}
+              />
+            </div>
             <div className="flex-1 space-y-3">
               <div className="flex items-center gap-2 rounded border border-neutral-200 bg-neutral-50 px-3 py-2">
                 <span className="shrink-0 text-xs font-medium text-neutral-500">URL</span>
@@ -360,7 +423,10 @@ export default function PhotosPage() {
                         Cover
                       </button>
                       <button
-                        onClick={() => setEditingId(photo.id)}
+                        onClick={() => {
+                          setEditingId(photo.id);
+                          setEditingFocal({ x: photo.focalX ?? 50, y: photo.focalY ?? 50 });
+                        }}
                         className="text-sm text-neutral-500 hover:text-neutral-900"
                       >
                         Edit

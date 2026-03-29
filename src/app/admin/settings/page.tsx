@@ -10,7 +10,20 @@ interface SiteSettings {
   instagramUrl: string | null;
   footerText: string | null;
   contactEmail: string | null;
+  lightboxMetadataFields: string[] | null;
+  lightboxCornerRadius: number | null;
+  lightboxCaptionPosition: string | null;
+  lightboxFadeSpeed: string | null;
+  lightboxCaptionAlignment: string | null;
 }
+
+const LIGHTBOX_METADATA_OPTIONS = [
+  { key: "title", label: "Title" },
+  { key: "description", label: "Description" },
+  { key: "location", label: "Location" },
+  { key: "camera", label: "Camera Settings" },
+  { key: "filename", label: "Filename" },
+];
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<SiteSettings | null>(null);
@@ -19,6 +32,11 @@ export default function SettingsPage() {
   const [logoUrl, setLogoUrl] = useState("");
   const [pwSaving, setPwSaving] = useState(false);
   const [pwMessage, setPwMessage] = useState("");
+  const [lbMetadataFields, setLbMetadataFields] = useState<string[]>(["title", "location"]);
+  const [lbCornerRadius, setLbCornerRadius] = useState(0);
+  const [lbCaptionPosition, setLbCaptionPosition] = useState("below");
+  const [lbFadeSpeed, setLbFadeSpeed] = useState("medium");
+  const [lbCaptionAlignment, setLbCaptionAlignment] = useState("left");
 
   useEffect(() => {
     fetch("/api/settings")
@@ -26,6 +44,11 @@ export default function SettingsPage() {
       .then((data) => {
         setSettings(data);
         setLogoUrl(data?.logoUrl ?? "");
+        setLbMetadataFields(data?.lightboxMetadataFields ?? ["title", "location"]);
+        setLbCornerRadius(data?.lightboxCornerRadius ?? 0);
+        setLbCaptionPosition(data?.lightboxCaptionPosition ?? "below");
+        setLbFadeSpeed(data?.lightboxFadeSpeed ?? "medium");
+        setLbCaptionAlignment(data?.lightboxCaptionAlignment ?? "left");
       });
   }, []);
 
@@ -41,6 +64,11 @@ export default function SettingsPage() {
       instagramUrl: form.get("instagramUrl") || null,
       footerText: form.get("footerText") || null,
       contactEmail: form.get("contactEmail") || null,
+      lightboxMetadataFields: lbMetadataFields,
+      lightboxCornerRadius: lbCornerRadius,
+      lightboxCaptionPosition: lbCaptionPosition,
+      lightboxFadeSpeed: lbFadeSpeed,
+      lightboxCaptionAlignment: lbCaptionAlignment,
     };
 
     const res = await fetch("/api/settings", {
@@ -53,6 +81,11 @@ export default function SettingsPage() {
       const updated = await res.json();
       setSettings(updated);
       setLogoUrl(updated.logoUrl ?? "");
+      setLbMetadataFields(updated.lightboxMetadataFields ?? ["title", "location"]);
+      setLbCornerRadius(updated.lightboxCornerRadius ?? 0);
+      setLbCaptionPosition(updated.lightboxCaptionPosition ?? "below");
+      setLbFadeSpeed(updated.lightboxFadeSpeed ?? "medium");
+      setLbCaptionAlignment(updated.lightboxCaptionAlignment ?? "left");
       setMessage("Settings saved!");
     } else {
       setMessage("Failed to save settings");
@@ -114,6 +147,85 @@ export default function SettingsPage() {
             className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
           />
         </div>
+        {/* Lightbox Defaults */}
+        <div className="border-t border-neutral-200 pt-4">
+          <h2 className="mb-3 text-base font-semibold text-neutral-800">Lightbox Defaults</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-neutral-700">Metadata to Show</label>
+              <div className="flex flex-col gap-1">
+                {LIGHTBOX_METADATA_OPTIONS.map((opt) => (
+                  <label key={opt.key} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={lbMetadataFields.includes(opt.key)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setLbMetadataFields([...lbMetadataFields, opt.key]);
+                        } else {
+                          setLbMetadataFields(lbMetadataFields.filter((k) => k !== opt.key));
+                        }
+                      }}
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-neutral-700">
+                Corner Radius — {lbCornerRadius}px
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={32}
+                step={1}
+                value={lbCornerRadius}
+                onChange={(e) => setLbCornerRadius(Number(e.target.value))}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-neutral-700">Caption Position</label>
+              <select
+                value={lbCaptionPosition}
+                onChange={(e) => setLbCaptionPosition(e.target.value)}
+                className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+              >
+                <option value="below">Below image</option>
+                <option value="overlay-top">Overlay — top</option>
+                <option value="overlay-bottom">Overlay — bottom</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-neutral-700">Fade Speed</label>
+              <select
+                value={lbFadeSpeed}
+                onChange={(e) => setLbFadeSpeed(e.target.value)}
+                className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+              >
+                <option value="none">None (instant)</option>
+                <option value="fast">Fast (150ms)</option>
+                <option value="medium">Medium (300ms)</option>
+                <option value="slow">Slow (500ms)</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-neutral-700">Caption Alignment</label>
+              <select
+                value={lbCaptionAlignment}
+                onChange={(e) => setLbCaptionAlignment(e.target.value)}
+                className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+              >
+                <option value="left">Left</option>
+                <option value="center">Center</option>
+                <option value="right">Right</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
         <button
           type="submit"
           disabled={saving}

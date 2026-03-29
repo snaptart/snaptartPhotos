@@ -24,6 +24,7 @@ interface Page {
   title: string;
   slug: string;
   pageType: string;
+  showTitle: boolean;
   isPublished: boolean;
   position: number;
   metaTitle: string | null;
@@ -36,6 +37,7 @@ export default function PagesPage() {
   const [showNewForm, setShowNewForm] = useState(false);
   const [message, setMessage] = useState("");
   const [editMeta, setEditMeta] = useState<string | null>(null);
+  const [homepageId, setHomepageId] = useState<string | null>(null);
   const router = useRouter();
 
   const sensors = useSensors(
@@ -44,15 +46,30 @@ export default function PagesPage() {
   );
 
   const fetchPages = useCallback(async () => {
-    const res = await fetch("/api/pages");
-    const data = await res.json();
+    const [pagesRes, settingsRes] = await Promise.all([
+      fetch("/api/pages"),
+      fetch("/api/settings"),
+    ]);
+    const data = await pagesRes.json();
+    const settings = await settingsRes.json();
     setPages(data);
+    setHomepageId(settings?.homepageId ?? null);
     setLoading(false);
   }, []);
 
   useEffect(() => {
     fetchPages();
   }, [fetchPages]);
+
+  async function handleSetHomepage(id: string) {
+    const newId = homepageId === id ? null : id;
+    await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ homepageId: newId }),
+    });
+    setHomepageId(newId);
+  }
 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -105,6 +122,7 @@ export default function PagesPage() {
         id: editMeta,
         title: form.get("title"),
         pageType: form.get("pageType"),
+        showTitle: form.get("showTitle") === "on",
         metaTitle: form.get("metaTitle") || null,
         metaDescription: form.get("metaDescription") || null,
       }),
@@ -224,6 +242,15 @@ export default function PagesPage() {
               <option value="contact">Contact</option>
               <option value="story">Story</option>
             </select>
+            <label className="flex items-center gap-2 text-sm text-neutral-700">
+              <input
+                type="checkbox"
+                name="showTitle"
+                defaultChecked={editingPage.showTitle}
+                className="rounded border-neutral-300"
+              />
+              Show page title
+            </label>
             <details className="rounded border border-neutral-200 p-3">
               <summary className="cursor-pointer text-sm font-medium text-neutral-600">SEO Settings</summary>
               <div className="mt-3 space-y-3">
@@ -294,9 +321,20 @@ export default function PagesPage() {
                         >
                           {page.isPublished ? "Published" : "Draft"}
                         </span>
+                        {homepageId === page.id && (
+                          <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-600">
+                            Home
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="flex gap-2">
+                      <button
+                        onClick={() => handleSetHomepage(page.id)}
+                        className={`text-sm ${homepageId === page.id ? "text-amber-600 hover:text-amber-800" : "text-neutral-500 hover:text-neutral-900"}`}
+                      >
+                        {homepageId === page.id ? "Unset Homepage" : "Set as Homepage"}
+                      </button>
                       <button
                         onClick={() => togglePublish(page)}
                         className="text-sm text-neutral-500 hover:text-neutral-900"

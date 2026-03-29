@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { pages, galleries, photos } from "@/lib/db/schema";
+import { pages, galleries, photos, siteSettings } from "@/lib/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -11,7 +11,7 @@ import TextAlign from "@tiptap/extension-text-align";
 import Underline from "@tiptap/extension-underline";
 import PuckRenderer from "@/components/public/PuckRenderer";
 import type { Data } from "@puckeditor/core";
-import type { EmbedPhoto } from "@/lib/puck/config";
+import type { EmbedPhoto, GlobalLightboxSettings } from "@/lib/puck/config";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -67,6 +67,16 @@ export default async function DynamicPage({ params }: Props) {
 
   // New Puck-based content
   if (isPuckData(page.content)) {
+    // Fetch global lightbox settings
+    const [settingsRow] = await db.select().from(siteSettings).limit(1);
+    const globalLightbox: GlobalLightboxSettings = {
+      metadataFields: settingsRow?.lightboxMetadataFields ?? ["title", "location"],
+      cornerRadius: settingsRow?.lightboxCornerRadius ?? 0,
+      captionPosition: (settingsRow?.lightboxCaptionPosition ?? "below") as GlobalLightboxSettings["captionPosition"],
+      fadeSpeed: (settingsRow?.lightboxFadeSpeed ?? "medium") as GlobalLightboxSettings["fadeSpeed"],
+      captionAlignment: (settingsRow?.lightboxCaptionAlignment ?? "left") as GlobalLightboxSettings["captionAlignment"],
+    };
+
     // Prefetch photos for any GalleryEmbed components
     const galleryPhotos: Record<string, EmbedPhoto[]> = {};
     const embedItems = (page.content.content ?? []).filter(
@@ -98,15 +108,19 @@ export default async function DynamicPage({ params }: Props) {
           cameraSettings: p.cameraSettings as EmbedPhoto["cameraSettings"],
           width: p.width ?? 800,
           height: p.height ?? 600,
+          focalX: p.focalX ?? 50,
+          focalY: p.focalY ?? 50,
         }));
     }
 
     return (
       <div className="mx-auto max-w-5xl px-4 py-12">
-        <h1 className="mb-8 text-center font-serif text-4xl font-semibold tracking-tight">
-          {page.title}
-        </h1>
-        <PuckRenderer data={page.content} galleryPhotos={galleryPhotos} />
+        {page.showTitle && (
+          <h1 className="mb-8 text-center font-serif text-4xl font-semibold tracking-tight">
+            {page.title}
+          </h1>
+        )}
+        <PuckRenderer data={page.content} galleryPhotos={galleryPhotos} globalLightbox={globalLightbox} />
       </div>
     );
   }
@@ -118,9 +132,11 @@ export default async function DynamicPage({ params }: Props) {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
-      <h1 className="mb-8 text-center text-4xl font-semibold tracking-tight">
-        {page.title}
-      </h1>
+      {page.showTitle && (
+        <h1 className="mb-8 text-center text-4xl font-semibold tracking-tight">
+          {page.title}
+        </h1>
+      )}
       {html ? (
         <div
           className="prose prose-lg mx-auto"
