@@ -114,11 +114,12 @@ export async function Navbar() {
       </nav>
 
       {/* Mobile nav: hamburger left, logo centered */}
-      <nav className="md:hidden flex items-center justify-center px-4 py-3">
-        <div className="absolute left-4">
+      <nav className="md:hidden grid grid-cols-[1fr_auto_1fr] items-center px-4 py-3">
+        <div className="justify-self-start">
           {mobileMenuEl}
         </div>
         <div>{logoEl}</div>
+        <div />
       </nav>
     </header>
   );

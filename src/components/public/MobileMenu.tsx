@@ -13,10 +13,10 @@ export function MobileMenu({ items, instagramUrl, menuFontSize }: MobileMenuProp
   const [open, setOpen] = useState(false);
 
   return (
-    <>
+    <div className="md:hidden">
       <button
         onClick={() => setOpen(!open)}
-        className="md:hidden flex items-center justify-center w-10 h-10"
+        className="flex items-center justify-center w-10 h-10"
         aria-label={open ? "Close menu" : "Open menu"}
       >
         <svg
@@ -36,7 +36,7 @@ export function MobileMenu({ items, instagramUrl, menuFontSize }: MobileMenuProp
 
       {open && (
         <div
-          className="md:hidden absolute left-0 right-0 top-full border-b border-neutral-200 z-50"
+          className="absolute left-0 right-0 top-full w-full border-b border-neutral-200 z-50"
           style={{ backgroundColor: "var(--theme-color-header-bg)" }}
         >
           <div
@@ -70,6 +70,6 @@ export function MobileMenu({ items, instagramUrl, menuFontSize }: MobileMenuProp
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
