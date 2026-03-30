@@ -29,21 +29,23 @@ export async function Navbar() {
   const logoUrl = navSettings?.logoUrl;
   const instagramUrl = navSettings?.instagramUrl;
 
-  const logoEl = (
+  const mobileLogoSize = Math.round(theme.logoSize / 3);
+
+  const logoEl = (size: number) => (
     <Link href="/" className="flex items-center gap-3">
       {logoUrl ? (
         <img
           src={logoUrl}
           alt={siteTitle}
           className="w-auto"
-          style={{ height: `${theme.logoSize}px` }}
+          style={{ height: `${size}px` }}
         />
       ) : (
         <span
           className="font-light tracking-widest"
           style={{
             fontFamily: "var(--theme-font-headings)",
-            fontSize: `${theme.logoSize * 0.6}px`,
+            fontSize: `${size * 0.6}px`,
           }}
         >
           {siteTitle}
@@ -92,7 +94,7 @@ export async function Navbar() {
   // Build 3-column layout: [left] [center] [right]
   // Place logo and menu into the correct slots based on theme
   const slots: Record<string, React.ReactNode[]> = { left: [], center: [], right: [] };
-  slots[theme.logoPosition].push(<div key="logo">{logoEl}</div>);
+  slots[theme.logoPosition].push(<div key="logo">{logoEl(theme.logoSize)}</div>);
   slots[theme.menuJustify].push(<div key="menu">{menuEl}</div>);
 
   return (
@@ -118,7 +120,7 @@ export async function Navbar() {
         <div className="justify-self-start">
           {mobileMenuEl}
         </div>
-        <div>{logoEl}</div>
+        <div>{logoEl(mobileLogoSize)}</div>
         <div />
       </nav>
     </header>

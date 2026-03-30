@@ -28,7 +28,7 @@ export async function Footer() {
 
   return (
     <footer
-      className={`border-t border-neutral-200 px-6 py-8 ${alignment}`}
+      className={`border-t border-neutral-200 px-4 py-4 md:px-6 md:py-8 ${alignment}`}
       style={{
         backgroundColor: "var(--theme-color-footer-bg)",
         fontFamily: "var(--theme-font-footer)",
@@ -37,7 +37,7 @@ export async function Footer() {
         opacity: 0.6,
       }}
     >
-      {settings.footerText && <p>{parseLinks(settings.footerText)}</p>}
+      {settings.footerText && <p className="break-words">{parseLinks(settings.footerText)}</p>}
       {settings.contactEmail && (
         <p className="mt-1">
           <a
