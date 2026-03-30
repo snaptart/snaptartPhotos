@@ -4,6 +4,7 @@ import { menuItems, siteSettings, themes } from "@/lib/db/schema";
 import { asc, eq } from "drizzle-orm";
 import { resolveTheme } from "@/lib/theme/types";
 import type { ThemeSettings } from "@/lib/theme/types";
+import { MobileMenu } from "./MobileMenu";
 
 export async function Navbar() {
   let items: { id: string; label: string; url: string; targetType: string }[] = [];
@@ -51,9 +52,10 @@ export async function Navbar() {
     </Link>
   );
 
+  // Desktop menu (hidden on mobile)
   const menuEl = (
     <div
-      className="flex items-center gap-8 tracking-wide"
+      className="hidden md:flex items-center gap-8 tracking-wide"
       style={{ fontSize: `${theme.menuFontSize}px`, fontFamily: "var(--theme-font-nav-menu)" }}
     >
       {items.map((item) => (
@@ -82,6 +84,11 @@ export async function Navbar() {
     </div>
   );
 
+  // Mobile hamburger menu
+  const mobileMenuEl = (
+    <MobileMenu items={items} instagramUrl={instagramUrl ?? null} menuFontSize={theme.menuFontSize} />
+  );
+
   // Build 3-column layout: [left] [center] [right]
   // Place logo and menu into the correct slots based on theme
   const slots: Record<string, React.ReactNode[]> = { left: [], center: [], right: [] };
@@ -90,10 +97,11 @@ export async function Navbar() {
 
   return (
     <header
-      className="border-b border-neutral-200"
+      className="relative border-b border-neutral-200"
       style={{ backgroundColor: "var(--theme-color-header-bg)" }}
     >
-      <nav className="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-6 py-4">
+      {/* Desktop nav */}
+      <nav className="mx-auto hidden md:grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-6 py-4">
         <div className="flex items-center gap-4 justify-self-start">
           {slots.left}
         </div>
@@ -103,6 +111,14 @@ export async function Navbar() {
         <div className="flex items-center gap-4 justify-self-end">
           {slots.right}
         </div>
+      </nav>
+
+      {/* Mobile nav: hamburger left, logo centered */}
+      <nav className="md:hidden flex items-center justify-center px-4 py-3">
+        <div className="absolute left-4">
+          {mobileMenuEl}
+        </div>
+        <div>{logoEl}</div>
       </nav>
     </header>
   );
