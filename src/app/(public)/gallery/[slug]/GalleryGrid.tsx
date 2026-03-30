@@ -24,6 +24,7 @@ export default function GalleryGrid({ photos }: { photos: Photo[] }) {
   const [crossfading, setCrossfading] = useState(false);
   const [slideDir, setSlideDir] = useState<"left" | "right" | null>(null);
   const navTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartRef = useRef({ x: 0, y: 0 });
 
   function openLightbox(index: number) {
     if (navTimer.current) clearTimeout(navTimer.current);
@@ -155,26 +156,20 @@ export default function GalleryGrid({ photos }: { photos: Photo[] }) {
       </div>
 
       {/* Lightbox */}
-      {selectedIndex !== null && (() => {
-        const touchStart = { x: 0, y: 0 };
-        const handleTouchStart = (e: React.TouchEvent) => {
-          touchStart.x = e.touches[0].clientX;
-          touchStart.y = e.touches[0].clientY;
-        };
-        const handleTouchEnd = (e: React.TouchEvent) => {
-          const dx = e.changedTouches[0].clientX - touchStart.x;
-          const dy = e.changedTouches[0].clientY - touchStart.y;
-          if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
-            if (dx < 0) navigateTo((selectedIndex + 1) % photos.length, "left");
-            else navigateTo((selectedIndex - 1 + photos.length) % photos.length, "right");
-          }
-        };
-
-        return (
+      {selectedIndex !== null && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
+            onTouchStart={(e) => {
+              touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }}
+            onTouchEnd={(e) => {
+              const dx = e.changedTouches[0].clientX - touchStartRef.current.x;
+              const dy = e.changedTouches[0].clientY - touchStartRef.current.y;
+              if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+                if (dx < 0) navigateTo((selectedIndex + 1) % photos.length, "left");
+                else navigateTo((selectedIndex - 1 + photos.length) % photos.length, "right");
+              }
+            }}
           >
             {/* Close button */}
             <button
@@ -209,8 +204,7 @@ export default function GalleryGrid({ photos }: { photos: Photo[] }) {
               &#8250;
             </button>
           </div>
-        );
-      })()}
+      )}
     </>
   );
 }
