@@ -15,12 +15,14 @@ interface Photo {
 }
 
 const FADE_MS = 200;
+const SLIDE_MS = 300;
 
 export default function GalleryGrid({ photos }: { photos: Photo[] }) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [displayIndex, setDisplayIndex] = useState(0);
   const [outgoingIndex, setOutgoingIndex] = useState<number | null>(null);
   const [crossfading, setCrossfading] = useState(false);
+  const [slideDir, setSlideDir] = useState<"left" | "right" | null>(null);
   const navTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function openLightbox(index: number) {
@@ -29,28 +31,78 @@ export default function GalleryGrid({ photos }: { photos: Photo[] }) {
     setDisplayIndex(index);
     setOutgoingIndex(null);
     setCrossfading(false);
+    setSlideDir(null);
   }
 
-  function navigateTo(index: number) {
+  function navigateTo(index: number, direction?: "left" | "right") {
     if (navTimer.current) clearTimeout(navTimer.current);
     const prev = displayIndex;
     setOutgoingIndex(prev);
-    setCrossfading(false);   // outgoing=1, incoming=0
+    setCrossfading(false);
+    setSlideDir(direction ?? null);
     setDisplayIndex(index);
     setSelectedIndex(index);
+    const duration = direction ? SLIDE_MS : FADE_MS;
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      setCrossfading(true);  // trigger both transitions
+      setCrossfading(true);
     }));
     navTimer.current = setTimeout(() => {
       setOutgoingIndex(null);
       setCrossfading(false);
-    }, FADE_MS + 50);
+      setSlideDir(null);
+    }, duration + 50);
   }
 
   const incomingOpacity = outgoingIndex === null || crossfading ? 1 : 0;
 
   const photoSlot = (index: number, isOutgoing: boolean) => {
     const photo = photos[index];
+
+    // Slide transition for swipe navigation
+    if (slideDir) {
+      // Swiping left (next): outgoing slides left, incoming enters from right
+      // Swiping right (prev): outgoing slides right, incoming enters from left
+      let transform: string;
+      if (isOutgoing) {
+        transform = crossfading
+          ? `translateX(${slideDir === "left" ? "-100%" : "100%"})`
+          : "translateX(0)";
+      } else {
+        transform = crossfading
+          ? "translateX(0)"
+          : `translateX(${slideDir === "left" ? "100%" : "-100%"})`;
+      }
+
+      return (
+        <div
+          style={{
+            gridArea: "1/1",
+            transform,
+            transition: `transform ${SLIDE_MS}ms ease`,
+            pointerEvents: isOutgoing ? "none" : "auto",
+          }}
+          className="flex flex-col items-center"
+        >
+          <Image
+            src={photo.url}
+            alt={photo.title ?? ""}
+            width={photo.width}
+            height={photo.height}
+            className="max-h-[80vh] w-auto object-contain"
+            sizes="90vw"
+            priority={!isOutgoing}
+          />
+          {(photo.title || photo.location) && (
+            <div className="mt-3 text-center text-white">
+              {photo.title && <p className="text-lg">{photo.title}</p>}
+              {photo.location && <p className="text-sm text-white/60">{photo.location}</p>}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Crossfade transition for arrow/keyboard navigation
     return (
       <div
         style={{
@@ -113,8 +165,8 @@ export default function GalleryGrid({ photos }: { photos: Photo[] }) {
           const dx = e.changedTouches[0].clientX - touchStart.x;
           const dy = e.changedTouches[0].clientY - touchStart.y;
           if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
-            if (dx < 0) navigateTo((selectedIndex + 1) % photos.length);
-            else navigateTo((selectedIndex - 1 + photos.length) % photos.length);
+            if (dx < 0) navigateTo((selectedIndex + 1) % photos.length, "left");
+            else navigateTo((selectedIndex - 1 + photos.length) % photos.length, "right");
           }
         };
 
@@ -142,7 +194,7 @@ export default function GalleryGrid({ photos }: { photos: Photo[] }) {
 
             {/* Image + info */}
             <div
-              className="grid max-h-[90vh] max-w-[90vw] place-items-center"
+              className="grid max-h-[90vh] w-full max-w-full sm:max-w-[90vw] place-items-center overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               {outgoingIndex !== null && photoSlot(outgoingIndex, true)}
