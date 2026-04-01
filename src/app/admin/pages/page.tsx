@@ -315,7 +315,7 @@ export default function PagesPage() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleSetHomepage(page.id)}
-                        className={`text-sm ${homepageId === page.id ? "text-amber-600 hover:text-amber-800" : "text-neutral-500 hover:text-neutral-900"}`}
+                        className={homepageId === page.id ? "rounded border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs text-amber-600 transition-colors hover:bg-amber-100 hover:text-amber-800" : "btn-text"}
                       >
                         {homepageId === page.id ? "Unset Homepage" : "Set as Homepage"}
                       </button>
@@ -336,7 +336,7 @@ export default function PagesPage() {
                       </button>
                       <button
                         onClick={() => handleDelete(page.id)}
-                        className="text-sm text-red-500 hover:text-red-700"
+                        className="btn-danger"
                       >
                         Delete
                       </button>

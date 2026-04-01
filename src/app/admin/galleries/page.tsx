@@ -268,7 +268,7 @@ export default function GalleriesPage() {
                       </button>
                       <button
                         onClick={() => handleDelete(gallery.id)}
-                        className="text-sm text-red-500 hover:text-red-700"
+                        className="btn-danger"
                       >
                         Delete
                       </button>

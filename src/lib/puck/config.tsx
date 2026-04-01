@@ -12,6 +12,8 @@ import type { JSONContent } from "@tiptap/react";
 import TiptapEditor from "@/components/admin/TiptapEditor";
 import ImagePicker from "@/components/admin/ImagePicker";
 import { parseLinks } from "@/lib/parseLinks";
+import Lightbox from "@/components/public/Lightbox";
+import type { LightboxPhoto, LightboxSettings } from "@/components/public/Lightbox";
 
 // Tiptap extensions for HTML generation
 const tiptapExtensions = [
@@ -80,13 +82,7 @@ type ColumnsProps = {
   gap: string;
 };
 
-export type GlobalLightboxSettings = {
-  metadataFields: string[];
-  cornerRadius: number;
-  captionPosition: "below" | "overlay-top" | "overlay-bottom";
-  fadeSpeed: "none" | "fast" | "medium" | "slow";
-  captionAlignment: "left" | "center" | "right";
-};
+export type GlobalLightboxSettings = LightboxSettings;
 
 type GalleryEmbedProps = {
   gallerySlug: string;
@@ -860,7 +856,7 @@ export const puckConfig: Config<Components> = {
 
 // ----- Gallery picker (custom Puck field) -----
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState } from "react";
 
 type GalleryOption = { id: string; title: string; slug: string };
 
@@ -1236,7 +1232,7 @@ const DEFAULT_LIGHTBOX: GlobalLightboxSettings = {
   captionPosition: "below",
   fadeSpeed: "medium",
   captionAlignment: "left",
-};
+} satisfies LightboxSettings;
 
 interface GalleryEmbedRendererProps {
   slug: string;
@@ -1276,14 +1272,6 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
   const [fetchedPhotos, setFetchedPhotos] = useState<EmbedPhoto[]>([]);
   const [loading, setLoading] = useState(!serverPhotos);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const [lightboxVisible, setLightboxVisible] = useState(false);
-  const [displayIndex, setDisplayIndex] = useState(0);
-  const [outgoingIndex, setOutgoingIndex] = useState<number | null>(null);
-  const [crossfading, setCrossfading] = useState(false);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const navTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const fadeMs = { none: 0, fast: 150, medium: 300, slow: 500 }[lb.fadeSpeed] ?? 300;
 
   useEffect(() => {
     if (serverPhotos) return;
@@ -1304,61 +1292,7 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
     return () => { cancelled = true; };
   }, [slug, max, serverPhotos]);
 
-  useEffect(() => {
-    return () => {
-      if (closeTimer.current) clearTimeout(closeTimer.current);
-      if (navTimer.current) clearTimeout(navTimer.current);
-    };
-  }, []);
-
   const photos = serverPhotos ?? fetchedPhotos;
-
-  const openLightbox = (index: number) => {
-    if (closeTimer.current) clearTimeout(closeTimer.current);
-    setLightboxIndex(index);
-    setDisplayIndex(index);
-    setOutgoingIndex(null);
-    setCrossfading(false);
-    requestAnimationFrame(() => setLightboxVisible(true));
-  };
-
-  const closeLightbox = useCallback(() => {
-    setLightboxVisible(false);
-    closeTimer.current = setTimeout(() => setLightboxIndex(null), fadeMs);
-  }, [fadeMs]);
-
-  const navigateTo = useCallback((index: number) => {
-    if (navTimer.current) clearTimeout(navTimer.current);
-    if (fadeMs === 0) {
-      setLightboxIndex(index);
-      setDisplayIndex(index);
-      return;
-    }
-    const prev = displayIndex;
-    setOutgoingIndex(prev);
-    setCrossfading(false);   // outgoing=1, incoming=0
-    setDisplayIndex(index);
-    setLightboxIndex(index);
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      setCrossfading(true);  // trigger both transitions
-    }));
-    navTimer.current = setTimeout(() => {
-      setOutgoingIndex(null);
-      setCrossfading(false);
-    }, fadeMs + 50);
-  }, [fadeMs, displayIndex]);
-
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (lightboxIndex === null) return;
-    if (e.key === "Escape") closeLightbox();
-    if (e.key === "ArrowLeft") navigateTo((lightboxIndex - 1 + photos.length) % photos.length);
-    if (e.key === "ArrowRight") navigateTo((lightboxIndex + 1) % photos.length);
-  }, [lightboxIndex, photos.length, closeLightbox, navigateTo]);
-
-  useEffect(() => {
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleKeyDown]);
 
   if (loading) {
     return <div className="text-center text-neutral-400 py-8">Loading gallery...</div>;
@@ -1402,7 +1336,7 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
   const photoCard = (photo: EmbedPhoto, index: number, useAspect: boolean) => (
     <div key={photo.id} style={{ maxWidth: imageMaxWidth }}>
       <button
-        onClick={() => openLightbox(index)}
+        onClick={() => setLightboxIndex(index)}
         className="block w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-neutral-400"
         style={{ borderRadius: radius }}
       >
@@ -1450,126 +1384,12 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
         </div>
       )}
 
-      {/* Lightbox */}
-      {lightboxIndex !== null && (() => {
-        const lbRadius = lb.cornerRadius;
-        const isOverlay = lb.captionPosition === "overlay-top" || lb.captionPosition === "overlay-bottom";
-        const incomingOpacity = outgoingIndex === null || crossfading ? 1 : 0;
-
-        const renderSlot = (idx: number, isOutgoing: boolean) => {
-          const p = photos[idx];
-          const hasCaption = lb.metadataFields.length > 0 && (
-            (lb.metadataFields.includes("title") && p.title) ||
-            (lb.metadataFields.includes("description") && p.description) ||
-            (lb.metadataFields.includes("location") && p.location) ||
-            (lb.metadataFields.includes("camera") && p.cameraSettings) ||
-            (lb.metadataFields.includes("filename") && p.filename)
-          );
-          const captionContent = hasCaption && (
-            <>
-              {lb.metadataFields.includes("title") && p.title && <p className="text-base" style={{ fontFamily: "var(--theme-font-captions)" }}>{parseLinks(p.title)}</p>}
-              {lb.metadataFields.includes("description") && p.description && <p className="text-sm text-white/80">{parseLinks(p.description)}</p>}
-              {lb.metadataFields.includes("location") && p.location && <p className="text-sm text-white/60">{parseLinks(p.location)}</p>}
-              {lb.metadataFields.includes("camera") && p.cameraSettings && (
-                <p className="text-xs text-white/40">
-                  {[p.cameraSettings.camera, p.cameraSettings.lens, p.cameraSettings.aperture, p.cameraSettings.shutter, p.cameraSettings.iso ? `ISO ${p.cameraSettings.iso}` : null].filter(Boolean).join(" \u00b7 ")}
-                </p>
-              )}
-              {lb.metadataFields.includes("filename") && p.filename && <p className="text-xs text-white/40">{p.filename}</p>}
-            </>
-          );
-          return (
-            <div
-              key={`${isOutgoing ? "out" : "in"}-${idx}`}
-              style={{
-                gridArea: "1/1",
-                opacity: isOutgoing ? (crossfading ? 0 : 1) : incomingOpacity,
-                transition: outgoingIndex !== null && fadeMs > 0 ? `opacity ${fadeMs}ms ease` : undefined,
-                pointerEvents: isOutgoing ? "none" : "auto",
-              }}
-              className="flex flex-col items-center"
-            >
-              <div className="relative group">
-                <img
-                  src={p.url}
-                  alt={p.title ?? ""}
-                  className="max-h-[80vh] w-auto object-contain"
-                  style={{ borderRadius: lbRadius }}
-                />
-                {isOverlay && hasCaption && (
-                  <div
-                    className={`absolute left-0 right-0 px-4 py-3 text-white space-y-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${{ left: "text-left", center: "text-center", right: "text-right" }[lb.captionAlignment]} ${
-                      lb.captionPosition === "overlay-top"
-                        ? "top-0 bg-gradient-to-b from-black/70 to-transparent"
-                        : "bottom-0 bg-gradient-to-t from-black/70 to-transparent"
-                    }`}
-                    style={lb.captionPosition === "overlay-top" ? { borderRadius: `${lbRadius}px ${lbRadius}px 0 0` } : { borderRadius: `0 0 ${lbRadius}px ${lbRadius}px` }}
-                  >
-                    {captionContent}
-                  </div>
-                )}
-              </div>
-              {!isOverlay && hasCaption && (
-                <div className={`mt-3 text-white space-y-0.5 w-full ${{ left: "text-left", center: "text-center", right: "text-right" }[lb.captionAlignment]}`}>{captionContent}</div>
-              )}
-            </div>
-          );
-        };
-
-        const touchStart = { x: 0, y: 0 };
-        const handleTouchStart = (e: React.TouchEvent) => {
-          touchStart.x = e.touches[0].clientX;
-          touchStart.y = e.touches[0].clientY;
-        };
-        const handleTouchEnd = (e: React.TouchEvent) => {
-          const dx = e.changedTouches[0].clientX - touchStart.x;
-          const dy = e.changedTouches[0].clientY - touchStart.y;
-          if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
-            if (dx < 0) navigateTo((lightboxIndex + 1) % photos.length);
-            else navigateTo((lightboxIndex - 1 + photos.length) % photos.length);
-          }
-        };
-
-        return (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/95"
-            style={{ opacity: lightboxVisible ? 1 : 0, transition: fadeMs > 0 ? `opacity ${fadeMs}ms ease` : undefined }}
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
-          >
-            {/* Close */}
-            <button onClick={closeLightbox} className="absolute right-4 top-4 text-3xl text-white/70 hover:text-white z-10">
-              &times;
-            </button>
-
-            {/* Prev */}
-            <button
-              onClick={(e) => { e.stopPropagation(); navigateTo((lightboxIndex - 1 + photos.length) % photos.length); }}
-              className="absolute left-4 text-4xl text-white/70 hover:text-white z-10 hidden sm:block"
-            >
-              &#8249;
-            </button>
-
-            {/* Image + caption */}
-            <div
-              className="max-h-[90vh] max-w-[90vw]"
-              style={{ display: "grid", placeItems: "center" }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {outgoingIndex !== null && renderSlot(outgoingIndex, true)}
-              {renderSlot(displayIndex, false)}
-            </div>
-
-            {/* Next */}
-            <button
-              onClick={(e) => { e.stopPropagation(); navigateTo((lightboxIndex + 1) % photos.length); }}
-              className="absolute right-4 text-4xl text-white/70 hover:text-white z-10 hidden sm:block"
-            >
-              &#8250;
-            </button>
-          </div>
-        );
-      })()}
+      <Lightbox
+        photos={photos}
+        selectedIndex={lightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+        settings={lb}
+      />
     </>
   );
 }

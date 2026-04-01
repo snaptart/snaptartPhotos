@@ -394,7 +394,7 @@ export default function PhotosPage() {
                       </button>
                       <button
                         onClick={() => handleDelete(photo.id)}
-                        className="text-sm text-red-500 hover:text-red-700"
+                        className="btn-danger"
                       >
                         Delete
                       </button>

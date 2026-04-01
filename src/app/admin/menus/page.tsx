@@ -308,7 +308,7 @@ export default function MenusPage() {
                       </button>
                       <button
                         onClick={() => handleDelete(item.id)}
-                        className="text-sm text-red-500 hover:text-red-700"
+                        className="btn-danger"
                       >
                         Delete
                       </button>
