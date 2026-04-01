@@ -355,8 +355,8 @@ export default function PhotosPage() {
                         <span className="ml-2 text-sm text-neutral-400">
                           {photo.width}x{photo.height}
                         </span>
-                        {photo.location && (
-                          <span className="ml-2 text-sm text-neutral-400">{photo.location}</span>
+                        {photo.description && (
+                          <span className="ml-2 text-sm text-neutral-400">{photo.description}</span>
                         )}
                         <div className="mt-0.5 flex items-center gap-1">
                           <code className="text-xs text-neutral-400 truncate max-w-xs">{photo.url}</code>
@@ -367,7 +367,7 @@ export default function PhotosPage() {
                               navigator.clipboard.writeText(photo.url);
                               setMessage("URL copied!");
                             }}
-                            className="shrink-0 text-xs text-neutral-400 hover:text-neutral-700"
+                            className="shrink-0 btn-text"
                             title="Copy URL"
                           >
                             Copy
