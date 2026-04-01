@@ -115,7 +115,7 @@ export default function PhotosPage() {
         continue;
       }
 
-      const { blobUrl, url } = await uploadRes.json();
+      const { blobUrl, url, thumbnailUrl } = await uploadRes.json();
 
       const photoRes = await fetch("/api/photos", {
         method: "POST",
@@ -124,7 +124,7 @@ export default function PhotosPage() {
           galleryId: selectedGallery,
           blobUrl,
           url,
-          thumbnailUrl: url,
+          thumbnailUrl,
           width: dimensions.width,
           height: dimensions.height,
           filename: file.name,

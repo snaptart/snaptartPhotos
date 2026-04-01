@@ -30,12 +30,15 @@ export default function GalleryGrid({ photos, lightboxSettings }: { photos: Phot
             className="mb-4 block w-full overflow-hidden rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-400"
           >
             <Image
-              src={photo.url}
+              src={photo.thumbnailUrl || photo.url}
               alt={photo.title ?? ""}
               width={photo.width}
               height={photo.height}
-              className="w-full transition-transform duration-300 hover:scale-[1.02]"
+              className="w-full opacity-0 transition-[transform,opacity] duration-300 hover:scale-[1.02]"
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              priority={index < 6}
+              ref={(el) => { if (el?.complete) el.classList.remove("opacity-0"); }}
+              onLoad={(e) => { (e.target as HTMLImageElement).classList.remove("opacity-0"); }}
             />
           </button>
         ))}
