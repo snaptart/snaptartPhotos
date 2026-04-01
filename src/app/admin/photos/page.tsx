@@ -18,6 +18,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "@/components/admin/SortableItem";
+import FocalPointPicker from "@/components/admin/FocalPointPicker";
 import Link from "next/link";
 
 interface Photo {
@@ -32,6 +33,8 @@ interface Photo {
   location: string | null;
   width: number;
   height: number;
+  focalX: number;
+  focalY: number;
   position: number;
 }
 
@@ -51,6 +54,7 @@ export default function PhotosPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingFocal, setEditingFocal] = useState<{ x: number; y: number }>({ x: 50, y: 50 });
   const [message, setMessage] = useState("");
 
   const sensors = useSensors(
@@ -113,7 +117,7 @@ export default function PhotosPage() {
 
       const { blobUrl, url } = await uploadRes.json();
 
-      await fetch("/api/photos", {
+      const photoRes = await fetch("/api/photos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -127,6 +131,10 @@ export default function PhotosPage() {
           position: photos.length + uploaded,
         }),
       });
+      if (!photoRes.ok) {
+        setMessage(`Failed to save ${file.name}`);
+        continue;
+      }
       uploaded++;
     }
 
@@ -145,7 +153,7 @@ export default function PhotosPage() {
     const reordered = arrayMove(photos, oldIndex, newIndex);
     setPhotos(reordered);
 
-    await fetch("/api/photos", {
+    const res = await fetch("/api/photos", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -153,6 +161,7 @@ export default function PhotosPage() {
         items: reordered.map((p, index) => ({ id: p.id, position: index })),
       }),
     });
+    if (!res.ok) setMessage("Failed to save order. Refresh to sync.");
   }
 
   async function handleUpdate(e: React.FormEvent<HTMLFormElement>) {
@@ -168,6 +177,8 @@ export default function PhotosPage() {
         title: form.get("title") || null,
         description: form.get("description") || null,
         location: form.get("location") || null,
+        focalX: editingFocal.x,
+        focalY: editingFocal.y,
       }),
     });
 
@@ -180,18 +191,26 @@ export default function PhotosPage() {
 
   async function handleDelete(id: string) {
     if (!confirm("Delete this photo?")) return;
-    await fetch(`/api/photos?id=${id}`, { method: "DELETE" });
-    setMessage("Photo deleted");
-    fetchPhotos();
+    const res = await fetch(`/api/photos?id=${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setMessage("Photo deleted");
+      fetchPhotos();
+    } else {
+      setMessage("Failed to delete photo");
+    }
   }
 
   async function setCover(photo: Photo) {
-    await fetch("/api/galleries", {
+    const res = await fetch("/api/galleries", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: selectedGallery, coverImageUrl: photo.thumbnailUrl }),
     });
-    setMessage("Cover image updated!");
+    if (res.ok) {
+      setMessage("Cover image updated!");
+    } else {
+      setMessage("Failed to set cover image");
+    }
   }
 
   const editingPhoto = photos.find((p) => p.id === editingId);
@@ -238,7 +257,7 @@ export default function PhotosPage() {
       </div>
 
       {message && (
-        <div className={`mb-4 rounded px-3 py-2 text-sm ${message.includes("Failed") ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600"}`}>
+        <div className={message.includes("Failed") ? "alert-error" : "alert-success"}>
           {message}
         </div>
       )}
@@ -250,7 +269,14 @@ export default function PhotosPage() {
         >
           <h2 className="mb-3 text-sm font-medium">Edit Photo</h2>
           <div className="flex gap-4">
-            <img src={editingPhoto.thumbnailUrl} alt="" className="h-20 w-20 rounded object-cover" />
+            <div className="w-48 shrink-0">
+              <FocalPointPicker
+                imageUrl={editingPhoto.thumbnailUrl}
+                focalX={editingFocal.x}
+                focalY={editingFocal.y}
+                onChange={(x, y) => setEditingFocal({ x, y })}
+              />
+            </div>
             <div className="flex-1 space-y-3">
               <div className="flex items-center gap-2 rounded border border-neutral-200 bg-neutral-50 px-3 py-2">
                 <span className="shrink-0 text-xs font-medium text-neutral-500">URL</span>
@@ -270,31 +296,29 @@ export default function PhotosPage() {
                 name="filename"
                 placeholder="Filename"
                 defaultValue={editingPhoto.filename ?? ""}
-                className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+                className="input-base"
               />
               <input
                 name="title"
                 placeholder="Title"
                 defaultValue={editingPhoto.title ?? ""}
-                className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+                className="input-base"
               />
               <input
                 name="description"
                 placeholder="Description"
                 defaultValue={editingPhoto.description ?? ""}
-                className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+                className="input-base"
               />
               <input
                 name="location"
                 placeholder="Location"
                 defaultValue={editingPhoto.location ?? ""}
-                className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+                className="input-base"
               />
               <div className="flex gap-2">
-                <button type="submit" className="rounded bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700">
-                  Update
-                </button>
-                <button type="button" onClick={() => setEditingId(null)} className="rounded border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-50">
+                <button type="submit" className="btn-primary">Update</button>
+                <button type="button" onClick={() => setEditingId(null)} className="btn-secondary">
                   Cancel
                 </button>
               </div>
@@ -354,20 +378,23 @@ export default function PhotosPage() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => setCover(photo)}
-                        className="text-sm text-neutral-500 hover:text-neutral-900"
+                        className="btn-text"
                         title="Set as gallery cover"
                       >
                         Cover
                       </button>
                       <button
-                        onClick={() => setEditingId(photo.id)}
-                        className="text-sm text-neutral-500 hover:text-neutral-900"
+                        onClick={() => {
+                          setEditingId(photo.id);
+                          setEditingFocal({ x: photo.focalX ?? 50, y: photo.focalY ?? 50 });
+                        }}
+                        className="btn-text"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => handleDelete(photo.id)}
-                        className="text-sm text-red-500 hover:text-red-700"
+                        className="btn-danger"
                       >
                         Delete
                       </button>

@@ -1,8 +1,9 @@
 import { db } from "@/lib/db";
-import { galleries, photos } from "@/lib/db/schema";
+import { galleries, photos, siteSettings } from "@/lib/db/schema";
 import { eq, asc, and } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import type { LightboxSettings } from "@/components/public/Lightbox";
 import GalleryGrid from "./GalleryGrid";
 
 interface Props {
@@ -39,11 +40,18 @@ export default async function GalleryPage({ params }: Props) {
 
   if (!gallery) notFound();
 
-  const galleryPhotos = await db
-    .select()
-    .from(photos)
-    .where(eq(photos.galleryId, gallery.id))
-    .orderBy(asc(photos.position));
+  const [galleryPhotos, [settingsRow]] = await Promise.all([
+    db.select().from(photos).where(eq(photos.galleryId, gallery.id)).orderBy(asc(photos.position)),
+    db.select().from(siteSettings).limit(1),
+  ]);
+
+  const lightboxSettings: LightboxSettings = {
+    metadataFields: settingsRow?.lightboxMetadataFields ?? ["title", "location"],
+    cornerRadius: settingsRow?.lightboxCornerRadius ?? 0,
+    captionPosition: (settingsRow?.lightboxCaptionPosition ?? "below") as LightboxSettings["captionPosition"],
+    fadeSpeed: (settingsRow?.lightboxFadeSpeed ?? "medium") as LightboxSettings["fadeSpeed"],
+    captionAlignment: (settingsRow?.lightboxCaptionAlignment ?? "left") as LightboxSettings["captionAlignment"],
+  };
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-12">
@@ -57,7 +65,7 @@ export default async function GalleryPage({ params }: Props) {
       {galleryPhotos.length === 0 ? (
         <p className="text-center text-neutral-500">No photos in this gallery yet.</p>
       ) : (
-        <GalleryGrid photos={galleryPhotos} />
+        <GalleryGrid photos={galleryPhotos} lightboxSettings={lightboxSettings} />
       )}
     </div>
   );

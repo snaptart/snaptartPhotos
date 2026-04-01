@@ -6,6 +6,7 @@ import {
   integer,
   boolean,
   jsonb,
+  real,
 } from "drizzle-orm/pg-core";
 
 export const adminUsers = pgTable("admin_users", {
@@ -21,7 +22,24 @@ export const siteSettings = pgTable("site_settings", {
   logoUrl: text("logo_url"),
   instagramUrl: text("instagram_url"),
   footerText: text("footer_text"),
+  footerAlignment: text("footer_alignment").notNull().default("center"),
   contactEmail: text("contact_email"),
+  homepageId: uuid("homepage_id"),
+  // Global lightbox defaults
+  lightboxMetadataFields: text("lightbox_metadata_fields").array().default(["title", "location"]),
+  lightboxCornerRadius: integer("lightbox_corner_radius").default(0),
+  lightboxCaptionPosition: text("lightbox_caption_position").default("below"),
+  lightboxFadeSpeed: text("lightbox_fade_speed").default("medium"),
+  lightboxCaptionAlignment: text("lightbox_caption_alignment").default("left"),
+  activeThemeId: uuid("active_theme_id"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const themes = pgTable("themes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull().default("Default"),
+  themeSettings: jsonb("theme_settings").notNull().default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -47,6 +65,7 @@ export const pages = pgTable("pages", {
   metaTitle: text("meta_title"),
   metaDescription: text("meta_description"),
   ogImageUrl: text("og_image_url"),
+  showTitle: boolean("show_title").notNull().default(true),
   isPublished: boolean("is_published").notNull().default(false),
   position: integer("position").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -82,6 +101,8 @@ export const photos = pgTable("photos", {
   tags: text("tags").array(),
   width: integer("width").notNull(),
   height: integer("height").notNull(),
+  focalX: real("focal_x").notNull().default(50),
+  focalY: real("focal_y").notNull().default(50),
   position: integer("position").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
