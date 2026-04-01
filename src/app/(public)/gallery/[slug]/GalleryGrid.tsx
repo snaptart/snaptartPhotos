@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Image from "next/image";
 
 interface Photo {
@@ -22,83 +22,118 @@ export default function GalleryGrid({ photos }: { photos: Photo[] }) {
   const [displayIndex, setDisplayIndex] = useState(0);
   const [outgoingIndex, setOutgoingIndex] = useState<number | null>(null);
   const [crossfading, setCrossfading] = useState(false);
-  const [slideDir, setSlideDir] = useState<"left" | "right" | null>(null);
   const navTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartRef = useRef({ x: 0, y: 0 });
 
+  // Refs for direct DOM slide animation
+  const incomingRef = useRef<HTMLDivElement>(null);
+  const outgoingRef = useRef<HTMLDivElement>(null);
+  const slideDirRef = useRef<"left" | "right" | null>(null);
+
   function openLightbox(index: number) {
     if (navTimer.current) clearTimeout(navTimer.current);
+    slideDirRef.current = null;
     setSelectedIndex(index);
     setDisplayIndex(index);
     setOutgoingIndex(null);
     setCrossfading(false);
-    setSlideDir(null);
   }
 
   function navigateTo(index: number, direction?: "left" | "right") {
     if (navTimer.current) clearTimeout(navTimer.current);
     const prev = displayIndex;
+    slideDirRef.current = direction ?? null;
     setOutgoingIndex(prev);
     setCrossfading(false);
-    setSlideDir(direction ?? null);
     setDisplayIndex(index);
     setSelectedIndex(index);
-    const duration = direction ? SLIDE_MS : FADE_MS;
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      setCrossfading(true);
-    }));
-    navTimer.current = setTimeout(() => {
-      setOutgoingIndex(null);
-      setCrossfading(false);
-      setSlideDir(null);
-    }, duration + 50);
+
+    if (!direction) {
+      // Crossfade: use the rAF approach
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        setCrossfading(true);
+      }));
+      navTimer.current = setTimeout(() => {
+        setOutgoingIndex(null);
+        setCrossfading(false);
+      }, FADE_MS + 50);
+    }
+    // Slide animation is handled via useEffect + DOM refs
   }
 
+  // Drive the slide animation imperatively via DOM refs
+  useEffect(() => {
+    const dir = slideDirRef.current;
+    if (!dir || outgoingIndex === null) return;
+
+    const inEl = incomingRef.current;
+    const outEl = outgoingRef.current;
+    if (!inEl || !outEl) return;
+
+    const offscreen = dir === "left" ? "100vw" : "-100vw";
+    const exitTo = dir === "left" ? "-100vw" : "100vw";
+
+    // 1. Position at start — no transition
+    inEl.style.transition = "none";
+    outEl.style.transition = "none";
+    inEl.style.transform = `translate3d(${offscreen}, 0, 0)`;
+    outEl.style.transform = "translate3d(0, 0, 0)";
+
+    // 2. Force reflow so browser registers the starting position
+    inEl.getBoundingClientRect();
+
+    // 3. Enable transition and set end position
+    inEl.style.transition = `transform ${SLIDE_MS}ms ease`;
+    outEl.style.transition = `transform ${SLIDE_MS}ms ease`;
+    inEl.style.transform = "translate3d(0, 0, 0)";
+    outEl.style.transform = `translate3d(${exitTo}, 0, 0)`;
+
+    // 4. Clean up after animation
+    navTimer.current = setTimeout(() => {
+      slideDirRef.current = null;
+      setOutgoingIndex(null);
+      setCrossfading(false);
+    }, SLIDE_MS + 50);
+  }, [outgoingIndex, displayIndex]);
+
+  const isSliding = slideDirRef.current !== null;
   const incomingOpacity = outgoingIndex === null || crossfading ? 1 : 0;
+
+  const photoContent = (photo: Photo, priority: boolean) => (
+    <>
+      <Image
+        src={photo.url}
+        alt={photo.title ?? ""}
+        width={photo.width}
+        height={photo.height}
+        className="max-h-[80vh] w-auto object-contain"
+        sizes="90vw"
+        priority={priority}
+      />
+      {(photo.title || photo.location) && (
+        <div className="mt-3 text-center text-white">
+          {photo.title && <p className="text-lg">{photo.title}</p>}
+          {photo.location && <p className="text-sm text-white/60">{photo.location}</p>}
+        </div>
+      )}
+    </>
+  );
 
   const photoSlot = (index: number, isOutgoing: boolean) => {
     const photo = photos[index];
 
-    // Slide transition for swipe navigation
-    if (slideDir) {
-      // Swiping left (next): outgoing slides left, incoming enters from right
-      // Swiping right (prev): outgoing slides right, incoming enters from left
-      let transform: string;
-      if (isOutgoing) {
-        transform = crossfading
-          ? `translateX(${slideDir === "left" ? "-100%" : "100%"})`
-          : "translateX(0)";
-      } else {
-        transform = crossfading
-          ? "translateX(0)"
-          : `translateX(${slideDir === "left" ? "100%" : "-100%"})`;
-      }
-
+    if (isSliding) {
       return (
         <div
+          ref={isOutgoing ? outgoingRef : incomingRef}
           style={{
             gridArea: "1/1",
-            transform,
-            transition: `transform ${SLIDE_MS}ms ease`,
             pointerEvents: isOutgoing ? "none" : "auto",
+            willChange: "transform",
           }}
           className="flex flex-col items-center"
         >
-          <Image
-            src={photo.url}
-            alt={photo.title ?? ""}
-            width={photo.width}
-            height={photo.height}
-            className="max-h-[80vh] w-auto object-contain"
-            sizes="90vw"
-            priority={!isOutgoing}
-          />
-          {(photo.title || photo.location) && (
-            <div className="mt-3 text-center text-white">
-              {photo.title && <p className="text-lg">{photo.title}</p>}
-              {photo.location && <p className="text-sm text-white/60">{photo.location}</p>}
-            </div>
-          )}
+          {photoContent(photo, !isOutgoing)}
         </div>
       );
     }
@@ -114,21 +149,7 @@ export default function GalleryGrid({ photos }: { photos: Photo[] }) {
         }}
         className="flex flex-col items-center"
       >
-        <Image
-          src={photo.url}
-          alt={photo.title ?? ""}
-          width={photo.width}
-          height={photo.height}
-          className="max-h-[80vh] w-auto object-contain"
-          sizes="90vw"
-          priority={!isOutgoing}
-        />
-        {(photo.title || photo.location) && (
-          <div className="mt-3 text-center text-white">
-            {photo.title && <p className="text-lg">{photo.title}</p>}
-            {photo.location && <p className="text-sm text-white/60">{photo.location}</p>}
-          </div>
-        )}
+        {photoContent(photo, !isOutgoing)}
       </div>
     );
   };
