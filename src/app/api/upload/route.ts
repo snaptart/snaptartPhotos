@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { put } from "@vercel/blob";
+import sharp from "sharp";
+
+const THUMBNAIL_WIDTH = 800;
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -22,13 +25,29 @@ export async function POST(req: Request) {
   try {
     const folder = (formData.get("folder") as string) || "snaptart";
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const filename = `${folder}/${Date.now()}-${safeName}`;
+    const timestamp = Date.now();
+    const filename = `${folder}/${timestamp}-${safeName}`;
 
+    // Upload full-res image
     const blob = await put(filename, file, { access: "public" });
+
+    // Generate and upload thumbnail
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const thumbnailBuffer = await sharp(buffer)
+      .resize({ width: THUMBNAIL_WIDTH, withoutEnlargement: true })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+
+    const thumbFilename = `${folder}/thumbs/${timestamp}-${safeName.replace(/\.[^.]+$/, ".jpg")}`;
+    const thumbBlob = await put(thumbFilename, thumbnailBuffer, {
+      access: "public",
+      contentType: "image/jpeg",
+    });
 
     return NextResponse.json({
       blobUrl: blob.url,
       url: blob.url,
+      thumbnailUrl: thumbBlob.url,
     });
   } catch {
     return NextResponse.json({ error: "Upload failed" }, { status: 500 });

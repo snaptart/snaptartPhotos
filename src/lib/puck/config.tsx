@@ -1157,8 +1157,10 @@ function HeroSlideshowClient({
           <img
             src={photo.url}
             alt={photo.title ?? ""}
-            className="h-full w-full"
+            className="h-full w-full opacity-0 transition-opacity duration-500"
             style={{ objectFit, objectPosition: `${photo.focalX ?? 50}% ${photo.focalY ?? 50}%` }}
+            ref={(el) => { if (el?.complete) el.classList.remove("opacity-0"); }}
+            onLoad={(e) => { (e.target as HTMLImageElement).classList.remove("opacity-0"); }}
           />
         </div>
       ))}
@@ -1345,8 +1347,10 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
             <img
               src={photo.url}
               alt={photo.title ?? ""}
-              className="absolute inset-0 h-full w-full object-cover"
+              className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-500"
               style={{ objectPosition: `${photo.focalX ?? 50}% ${photo.focalY ?? 50}%` }}
+              ref={(el) => { if (el?.complete) el.classList.remove("opacity-0"); }}
+              onLoad={(e) => { (e.target as HTMLImageElement).classList.remove("opacity-0"); }}
             />
           </div>
         ) : (
@@ -1355,8 +1359,10 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
             alt={photo.title ?? ""}
             width={photo.width}
             height={photo.height}
-            className="w-full object-cover"
+            className="w-full object-cover opacity-0 transition-opacity duration-500"
             style={{ borderRadius: radius, objectPosition: `${photo.focalX ?? 50}% ${photo.focalY ?? 50}%` }}
+            ref={(el) => { if (el?.complete) el.classList.remove("opacity-0"); }}
+            onLoad={(e) => { (e.target as HTMLImageElement).classList.remove("opacity-0"); }}
           />
         )}
       </button>
