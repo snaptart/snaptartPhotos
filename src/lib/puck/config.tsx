@@ -397,6 +397,7 @@ export const puckConfig: Config<Components> = {
         focalY: 50,
       },
       render: ({ url, alt, aspectRatio, caption, width, captionX, captionY, captionFontSize, captionColor, captionBold, captionItalic, captionBgColor, captionBgOpacity, borderRadius, linkUrl, linkTarget, focalX, focalY }) => {
+        const isPriority = useImagePriority();
         const isOverlay = captionY >= 0 && captionY <= 100;
         const arMap: Record<string, string> = { square: "1/1", "4:3": "4/3", "3:2": "3/2", "16:9": "16/9" };
         const arValue = arMap[aspectRatio];
@@ -421,10 +422,28 @@ export const puckConfig: Config<Components> = {
         const imageEl = url ? (
           arValue ? (
             <div className="relative overflow-hidden w-full" style={{ aspectRatio: arValue, borderRadius: `${borderRadius}px` }}>
-              <img src={url} alt={alt} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: focalPos }} />
+              <img
+                src={url}
+                alt={alt}
+                className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-300"
+                style={{ objectPosition: focalPos }}
+                loading={isPriority ? "eager" : "lazy"}
+                fetchPriority={isPriority ? "high" : undefined}
+                ref={(el) => { if (el?.complete) el.classList.remove("opacity-0"); }}
+                onLoad={(e) => { (e.target as HTMLImageElement).classList.remove("opacity-0"); }}
+              />
             </div>
           ) : (
-            <img src={url} alt={alt} className="w-full" style={{ borderRadius: `${borderRadius}px`, objectPosition: focalPos }} />
+            <img
+              src={url}
+              alt={alt}
+              className="w-full opacity-0 transition-opacity duration-300"
+              style={{ borderRadius: `${borderRadius}px`, objectPosition: focalPos }}
+              loading={isPriority ? "eager" : "lazy"}
+              fetchPriority={isPriority ? "high" : undefined}
+              ref={(el) => { if (el?.complete) el.classList.remove("opacity-0"); }}
+              onLoad={(e) => { (e.target as HTMLImageElement).classList.remove("opacity-0"); }}
+            />
           )
         ) : (
           <div className="flex h-48 items-center justify-center rounded bg-neutral-100 text-neutral-400">
@@ -856,7 +875,18 @@ export const puckConfig: Config<Components> = {
 
 // ----- Gallery picker (custom Puck field) -----
 
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
+
+// Image priority context — tracks how many images have rendered so the first N load eagerly
+const ImageCounterContext = createContext<{ next: () => number }>({ next: () => Infinity });
+export { ImageCounterContext };
+
+function useImagePriority(threshold = 2): boolean {
+  const ctx = useContext(ImageCounterContext);
+  const indexRef = useRef<number | null>(null);
+  if (indexRef.current === null) indexRef.current = ctx.next();
+  return indexRef.current < threshold;
+}
 
 type GalleryOption = { id: string; title: string; slug: string };
 
@@ -1157,8 +1187,9 @@ function HeroSlideshowClient({
           <img
             src={photo.url}
             alt={photo.title ?? ""}
-            className="h-full w-full opacity-0 transition-opacity duration-500"
+            className="h-full w-full opacity-0 transition-opacity duration-300"
             style={{ objectFit, objectPosition: `${photo.focalX ?? 50}% ${photo.focalY ?? 50}%` }}
+            loading={i === 0 ? "eager" : "lazy"}
             ref={(el) => { if (el?.complete) el.classList.remove("opacity-0"); }}
             onLoad={(e) => { (e.target as HTMLImageElement).classList.remove("opacity-0"); }}
           />
@@ -1347,8 +1378,9 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
             <img
               src={photo.url}
               alt={photo.title ?? ""}
-              className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-500"
+              className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-300"
               style={{ objectPosition: `${photo.focalX ?? 50}% ${photo.focalY ?? 50}%` }}
+              loading={index < 6 ? "eager" : "lazy"}
               ref={(el) => { if (el?.complete) el.classList.remove("opacity-0"); }}
               onLoad={(e) => { (e.target as HTMLImageElement).classList.remove("opacity-0"); }}
             />
@@ -1359,8 +1391,9 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
             alt={photo.title ?? ""}
             width={photo.width}
             height={photo.height}
-            className="w-full object-cover opacity-0 transition-opacity duration-500"
+            className="w-full object-cover opacity-0 transition-opacity duration-300"
             style={{ borderRadius: radius, objectPosition: `${photo.focalX ?? 50}% ${photo.focalY ?? 50}%` }}
+            loading={index < 6 ? "eager" : "lazy"}
             ref={(el) => { if (el?.complete) el.classList.remove("opacity-0"); }}
             onLoad={(e) => { (e.target as HTMLImageElement).classList.remove("opacity-0"); }}
           />

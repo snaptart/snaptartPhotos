@@ -34,8 +34,9 @@ export default function GalleryGrid({ photos, lightboxSettings }: { photos: Phot
               alt={photo.title ?? ""}
               width={photo.width}
               height={photo.height}
-              className="w-full opacity-0 transition-[transform,opacity] duration-500 hover:scale-[1.02]"
+              className="w-full opacity-0 transition-[transform,opacity] duration-300 hover:scale-[1.02]"
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              priority={index < 6}
               ref={(el) => { if (el?.complete) el.classList.remove("opacity-0"); }}
               onLoad={(e) => { (e.target as HTMLImageElement).classList.remove("opacity-0"); }}
             />
