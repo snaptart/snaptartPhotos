@@ -16,6 +16,9 @@ export interface ThemeSettings {
   colorFooterText: string;
   colorAccent: string;
   colorText: string;
+  colorGalleryCaptions: string;
+  colorLightboxText: string;
+  colorHeroOverlay: string;
 }
 
 export const THEME_DEFAULTS: ThemeSettings = {
@@ -36,6 +39,9 @@ export const THEME_DEFAULTS: ThemeSettings = {
   colorFooterText: "#737373",
   colorAccent: "#525252",
   colorText: "#171717",
+  colorGalleryCaptions: "#525252",
+  colorLightboxText: "#ffffff",
+  colorHeroOverlay: "#ffffff",
 };
 
 export function resolveTheme(

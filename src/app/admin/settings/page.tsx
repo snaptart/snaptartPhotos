@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import ImagePicker from "@/components/admin/ImagePicker";
+import { DEFAULT_LIGHTBOX_SETTINGS } from "@/components/public/Lightbox";
+import { useMessage } from "@/lib/hooks/useMessage";
 
 interface SiteSettings {
   id: string;
@@ -40,11 +42,11 @@ function draftFromSettings(data: SiteSettings): SettingsDraft {
   return {
     logoUrl: data.logoUrl ?? "",
     footerAlignment: data.footerAlignment ?? "center",
-    lbMetadataFields: data.lightboxMetadataFields ?? ["title", "location"],
-    lbCornerRadius: data.lightboxCornerRadius ?? 0,
-    lbCaptionPosition: data.lightboxCaptionPosition ?? "below",
-    lbFadeSpeed: data.lightboxFadeSpeed ?? "medium",
-    lbCaptionAlignment: data.lightboxCaptionAlignment ?? "left",
+    lbMetadataFields: data.lightboxMetadataFields ?? DEFAULT_LIGHTBOX_SETTINGS.metadataFields,
+    lbCornerRadius: data.lightboxCornerRadius ?? DEFAULT_LIGHTBOX_SETTINGS.cornerRadius,
+    lbCaptionPosition: data.lightboxCaptionPosition ?? DEFAULT_LIGHTBOX_SETTINGS.captionPosition,
+    lbFadeSpeed: data.lightboxFadeSpeed ?? DEFAULT_LIGHTBOX_SETTINGS.fadeSpeed,
+    lbCaptionAlignment: data.lightboxCaptionAlignment ?? DEFAULT_LIGHTBOX_SETTINGS.captionAlignment,
   };
 }
 
@@ -53,16 +55,16 @@ export default function SettingsPage() {
   const [draft, setDraft] = useState<SettingsDraft>({
     logoUrl: "",
     footerAlignment: "center",
-    lbMetadataFields: ["title", "location"],
-    lbCornerRadius: 0,
-    lbCaptionPosition: "below",
-    lbFadeSpeed: "medium",
-    lbCaptionAlignment: "left",
+    lbMetadataFields: DEFAULT_LIGHTBOX_SETTINGS.metadataFields,
+    lbCornerRadius: DEFAULT_LIGHTBOX_SETTINGS.cornerRadius,
+    lbCaptionPosition: DEFAULT_LIGHTBOX_SETTINGS.captionPosition,
+    lbFadeSpeed: DEFAULT_LIGHTBOX_SETTINGS.fadeSpeed,
+    lbCaptionAlignment: DEFAULT_LIGHTBOX_SETTINGS.captionAlignment,
   });
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
+  const { message, showSuccess, showError, clear, alertClass } = useMessage();
   const [pwSaving, setPwSaving] = useState(false);
-  const [pwMessage, setPwMessage] = useState("");
+  const { message: pwMessage, showSuccess: pwShowSuccess, showError: pwShowError, clear: pwClear, alertClass: pwAlertClass } = useMessage();
 
   useEffect(() => {
     fetch("/api/settings")
@@ -80,7 +82,7 @@ export default function SettingsPage() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSaving(true);
-    setMessage("");
+    clear();
 
     const form = new FormData(e.currentTarget);
     const data = {
@@ -107,9 +109,9 @@ export default function SettingsPage() {
       const updated = await res.json();
       setSettings(updated);
       setDraft(draftFromSettings(updated));
-      setMessage("Settings saved!");
+      showSuccess("Settings saved!");
     } else {
-      setMessage("Failed to save settings");
+      showError("Failed to save settings");
     }
     setSaving(false);
   }
@@ -118,7 +120,7 @@ export default function SettingsPage() {
     e.preventDefault();
     const formEl = e.currentTarget;
     setPwSaving(true);
-    setPwMessage("");
+    pwClear();
 
     const form = new FormData(e.currentTarget);
     const res = await fetch("/api/change-password", {
@@ -131,11 +133,11 @@ export default function SettingsPage() {
     });
 
     if (res.ok) {
-      setPwMessage("Password updated!");
+      pwShowSuccess("Password updated!");
       formEl.reset();
     } else {
       const data = await res.json();
-      setPwMessage(data.error || "Failed to update password");
+      pwShowError(data.error || "Failed to update password");
     }
     setPwSaving(false);
   }
@@ -147,8 +149,8 @@ export default function SettingsPage() {
       <h1 className="mb-6 text-2xl font-semibold">Site Settings</h1>
 
       {message && (
-        <div className={message.includes("Failed") ? "alert-error" : "alert-success"}>
-          {message}
+        <div className={alertClass}>
+          {message.text}
         </div>
       )}
 
@@ -270,8 +272,8 @@ export default function SettingsPage() {
       <h2 className="mb-4 text-xl font-semibold">Change Password</h2>
 
       {pwMessage && (
-        <div className={pwMessage.includes("Password updated") ? "alert-success" : "alert-error"}>
-          {pwMessage}
+        <div className={pwAlertClass}>
+          {pwMessage.text}
         </div>
       )}
 
