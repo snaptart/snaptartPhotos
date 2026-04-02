@@ -13,6 +13,7 @@ import { SortableItem } from "@/components/admin/SortableItem";
 import { useSortableList } from "@/lib/hooks/useSortableList";
 import { useMessage } from "@/lib/hooks/useMessage";
 import Link from "next/link";
+import siteConfig from "@/lib/site.config";
 
 interface Gallery {
   id: string;
@@ -67,10 +68,10 @@ export default function GalleriesPage() {
 
     if (res.ok) {
       setShowForm(false);
-      showSuccess("Gallery created!");
+      showSuccess(`${siteConfig.labels.gallery} created!`);
       fetchGalleries();
     } else {
-      showError("Failed to create gallery");
+      showError(`Failed to create ${siteConfig.labels.gallery.toLowerCase()}`);
     }
   }
 
@@ -91,19 +92,19 @@ export default function GalleriesPage() {
 
     if (res.ok) {
       setEditingId(null);
-      showSuccess("Gallery updated!");
+      showSuccess(`${siteConfig.labels.gallery} updated!`);
       fetchGalleries();
     }
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this gallery and all its photos?")) return;
+    if (!confirm(`Delete this ${siteConfig.labels.gallery.toLowerCase()} and all its ${siteConfig.labels.photos.toLowerCase()}?`)) return;
     const res = await fetch(`/api/galleries?id=${id}`, { method: "DELETE" });
     if (res.ok) {
-      showSuccess("Gallery deleted");
+      showSuccess(`${siteConfig.labels.gallery} deleted`);
       fetchGalleries();
     } else {
-      showError("Failed to delete gallery");
+      showError(`Failed to delete ${siteConfig.labels.gallery.toLowerCase()}`);
     }
   }
 
@@ -116,7 +117,7 @@ export default function GalleriesPage() {
     if (res.ok) {
       fetchGalleries();
     } else {
-      showError("Failed to update gallery");
+      showError(`Failed to update ${siteConfig.labels.gallery.toLowerCase()}`);
     }
   }
 
@@ -127,12 +128,12 @@ export default function GalleriesPage() {
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Galleries</h1>
+        <h1 className="text-2xl font-semibold">{siteConfig.labels.galleries}</h1>
         <button
           onClick={() => { setShowForm(true); setEditingId(null); }}
           className="btn-primary"
         >
-          New Gallery
+          New {siteConfig.labels.gallery}
         </button>
       </div>
 
@@ -148,12 +149,12 @@ export default function GalleriesPage() {
           className="mb-6 rounded-lg border border-neutral-200 bg-white p-4"
         >
           <h2 className="mb-3 text-sm font-medium">
-            {editingId ? "Edit Gallery" : "New Gallery"}
+            {editingId ? `Edit ${siteConfig.labels.gallery}` : `New ${siteConfig.labels.gallery}`}
           </h2>
           <div className="space-y-3">
             <input
               name="title"
-              placeholder="Gallery title"
+              placeholder={`${siteConfig.labels.gallery} title`}
               defaultValue={editingGallery?.title ?? ""}
               required
               className="input-base"
@@ -190,7 +191,7 @@ export default function GalleriesPage() {
       )}
 
       {galleries.length === 0 ? (
-        <p className="text-sm text-neutral-500">No galleries yet. Create one to get started.</p>
+        <p className="text-sm text-neutral-500">No {siteConfig.labels.galleries.toLowerCase()} yet. Create one to get started.</p>
       ) : (
         <div className="rounded-lg border border-neutral-200 bg-white">
           <DndContext
@@ -233,7 +234,7 @@ export default function GalleriesPage() {
                         href={`/admin/photos?galleryId=${gallery.id}`}
                         className="btn-text"
                       >
-                        Photos
+                        {siteConfig.labels.photos}
                       </Link>
                       <button onClick={() => togglePublish(gallery)} className="btn-text">
                         {gallery.isPublished ? "Unpublish" : "Publish"}

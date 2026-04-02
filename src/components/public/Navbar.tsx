@@ -5,6 +5,7 @@ import { asc, eq } from "drizzle-orm";
 import { resolveTheme } from "@/lib/theme/types";
 import type { ThemeSettings } from "@/lib/theme/types";
 import { MobileMenu } from "./MobileMenu";
+import siteConfig from "@/lib/site.config";
 
 export async function Navbar() {
   let items: { id: string; label: string; url: string; targetType: string }[] = [];
@@ -25,7 +26,7 @@ export async function Navbar() {
     // DB not available — use fallback
   }
 
-  const siteTitle = navSettings?.siteTitle ?? "SnaptArt";
+  const siteTitle = navSettings?.siteTitle ?? siteConfig.siteName;
   const logoUrl = navSettings?.logoUrl;
   const instagramUrl = navSettings?.instagramUrl;
 

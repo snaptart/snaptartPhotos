@@ -17,6 +17,7 @@ import type { JSONContent } from "@tiptap/react";
 import TiptapEditor from "@/components/admin/TiptapEditor";
 import ImagePicker from "@/components/admin/ImagePicker";
 import { parseLinks } from "@/lib/parseLinks";
+import siteConfig from "@/lib/site.config";
 import Lightbox from "@/components/public/Lightbox";
 import type { LightboxPhoto, LightboxSettings } from "@/components/public/Lightbox";
 import { FormWrapperRender } from "@/components/puck/form/FormWrapper";
@@ -658,12 +659,12 @@ export const puckConfig: Config<Components> = {
       fields: {
         gallerySlug: {
           type: "custom",
-          label: "Gallery",
+          label: siteConfig.labels.gallery,
           render: ({ value, onChange }) => (
             <GalleryPicker value={value} onChange={onChange} />
           ),
         },
-        maxPhotos: { type: "number", label: "Max Photos", min: 1, max: 20 },
+        maxPhotos: { type: "number", label: `Max ${siteConfig.labels.photos}`, min: 1, max: 20 },
         height: {
           type: "select",
           label: "Height (or min-height when aspect ratio is set)",
@@ -820,16 +821,16 @@ export const puckConfig: Config<Components> = {
     },
 
     GalleryEmbed: {
-      label: "Gallery Embed",
+      label: `${siteConfig.labels.gallery} Embed`,
       fields: {
         gallerySlug: {
           type: "custom",
-          label: "Gallery",
+          label: siteConfig.labels.gallery,
           render: ({ value, onChange }) => (
             <GalleryPicker value={value} onChange={onChange} />
           ),
         },
-        maxPhotos: { type: "number", label: "Max Photos", min: 1, max: 50 },
+        maxPhotos: { type: "number", label: `Max ${siteConfig.labels.photos}`, min: 1, max: 50 },
         layout: {
           type: "select",
           label: "Layout",
@@ -1274,7 +1275,7 @@ function LinkPicker({ value, onChange }: { value: string; onChange: (v: string) 
         }
         if (galleriesRes.ok) {
           const galleries: { title: string; slug: string }[] = await galleriesRes.json();
-          galleries.forEach((g) => items.push({ label: `Gallery: ${g.title}`, value: `/gallery/${g.slug}` }));
+          galleries.forEach((g) => items.push({ label: `${siteConfig.labels.gallery}: ${g.title}`, value: `/${siteConfig.labels.gallerySlug}/${g.slug}` }));
         }
       } catch {}
       setOptions(items);

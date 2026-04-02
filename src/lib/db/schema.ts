@@ -18,7 +18,7 @@ export const adminUsers = pgTable("admin_users", {
 
 export const siteSettings = pgTable("site_settings", {
   id: uuid("id").defaultRandom().primaryKey(),
-  siteTitle: text("site_title").notNull().default("SnaptArt"),
+  siteTitle: text("site_title").notNull().default("My Site"),
   logoUrl: text("logo_url"),
   instagramUrl: text("instagram_url"),
   footerText: text("footer_text"),
@@ -26,7 +26,7 @@ export const siteSettings = pgTable("site_settings", {
   contactEmail: text("contact_email"),
   homepageId: uuid("homepage_id"),
   // Global lightbox defaults
-  lightboxMetadataFields: text("lightbox_metadata_fields").array().default(["title", "location"]),
+  lightboxMetadataFields: text("lightbox_metadata_fields").array().default(["title", "description"]),
   lightboxCornerRadius: integer("lightbox_corner_radius").default(0),
   lightboxCaptionPosition: text("lightbox_caption_position").default("below"),
   lightboxFadeSpeed: text("lightbox_fade_speed").default("medium"),
@@ -101,8 +101,8 @@ export const photos = pgTable("photos", {
   filename: text("filename"),
   title: text("title"),
   description: text("description"),
-  location: text("location"),
-  cameraSettings: jsonb("camera_settings"), // { camera, lens, iso, aperture, shutter }
+  location: text("location"), // optional — photography/portfolio metadata
+  cameraSettings: jsonb("camera_settings"), // optional — { camera, lens, iso, aperture, shutter }
   tags: text("tags").array(),
   width: integer("width").notNull(),
   height: integer("height").notNull(),

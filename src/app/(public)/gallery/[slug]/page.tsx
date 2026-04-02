@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { DEFAULT_LIGHTBOX_SETTINGS, type LightboxSettings } from "@/components/public/Lightbox";
 import GalleryGrid from "./GalleryGrid";
+import siteConfig from "@/lib/site.config";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -63,7 +64,7 @@ export default async function GalleryPage({ params }: Props) {
       </div>
 
       {galleryPhotos.length === 0 ? (
-        <p className="text-center text-neutral-500">No photos in this gallery yet.</p>
+        <p className="text-center text-neutral-500">No {siteConfig.labels.photos.toLowerCase()} in this {siteConfig.labels.gallery.toLowerCase()} yet.</p>
       ) : (
         <GalleryGrid photos={galleryPhotos} lightboxSettings={lightboxSettings} />
       )}

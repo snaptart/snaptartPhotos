@@ -12,6 +12,7 @@ import {
 import { SortableItem } from "@/components/admin/SortableItem";
 import { useSortableList } from "@/lib/hooks/useSortableList";
 import { useMessage } from "@/lib/hooks/useMessage";
+import siteConfig from "@/lib/site.config";
 
 interface MenuItem {
   id: string;
@@ -106,7 +107,7 @@ export default function MenusPage() {
     const selected = options.find((o) => o.id === id);
     if (!selected) return;
 
-    const urlPrefix = form.targetType === "page" ? "/" : "/gallery/";
+    const urlPrefix = form.targetType === "page" ? "/" : `/${siteConfig.labels.gallerySlug}/`;
     setForm((prev) => ({
       ...prev,
       targetId: selected.id,

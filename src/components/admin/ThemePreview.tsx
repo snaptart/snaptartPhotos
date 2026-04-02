@@ -137,7 +137,7 @@ export default function ThemePreview({ theme, siteTitle, logoUrl }: ThemePreview
           }}
         >
           This is sample body text showing how your chosen font and colors look together.
-          Photography from Minnesota, France, and other beautiful places.
+          This is how your chosen font and colors look on longer paragraphs of text.
         </p>
         <div className="flex gap-3">
           <div className="h-16 w-24 rounded bg-neutral-300" />
@@ -152,7 +152,7 @@ export default function ThemePreview({ theme, siteTitle, logoUrl }: ThemePreview
             color: theme.colorGalleryCaptions,
           }}
         >
-          Caption text — Sunset at Lake Superior
+          Caption text — Sample image caption
         </p>
         <div
           className="mt-1 rounded px-2 py-1"
@@ -180,7 +180,7 @@ export default function ThemePreview({ theme, siteTitle, logoUrl }: ThemePreview
           fontSize: `${theme.footerFontSize * 0.75}px`,
         }}
       >
-        <p>&copy; 2026 Michael Schroeder. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} {siteTitle || "Your Site"}. All rights reserved.</p>
         <p className="mt-0.5">
           <span style={{ color: theme.colorAccent }}>contact@example.com</span>
         </p>

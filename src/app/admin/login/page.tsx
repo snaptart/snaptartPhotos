@@ -35,7 +35,7 @@ function LoginForm() {
     <div className="flex min-h-screen items-center justify-center bg-neutral-50 font-sans">
       <div className="w-full max-w-sm rounded-lg border border-neutral-200 bg-white p-8 shadow-sm">
         <h1 className="mb-6 text-center font-serif text-2xl font-light tracking-wide">
-          SnaptArt Admin
+          Admin
         </h1>
 
         {error && (
