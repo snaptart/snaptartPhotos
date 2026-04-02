@@ -26,5 +26,8 @@ export function buildThemeCssVars(theme: ThemeSettings): string {
   --theme-color-footer-text: ${theme.colorFooterText};
   --theme-color-accent: ${theme.colorAccent};
   --theme-color-text: ${theme.colorText};
+  --theme-color-gallery-captions: ${theme.colorGalleryCaptions};
+  --theme-color-lightbox-text: ${theme.colorLightboxText};
+  --theme-color-hero-overlay: ${theme.colorHeroOverlay};
 }`;
 }

@@ -144,15 +144,15 @@ export default function Lightbox({ photos, selectedIndex, onClose, settings = DE
     if (!hasCaption) return null;
     return (
       <>
-        {fields.includes("title") && p.title && <p className="text-base" style={{ fontFamily: "var(--theme-font-captions)" }}>{parseLinks(p.title)}</p>}
-        {fields.includes("description") && p.description && <p className="text-sm text-white/80">{parseLinks(p.description)}</p>}
-        {fields.includes("location") && p.location && <p className="text-sm text-white/60">{parseLinks(p.location)}</p>}
+        {fields.includes("title") && p.title && <p className="text-base" style={{ fontFamily: "var(--theme-font-captions)", color: "var(--theme-color-lightbox-text)" }}>{parseLinks(p.title)}</p>}
+        {fields.includes("description") && p.description && <p className="text-sm" style={{ color: "var(--theme-color-lightbox-text)", opacity: 0.8 }}>{parseLinks(p.description)}</p>}
+        {fields.includes("location") && p.location && <p className="text-sm" style={{ color: "var(--theme-color-lightbox-text)", opacity: 0.6 }}>{parseLinks(p.location)}</p>}
         {fields.includes("camera") && p.cameraSettings && (
-          <p className="text-xs text-white/40">
+          <p className="text-xs" style={{ color: "var(--theme-color-lightbox-text)", opacity: 0.4 }}>
             {[p.cameraSettings.camera, p.cameraSettings.lens, p.cameraSettings.aperture, p.cameraSettings.shutter, p.cameraSettings.iso ? `ISO ${p.cameraSettings.iso}` : null].filter(Boolean).join(" \u00b7 ")}
           </p>
         )}
-        {fields.includes("filename") && p.filename && <p className="text-xs text-white/40">{p.filename}</p>}
+        {fields.includes("filename") && p.filename && <p className="text-xs" style={{ color: "var(--theme-color-lightbox-text)", opacity: 0.4 }}>{p.filename}</p>}
       </>
     );
   };
@@ -172,7 +172,7 @@ export default function Lightbox({ photos, selectedIndex, onClose, settings = DE
           />
           {isOverlay && caption && (
             <div
-              className={`absolute left-0 right-0 px-4 py-3 text-white space-y-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${alignClass} ${
+              className={`absolute left-0 right-0 px-4 py-3 space-y-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${alignClass} ${
                 settings.captionPosition === "overlay-top"
                   ? "top-0 bg-gradient-to-b from-black/70 to-transparent"
                   : "bottom-0 bg-gradient-to-t from-black/70 to-transparent"
@@ -184,7 +184,7 @@ export default function Lightbox({ photos, selectedIndex, onClose, settings = DE
           )}
         </div>
         {!isOverlay && caption && (
-          <div className={`mt-3 text-white space-y-0.5 w-full ${alignClass}`}>{caption}</div>
+          <div className={`mt-3 space-y-0.5 w-full ${alignClass}`}>{caption}</div>
         )}
       </>
     );

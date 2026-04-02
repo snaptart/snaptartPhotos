@@ -310,6 +310,9 @@ export default function ThemesPage() {
               <ColorInput label="Footer Text Color" value={themeDraft.colorFooterText} onChange={(v) => updateTheme("colorFooterText", v)} />
               <ColorInput label="Text Color" value={themeDraft.colorText} onChange={(v) => updateTheme("colorText", v)} />
               <ColorInput label="Accent / Link Color" value={themeDraft.colorAccent} onChange={(v) => updateTheme("colorAccent", v)} />
+              <ColorInput label="Gallery Captions" value={themeDraft.colorGalleryCaptions} onChange={(v) => updateTheme("colorGalleryCaptions", v)} />
+              <ColorInput label="Lightbox Text" value={themeDraft.colorLightboxText} onChange={(v) => updateTheme("colorLightboxText", v)} />
+              <ColorInput label="Hero Overlay Text" value={themeDraft.colorHeroOverlay} onChange={(v) => updateTheme("colorHeroOverlay", v)} />
             </div>
           </div>
 

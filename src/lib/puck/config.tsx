@@ -290,12 +290,12 @@ export const puckConfig: Config<Components> = {
           )}
           <div className="relative z-10 text-center px-4">
             {title && (
-              <h1 className="text-4xl md:text-6xl font-semibold text-white tracking-tight mb-4" style={{ fontFamily: "var(--theme-font-headings)" }}>
+              <h1 className="text-4xl md:text-6xl font-semibold tracking-tight mb-4" style={{ fontFamily: "var(--theme-font-headings)", color: "var(--theme-color-hero-overlay)" }}>
                 {title}
               </h1>
             )}
             {subtitle && (
-              <p className="text-xl md:text-2xl text-white/90" style={{ fontFamily: "var(--theme-font-overlay)" }}>
+              <p className="text-xl md:text-2xl" style={{ fontFamily: "var(--theme-font-overlay)", color: "var(--theme-color-hero-overlay)", opacity: 0.9 }}>
                 {subtitle}
               </p>
             )}
@@ -1630,21 +1630,21 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
   const renderPhotoMeta = (photo: EmbedPhoto) => {
     if (!showMetadata || metadataFields.length === 0) return null;
     return (
-      <div className="mt-1.5 space-y-0.5 text-sm text-neutral-600">
+      <div className="mt-1.5 space-y-0.5 text-sm" style={{ color: "var(--theme-color-gallery-captions)" }}>
         {metadataFields.includes("title") && photo.title && (
           <p className="font-medium" style={{ fontFamily: "var(--theme-font-captions)" }}>{parseLinks(photo.title)}</p>
         )}
         {metadataFields.includes("filename") && photo.filename && (
-          <p className="text-neutral-400 text-xs">{photo.filename}</p>
+          <p className="text-xs" style={{ opacity: 0.65 }}>{photo.filename}</p>
         )}
         {metadataFields.includes("description") && photo.description && (
-          <p className="text-neutral-500">{parseLinks(photo.description)}</p>
+          <p style={{ opacity: 0.85 }}>{parseLinks(photo.description)}</p>
         )}
         {metadataFields.includes("location") && photo.location && (
-          <p className="text-neutral-400 text-xs">{parseLinks(photo.location)}</p>
+          <p className="text-xs" style={{ opacity: 0.65 }}>{parseLinks(photo.location)}</p>
         )}
         {metadataFields.includes("camera") && photo.cameraSettings && (
-          <p className="text-neutral-400 text-xs">
+          <p className="text-xs" style={{ opacity: 0.65 }}>
             {[photo.cameraSettings.camera, photo.cameraSettings.lens, photo.cameraSettings.aperture, photo.cameraSettings.shutter, photo.cameraSettings.iso ? `ISO ${photo.cameraSettings.iso}` : null].filter(Boolean).join(" \u00b7 ")}
           </p>
         )}

@@ -149,21 +149,25 @@ export default function ThemePreview({ theme, siteTitle, logoUrl }: ThemePreview
           style={{
             fontFamily: getFontFallback(theme.fontCaptions),
             fontSize: "11px",
-            opacity: 0.7,
+            color: theme.colorGalleryCaptions,
           }}
         >
           Caption text — Sunset at Lake Superior
         </p>
-        <p
-          className="mt-1"
-          style={{
-            fontFamily: getFontFallback(theme.fontOverlay),
-            fontSize: "11px",
-            opacity: 0.5,
-          }}
+        <div
+          className="mt-1 rounded px-2 py-1"
+          style={{ backgroundColor: "#1a1a1a", display: "inline-block" }}
         >
-          Overlay text sample
-        </p>
+          <p
+            style={{
+              fontFamily: getFontFallback(theme.fontOverlay),
+              fontSize: "11px",
+              color: theme.colorHeroOverlay,
+            }}
+          >
+            Hero overlay sample
+          </p>
+        </div>
       </div>
 
       {/* Mini Footer */}
