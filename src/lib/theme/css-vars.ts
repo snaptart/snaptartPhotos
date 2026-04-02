@@ -15,6 +15,7 @@ export function buildThemeCssVars(theme: ThemeSettings): string {
   --theme-font-footer: ${getFontFallback(theme.fontFooter)};
   --theme-font-captions: ${getFontFallback(theme.fontCaptions)};
   --theme-font-overlay: ${getFontFallback(theme.fontOverlay)};
+  --theme-body-font-size: ${theme.bodyFontSize}px;
   --theme-logo-position: ${theme.logoPosition};
   --theme-logo-size: ${theme.logoSize}px;
   --theme-menu-font-size: ${theme.menuFontSize}px;

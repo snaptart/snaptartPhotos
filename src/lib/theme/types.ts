@@ -5,6 +5,7 @@ export interface ThemeSettings {
   fontFooter: string;
   fontCaptions: string;
   fontOverlay: string;
+  bodyFontSize: number;
   logoPosition: "left" | "center" | "right";
   logoSize: number;
   menuFontSize: number;
@@ -28,6 +29,7 @@ export const THEME_DEFAULTS: ThemeSettings = {
   fontFooter: "EB Garamond",
   fontCaptions: "EB Garamond",
   fontOverlay: "EB Garamond",
+  bodyFontSize: 16,
   logoPosition: "left",
   logoSize: 40,
   menuFontSize: 14,
