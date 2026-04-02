@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Puck } from "@puckeditor/core";
 import type { Data } from "@puckeditor/core";
 import { puckConfig } from "@/lib/puck/config";
+import { draggableOutlinePlugin } from "@/components/puck/DraggableOutline";
 import "@puckeditor/core/puck.css";
 
 const EMPTY_DATA: Data = {
@@ -98,6 +99,7 @@ export default function PuckEditorPage() {
         onPublish={handleSave}
         headerTitle={page.title}
         headerPath={`/${page.slug}`}
+        overrides={draggableOutlinePlugin().overrides}
       />
       {saving && (
         <div className="fixed bottom-4 right-4 z-50 rounded bg-neutral-900 px-4 py-2 text-sm text-white shadow-lg">
