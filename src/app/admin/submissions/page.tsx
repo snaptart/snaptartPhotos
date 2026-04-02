@@ -19,8 +19,12 @@ export default function SubmissionsPage() {
   const fetchSubmissions = useCallback(async () => {
     const params = filter ? `?formName=${encodeURIComponent(filter)}` : "";
     const res = await fetch(`/api/form-submissions${params}`);
+    if (!res.ok) {
+      setLoading(false);
+      return;
+    }
     const data = await res.json();
-    setSubmissions(data);
+    setSubmissions(Array.isArray(data) ? data : []);
     setLoading(false);
   }, [filter]);
 
