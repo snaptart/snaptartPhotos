@@ -33,8 +33,7 @@ export async function Footer() {
         backgroundColor: "var(--theme-color-footer-bg)",
         fontFamily: "var(--theme-font-footer)",
         fontSize: "var(--theme-footer-font-size)",
-        color: "var(--theme-color-text)",
-        opacity: 0.6,
+        color: "var(--theme-color-footer-text)",
       }}
     >
       {settings.footerText && <p className="break-words">{parseLinks(settings.footerText)}</p>}

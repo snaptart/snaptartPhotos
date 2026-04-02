@@ -8,12 +8,31 @@ import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import TextAlign from "@tiptap/extension-text-align";
 import Underline from "@tiptap/extension-underline";
+import { Indent } from "@/lib/tiptap/indent";
 import type { JSONContent } from "@tiptap/react";
 import TiptapEditor from "@/components/admin/TiptapEditor";
 import ImagePicker from "@/components/admin/ImagePicker";
 import { parseLinks } from "@/lib/parseLinks";
 import Lightbox from "@/components/public/Lightbox";
 import type { LightboxPhoto, LightboxSettings } from "@/components/public/Lightbox";
+import { FormWrapperRender } from "@/components/puck/form/FormWrapper";
+import type { FormWrapperProps } from "@/components/puck/form/FormWrapper";
+import {
+  TextFieldRender,
+  TextAreaRender,
+  SelectFieldRender,
+  RadioGroupRender,
+  CheckboxGroupRender,
+  CheckboxRender,
+} from "@/components/puck/form/fields";
+import type {
+  TextFieldProps,
+  TextAreaProps,
+  SelectFieldProps,
+  RadioGroupProps,
+  CheckboxGroupProps,
+  CheckboxProps,
+} from "@/components/puck/form/fields";
 
 // Tiptap extensions for HTML generation
 const tiptapExtensions = [
@@ -22,15 +41,18 @@ const tiptapExtensions = [
   Image,
   Link,
   TextAlign.configure({ types: ["heading", "paragraph"] }),
+  Indent,
 ];
 
 function tiptapToHtml(content: JSONContent | null): string {
   if (!content) return "";
   try {
-    return generateHTML(
+    const html = generateHTML(
       content as Parameters<typeof generateHTML>[0],
       tiptapExtensions
     );
+    // Preserve empty paragraphs as visible line breaks
+    return html.replace(/<p([^>]*)><\/p>/g, "<p$1><br></p>");
   } catch {
     return "";
   }
@@ -77,8 +99,14 @@ type SpacerProps = {
   height: number;
 };
 
+type ContainerProps = {
+  paddingLeft: number;
+  paddingRight: number;
+};
+
 type ColumnsProps = {
   columns: "2" | "3";
+  distribution: string;
   gap: string;
 };
 
@@ -126,8 +154,16 @@ type Components = {
   HeroSlideshow: HeroSlideshowProps;
   ImageBlock: ImageBlockProps;
   Spacer: SpacerProps;
+  Container: ContainerProps;
   Columns: ColumnsProps;
   GalleryEmbed: GalleryEmbedProps;
+  Form: FormWrapperProps;
+  TextField: TextFieldProps;
+  TextArea: TextAreaProps;
+  SelectField: SelectFieldProps;
+  RadioGroup: RadioGroupProps;
+  CheckboxGroup: CheckboxGroupProps;
+  Checkbox: CheckboxProps;
 };
 
 // ----- Puck config -----
@@ -135,8 +171,9 @@ type Components = {
 export const puckConfig: Config<Components> = {
   categories: {
     content: { components: ["RichText", "ImageBlock", "GalleryEmbed"] },
-    layout: { components: ["Columns", "Spacer"] },
+    layout: { components: ["Columns", "Spacer", "Container"] },
     hero: { components: ["Hero", "HeroSlideshow"] },
+    forms: { components: ["Form", "TextField", "TextArea", "SelectField", "RadioGroup", "CheckboxGroup", "Checkbox"] },
   },
   components: {
     RichText: {
@@ -159,13 +196,24 @@ export const puckConfig: Config<Components> = {
       },
       render: ({ content }) => {
         const html = tiptapToHtml(content);
-        return html ? (
-          <div
-            className="prose prose-lg mx-auto max-w-none"
-            dangerouslySetInnerHTML={{ __html: html }}
-          />
-        ) : (
-          <p className="text-neutral-400 italic">Start typing...</p>
+        if (!html) return <p className="text-neutral-400 italic">Start typing...</p>;
+        return (
+          <>
+            <style>{`
+              .richtext-render p { margin: 0.125em 0; line-height: 1.5; font-size: 1.125rem; }
+              .richtext-render h1 { font-size: 2em; font-weight: 700; margin: 0.75em 0 0.25em; }
+              .richtext-render h2 { font-size: 1.5em; font-weight: 700; margin: 0.75em 0 0.25em; }
+              .richtext-render h3 { font-size: 1.25em; font-weight: 600; margin: 0.75em 0 0.25em; }
+              .richtext-render blockquote { border-left: 3px solid #d4d4d4; padding-left: 1em; margin: 0.5em 0; font-style: italic; }
+              .richtext-render ul, .richtext-render ol { padding-left: 1.5em; margin: 0.25em 0; }
+              .richtext-render a { text-decoration: underline; }
+              .richtext-render hr { border-top: 1px solid #d4d4d4; margin: 1em 0; }
+            `}</style>
+            <div
+              className="richtext-render mx-auto max-w-none"
+              dangerouslySetInnerHTML={{ __html: html }}
+            />
+          </>
         );
       },
     },
@@ -493,6 +541,20 @@ export const puckConfig: Config<Components> = {
       ),
     },
 
+    Container: {
+      label: "Container",
+      fields: {
+        paddingLeft: { type: "number", label: "Left Padding (px)", min: 0, max: 300 },
+        paddingRight: { type: "number", label: "Right Padding (px)", min: 0, max: 300 },
+      },
+      defaultProps: { paddingLeft: 0, paddingRight: 0 },
+      render: ({ paddingLeft, paddingRight, puck }) => (
+        <div style={{ paddingLeft, paddingRight }}>
+          <DropZone zone="container-content" />
+        </div>
+      ),
+    },
+
     Columns: {
       label: "Columns",
       fields: {
@@ -504,6 +566,11 @@ export const puckConfig: Config<Components> = {
             { label: "3 Columns", value: "3" },
           ],
         },
+        distribution: {
+          type: "select",
+          label: "Width Distribution",
+          options: [],
+        },
         gap: {
           type: "select",
           label: "Gap",
@@ -514,12 +581,62 @@ export const puckConfig: Config<Components> = {
           ],
         },
       },
-      defaultProps: { columns: "2", gap: "gap-8" },
-      render: ({ columns, gap }) => {
-        const gridCols = columns === "3" ? "md:grid-cols-3" : "md:grid-cols-2";
+      resolveFields: (data, { fields }) => {
+        const twoColOptions = [
+          { label: "Equal", value: "equal" },
+          { label: "1/3 + 2/3", value: "1-2" },
+          { label: "2/3 + 1/3", value: "2-1" },
+          { label: "1/4 + 3/4", value: "1-3" },
+          { label: "3/4 + 1/4", value: "3-1" },
+        ];
+        const threeColOptions = [
+          { label: "Equal", value: "equal" },
+          { label: "1/4 + 1/2 + 1/4", value: "1-2-1" },
+          { label: "1/2 + 1/4 + 1/4", value: "2-1-1" },
+          { label: "1/4 + 1/4 + 1/2", value: "1-1-2" },
+        ];
+        return {
+          ...fields,
+          distribution: {
+            type: "select" as const,
+            label: "Width Distribution",
+            options: data.props.columns === "3" ? threeColOptions : twoColOptions,
+          },
+        };
+      },
+      defaultProps: { columns: "2", distribution: "equal", gap: "gap-8" },
+      render: ({ columns, distribution, gap }) => {
         const colCount = columns === "3" ? 3 : 2;
+
+        // Filter distribution options based on column count
+        const dist = colCount === 2 && ["1-2-1", "2-1-1", "1-1-2"].includes(distribution)
+          ? "equal"
+          : colCount === 3 && ["1-2", "2-1", "1-3", "3-1"].includes(distribution)
+            ? "equal"
+            : distribution;
+
+        const gridTemplates: Record<string, string> = {
+          // 2 columns
+          "2-equal": "1fr 1fr",
+          "2-1-2": "1fr 2fr",
+          "2-2-1": "2fr 1fr",
+          "2-1-3": "1fr 3fr",
+          "2-3-1": "3fr 1fr",
+          // 3 columns
+          "3-equal": "1fr 1fr 1fr",
+          "3-1-2-1": "1fr 2fr 1fr",
+          "3-2-1-1": "2fr 1fr 1fr",
+          "3-1-1-2": "1fr 1fr 2fr",
+        };
+
+        const templateKey = `${colCount}-${dist}`;
+        const gridTemplate = gridTemplates[templateKey] || (colCount === 3 ? "1fr 1fr 1fr" : "1fr 1fr");
+
         return (
-          <div className={`grid grid-cols-1 ${gridCols} ${gap}`}>
+          <div
+            className={`puck-columns grid ${gap}`}
+            style={{ "--col-template": gridTemplate } as React.CSSProperties}
+          >
             {Array.from({ length: colCount }).map((_, i) => (
               <DropZone key={i} zone={`column-${i}`} />
             ))}
@@ -869,6 +986,171 @@ export const puckConfig: Config<Components> = {
           />
         );
       },
+    },
+
+    // ----- Form components -----
+
+    Form: {
+      label: "Form",
+      fields: {
+        formName: { type: "text", label: "Form Name (identifier)" },
+        submitLabel: { type: "text", label: "Submit Button Text" },
+        successMessage: { type: "textarea", label: "Success Message" },
+        recipientEmail: { type: "text", label: "Notification Email (for future use)" },
+      },
+      defaultProps: {
+        formName: "contact",
+        submitLabel: "Submit",
+        successMessage: "Thank you! Your submission has been received.",
+        recipientEmail: "",
+      },
+      render: (props) => <FormWrapperRender {...props} />,
+    },
+
+    TextField: {
+      label: "Text Field",
+      fields: {
+        label: { type: "text", label: "Label" },
+        name: { type: "text", label: "Field Name (key)" },
+        placeholder: { type: "text", label: "Placeholder" },
+        required: {
+          type: "radio",
+          label: "Required",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        fieldType: {
+          type: "select",
+          label: "Input Type",
+          options: [
+            { label: "Text", value: "text" },
+            { label: "Email", value: "email" },
+            { label: "Phone", value: "tel" },
+            { label: "URL", value: "url" },
+          ],
+        },
+      },
+      defaultProps: {
+        label: "Name",
+        name: "name",
+        placeholder: "",
+        required: false,
+        fieldType: "text",
+      },
+      render: (props) => <TextFieldRender {...props} />,
+    },
+
+    TextArea: {
+      label: "Text Area",
+      fields: {
+        label: { type: "text", label: "Label" },
+        name: { type: "text", label: "Field Name (key)" },
+        placeholder: { type: "text", label: "Placeholder" },
+        required: {
+          type: "radio",
+          label: "Required",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        rows: { type: "number", label: "Rows", min: 2, max: 20 },
+      },
+      defaultProps: {
+        label: "Message",
+        name: "message",
+        placeholder: "",
+        required: false,
+        rows: 4,
+      },
+      render: (props) => <TextAreaRender {...props} />,
+    },
+
+    SelectField: {
+      label: "Dropdown Select",
+      fields: {
+        label: { type: "text", label: "Label" },
+        name: { type: "text", label: "Field Name (key)" },
+        required: {
+          type: "radio",
+          label: "Required",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        options: {
+          type: "textarea",
+          label: "Options (one per line, use value|label for custom values)",
+        },
+      },
+      defaultProps: {
+        label: "Subject",
+        name: "subject",
+        required: false,
+        options: "General Inquiry\nPrint Request\nCollaboration",
+      },
+      render: (props) => <SelectFieldRender {...props} />,
+    },
+
+    RadioGroup: {
+      label: "Radio Buttons",
+      fields: {
+        label: { type: "text", label: "Label" },
+        name: { type: "text", label: "Field Name (key)" },
+        required: {
+          type: "radio",
+          label: "Required",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        options: {
+          type: "textarea",
+          label: "Options (one per line, use value|label for custom values)",
+        },
+      },
+      defaultProps: {
+        label: "Preferred Contact",
+        name: "preferred_contact",
+        required: false,
+        options: "email|Email\nphone|Phone",
+      },
+      render: (props) => <RadioGroupRender {...props} />,
+    },
+
+    CheckboxGroup: {
+      label: "Checkbox Group",
+      fields: {
+        label: { type: "text", label: "Label" },
+        name: { type: "text", label: "Field Name (key)" },
+        options: {
+          type: "textarea",
+          label: "Options (one per line, use value|label for custom values)",
+        },
+      },
+      defaultProps: {
+        label: "Interests",
+        name: "interests",
+        options: "prints|Prints\ncommissions|Commissions\nworkshops|Workshops",
+      },
+      render: (props) => <CheckboxGroupRender {...props} />,
+    },
+
+    Checkbox: {
+      label: "Checkbox",
+      fields: {
+        label: { type: "text", label: "Label" },
+        name: { type: "text", label: "Field Name (key)" },
+      },
+      defaultProps: {
+        label: "I agree to the terms",
+        name: "agree_terms",
+      },
+      render: (props) => <CheckboxRender {...props} />,
     },
   },
 };

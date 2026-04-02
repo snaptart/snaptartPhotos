@@ -35,11 +35,9 @@ export async function PUT(req: Request) {
 
     // Bulk reorder
     if (body.items && Array.isArray(body.items)) {
-      await db.transaction(async (tx) => {
-        for (const item of body.items) {
-          await tx.update(menuItems).set({ position: item.position }).where(eq(menuItems.id, item.id));
-        }
-      });
+      for (const item of body.items) {
+        await db.update(menuItems).set({ position: item.position }).where(eq(menuItems.id, item.id));
+      }
       const updated = await db.select().from(menuItems).orderBy(asc(menuItems.position));
       return NextResponse.json(updated);
     }

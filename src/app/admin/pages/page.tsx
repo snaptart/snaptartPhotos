@@ -202,7 +202,6 @@ export default function PagesPage() {
               <option value="custom">Custom</option>
               <option value="about">About</option>
               <option value="contact">Contact</option>
-              <option value="story">Story</option>
             </select>
             <div className="flex gap-2">
               <button type="submit" className="btn-primary">Create &amp; Edit</button>
@@ -233,7 +232,6 @@ export default function PagesPage() {
               <option value="custom">Custom</option>
               <option value="about">About</option>
               <option value="contact">Contact</option>
-              <option value="story">Story</option>
             </select>
             <label className="flex items-center gap-2 text-sm text-neutral-700">
               <input

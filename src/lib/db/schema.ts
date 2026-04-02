@@ -65,6 +65,11 @@ export const pages = pgTable("pages", {
   metaTitle: text("meta_title"),
   metaDescription: text("meta_description"),
   ogImageUrl: text("og_image_url"),
+  typography: jsonb("typography").$type<{
+    fontHeadings?: string;
+    fontBody?: string;
+    bodyFontSize?: "small" | "medium" | "large";
+  }>(),
   showTitle: boolean("show_title").notNull().default(true),
   isPublished: boolean("is_published").notNull().default(false),
   position: integer("position").notNull().default(0),
@@ -106,6 +111,14 @@ export const photos = pgTable("photos", {
   position: integer("position").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const formSubmissions = pgTable("form_submissions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  formName: text("form_name").notNull(),
+  data: jsonb("data").notNull(), // { fieldName: value, ... }
+  ipAddress: text("ip_address"),
+  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
 });
 
 export const pageElements = pgTable("page_elements", {

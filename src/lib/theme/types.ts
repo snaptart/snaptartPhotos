@@ -13,6 +13,7 @@ export interface ThemeSettings {
   colorSiteBg: string;
   colorHeaderBg: string;
   colorFooterBg: string;
+  colorFooterText: string;
   colorAccent: string;
   colorText: string;
 }
@@ -32,6 +33,7 @@ export const THEME_DEFAULTS: ThemeSettings = {
   colorSiteBg: "#ffffff",
   colorHeaderBg: "#ffffff",
   colorFooterBg: "#ffffff",
+  colorFooterText: "#737373",
   colorAccent: "#525252",
   colorText: "#171717",
 };

@@ -11,6 +11,7 @@ const navItems = [
   { label: "Photos", href: "/admin/photos" },
   { label: "Pages", href: "/admin/pages" },
   { label: "Stories", href: "/admin/stories" },
+  { label: "Submissions", href: "/admin/submissions" },
   { label: "Menus", href: "/admin/menus" },
   { label: "Themes", href: "/admin/themes" },
   { label: "Settings", href: "/admin/settings" },

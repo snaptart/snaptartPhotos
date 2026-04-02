@@ -23,6 +23,7 @@ export function buildThemeCssVars(theme: ThemeSettings): string {
   --theme-color-site-bg: ${theme.colorSiteBg};
   --theme-color-header-bg: ${theme.colorHeaderBg};
   --theme-color-footer-bg: ${theme.colorFooterBg};
+  --theme-color-footer-text: ${theme.colorFooterText};
   --theme-color-accent: ${theme.colorAccent};
   --theme-color-text: ${theme.colorText};
 }`;

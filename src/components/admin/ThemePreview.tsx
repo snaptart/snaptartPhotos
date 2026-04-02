@@ -172,9 +172,8 @@ export default function ThemePreview({ theme, siteTitle, logoUrl }: ThemePreview
         style={{
           backgroundColor: theme.colorFooterBg,
           fontFamily: getFontFallback(theme.fontFooter),
-          color: theme.colorText,
+          color: theme.colorFooterText,
           fontSize: `${theme.footerFontSize * 0.75}px`,
-          opacity: 0.6,
         }}
       >
         <p>&copy; 2026 Michael Schroeder. All rights reserved.</p>
