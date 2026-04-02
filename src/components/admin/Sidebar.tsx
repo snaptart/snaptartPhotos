@@ -4,14 +4,15 @@ import Link from "next/link";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
+import siteConfig from "@/lib/site.config";
 
 const navItems = [
   { label: "Dashboard", href: "/admin" },
-  { label: "Galleries", href: "/admin/galleries" },
-  { label: "Photos", href: "/admin/photos" },
+  { label: siteConfig.labels.galleries, href: "/admin/galleries" },
+  { label: siteConfig.labels.photos, href: "/admin/photos" },
   { label: "Pages", href: "/admin/pages" },
-  { label: "Stories", href: "/admin/stories" },
-  { label: "Submissions", href: "/admin/submissions" },
+  ...(siteConfig.features.stories ? [{ label: "Stories", href: "/admin/stories" }] : []),
+  ...(siteConfig.features.submissions ? [{ label: "Submissions", href: "/admin/submissions" }] : []),
   { label: "Menus", href: "/admin/menus" },
   { label: "Themes", href: "/admin/themes" },
   { label: "Settings", href: "/admin/settings" },
@@ -57,7 +58,7 @@ export function AdminSidebar() {
       >
         <div className="border-b border-neutral-200 px-5 py-4">
           <Link href="/admin" className="font-serif text-lg tracking-wide">
-            SnaptArt
+            {siteConfig.siteName}
           </Link>
           <p className="text-xs text-neutral-400">Admin</p>
         </div>

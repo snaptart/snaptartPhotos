@@ -15,6 +15,7 @@ import { useSortableList } from "@/lib/hooks/useSortableList";
 import { useMessage } from "@/lib/hooks/useMessage";
 import FocalPointPicker from "@/components/admin/FocalPointPicker";
 import Link from "next/link";
+import siteConfig from "@/lib/site.config";
 
 interface Photo {
   id: string;
@@ -137,7 +138,7 @@ export default function PhotosPage() {
       uploaded++;
     }
 
-    showSuccess(`${uploaded} photo${uploaded !== 1 ? "s" : ""} uploaded!`);
+    showSuccess(`${uploaded} ${uploaded !== 1 ? siteConfig.labels.photos.toLowerCase() : siteConfig.labels.photo.toLowerCase()} uploaded!`);
     setUploading(false);
     e.target.value = "";
     fetchPhotos();
@@ -163,19 +164,19 @@ export default function PhotosPage() {
 
     if (res.ok) {
       setEditingId(null);
-      showSuccess("Photo updated!");
+      showSuccess(`${siteConfig.labels.photo} updated!`);
       fetchPhotos();
     }
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this photo?")) return;
+    if (!confirm(`Delete this ${siteConfig.labels.photo.toLowerCase()}?`)) return;
     const res = await fetch(`/api/photos?id=${id}`, { method: "DELETE" });
     if (res.ok) {
-      showSuccess("Photo deleted");
+      showSuccess(`${siteConfig.labels.photo} deleted`);
       fetchPhotos();
     } else {
-      showError("Failed to delete photo");
+      showError(`Failed to delete ${siteConfig.labels.photo.toLowerCase()}`);
     }
   }
 
@@ -199,20 +200,20 @@ export default function PhotosPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">Photos</h1>
+          <h1 className="text-2xl font-semibold">{siteConfig.labels.photos}</h1>
           <select
             value={selectedGallery}
             onChange={(e) => setSelectedGallery(e.target.value)}
             className="rounded border border-neutral-300 px-3 py-1.5 text-sm focus:border-neutral-500 focus:outline-none"
           >
-            <option value="">Select gallery...</option>
+            <option value="">Select {siteConfig.labels.gallery.toLowerCase()}...</option>
             {galleries.map((g) => (
               <option key={g.id} value={g.id}>{g.title}</option>
             ))}
           </select>
           {currentGallery && (
             <Link
-              href={`/gallery/${currentGallery.slug}`}
+              href={`/${siteConfig.labels.gallerySlug}/${currentGallery.slug}`}
               className="text-sm text-neutral-400 hover:text-neutral-600"
               target="_blank"
             >
@@ -222,7 +223,7 @@ export default function PhotosPage() {
         </div>
         {selectedGallery && (
           <label className={`cursor-pointer rounded px-4 py-2 text-sm text-white ${uploading ? "bg-neutral-400" : "bg-neutral-900 hover:bg-neutral-700"}`}>
-            {uploading ? "Uploading..." : "Upload Photos"}
+            {uploading ? "Uploading..." : `Upload ${siteConfig.labels.photos}`}
             <input
               type="file"
               accept="image/*"
@@ -246,7 +247,7 @@ export default function PhotosPage() {
           onSubmit={handleUpdate}
           className="mb-6 rounded-lg border border-neutral-200 bg-white p-4"
         >
-          <h2 className="mb-3 text-sm font-medium">Edit Photo</h2>
+          <h2 className="mb-3 text-sm font-medium">Edit {siteConfig.labels.photo}</h2>
           <div className="flex gap-4">
             <div className="w-48 shrink-0">
               <FocalPointPicker
@@ -307,11 +308,11 @@ export default function PhotosPage() {
       )}
 
       {!selectedGallery ? (
-        <p className="text-sm text-neutral-500">Select a gallery to manage its photos.</p>
+        <p className="text-sm text-neutral-500">Select a {siteConfig.labels.gallery.toLowerCase()} to manage its {siteConfig.labels.photos.toLowerCase()}.</p>
       ) : loading ? (
         <div className="text-neutral-500">Loading...</div>
       ) : photos.length === 0 ? (
-        <p className="text-sm text-neutral-500">No photos in this gallery yet. Upload some to get started.</p>
+        <p className="text-sm text-neutral-500">No {siteConfig.labels.photos.toLowerCase()} in this {siteConfig.labels.gallery.toLowerCase()} yet. Upload some to get started.</p>
       ) : (
         <div className="rounded-lg border border-neutral-200 bg-white">
           <DndContext

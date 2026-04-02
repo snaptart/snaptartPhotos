@@ -23,7 +23,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const folder = (formData.get("folder") as string) || "snaptart";
+    const folder = (formData.get("folder") as string) || (process.env.UPLOAD_FOLDER || "uploads");
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
     const timestamp = Date.now();
     const filename = `${folder}/${timestamp}-${safeName}`;

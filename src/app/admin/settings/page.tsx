@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import ImagePicker from "@/components/admin/ImagePicker";
 import { DEFAULT_LIGHTBOX_SETTINGS } from "@/components/public/Lightbox";
 import { useMessage } from "@/lib/hooks/useMessage";
+import siteConfig from "@/lib/site.config";
 
 interface SiteSettings {
   id: string;
@@ -30,13 +31,7 @@ interface SettingsDraft {
   lbCaptionAlignment: string;
 }
 
-const LIGHTBOX_METADATA_OPTIONS = [
-  { key: "title", label: "Title" },
-  { key: "description", label: "Description" },
-  { key: "location", label: "Location" },
-  { key: "camera", label: "Camera Settings" },
-  { key: "filename", label: "Filename" },
-];
+const LIGHTBOX_METADATA_OPTIONS = siteConfig.lightboxMetadataOptions.filter((o) => o.enabled);
 
 function draftFromSettings(data: SiteSettings): SettingsDraft {
   return {

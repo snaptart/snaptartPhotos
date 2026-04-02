@@ -24,7 +24,7 @@ export interface LightboxSettings {
 }
 
 export const DEFAULT_LIGHTBOX_SETTINGS: LightboxSettings = {
-  metadataFields: ["title", "location"],
+  metadataFields: ["title", "description"],
   cornerRadius: 0,
   captionPosition: "below",
   fadeSpeed: "medium",

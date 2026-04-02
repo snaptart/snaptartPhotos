@@ -10,6 +10,7 @@ import Underline from "@tiptap/extension-underline";
 import PuckRenderer from "@/components/public/PuckRenderer";
 import type { Data } from "@puckeditor/core";
 import type { EmbedPhoto, GlobalLightboxSettings } from "@/lib/puck/config";
+import siteConfig from "@/lib/site.config";
 
 const tiptapExtensions = [
   StarterKit,
@@ -34,9 +35,9 @@ export default async function HomePage() {
   if (!settingsRow?.homepageId) {
     return (
       <div className="flex flex-col items-center justify-center px-4 py-24">
-        <h1 className="mb-4 text-5xl font-light tracking-wide">SnaptArt</h1>
+        <h1 className="mb-4 text-5xl font-light tracking-wide">{settingsRow?.siteTitle ?? siteConfig.siteName}</h1>
         <p className="text-lg text-neutral-500">
-          Photography from Minnesota, France, and other places
+          {siteConfig.siteDescription}
         </p>
       </div>
     );
@@ -50,9 +51,9 @@ export default async function HomePage() {
   if (!page) {
     return (
       <div className="flex flex-col items-center justify-center px-4 py-24">
-        <h1 className="mb-4 text-5xl font-light tracking-wide">SnaptArt</h1>
+        <h1 className="mb-4 text-5xl font-light tracking-wide">{settingsRow?.siteTitle ?? siteConfig.siteName}</h1>
         <p className="text-lg text-neutral-500">
-          Photography from Minnesota, France, and other places
+          {siteConfig.siteDescription}
         </p>
       </div>
     );
