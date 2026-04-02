@@ -140,6 +140,20 @@ export default function PagesPage() {
     }
   }
 
+  async function handleDuplicate(id: string) {
+    const res = await fetch("/api/pages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ duplicateId: id, position: pages.length }),
+    });
+    if (res.ok) {
+      setMessage("Page duplicated!");
+      fetchPages();
+    } else {
+      setMessage("Failed to duplicate page");
+    }
+  }
+
   async function handleDelete(id: string) {
     if (!confirm("Delete this page?")) return;
     const res = await fetch(`/api/pages?id=${id}`, { method: "DELETE" });
@@ -331,6 +345,12 @@ export default function PagesPage() {
                         className="btn-text"
                       >
                         Settings
+                      </button>
+                      <button
+                        onClick={() => handleDuplicate(page.id)}
+                        className="btn-text"
+                      >
+                        Duplicate
                       </button>
                       <button
                         onClick={() => handleDelete(page.id)}
