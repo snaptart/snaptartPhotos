@@ -23,6 +23,25 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
+
+    // Duplicate existing page
+    if (body.duplicateId) {
+      const [source] = await db.select().from(pages).where(eq(pages.id, body.duplicateId));
+      if (!source) return NextResponse.json({ error: "Source page not found" }, { status: 404 });
+
+      const title = `Copy of ${source.title}`;
+      const slug = generateSlug(title);
+      const { id, createdAt, updatedAt, ...rest } = source;
+      const [item] = await db.insert(pages).values({
+        ...rest,
+        title,
+        slug,
+        isPublished: false,
+        position: body.position ?? 0,
+      }).returning();
+      return NextResponse.json(item);
+    }
+
     const slug = generateSlug(body.title);
     const [item] = await db.insert(pages).values({ ...body, slug }).returning();
     return NextResponse.json(item);

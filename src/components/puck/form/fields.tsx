@@ -36,7 +36,7 @@ export function TextFieldRender({ label, name, placeholder, required, fieldType 
   }, [name, required, fieldType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div>
+    <div className="py-2">
       <FieldLabel label={label} required={required} />
       <input
         type={fieldType}
@@ -73,7 +73,7 @@ export function TextAreaRender({ label, name, placeholder, required, rows }: Tex
   }, [name, required]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div>
+    <div className="py-2">
       <FieldLabel label={label} required={required} />
       <textarea
         name={name}
@@ -114,7 +114,7 @@ export function SelectFieldRender({ label, name, required, options }: SelectFiel
   }, [name, required]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div>
+    <div className="py-2">
       <FieldLabel label={label} required={required} />
       <select
         name={name}
@@ -163,7 +163,7 @@ export function RadioGroupRender({ label, name, required, options }: RadioGroupP
   }, [name, required]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <fieldset>
+    <fieldset className="py-2">
       <FieldLabel label={label} required={required} />
       <div className="mt-1 space-y-1">
         {optList.map((opt) => {
@@ -221,7 +221,7 @@ export function CheckboxGroupRender({ label, name, options }: CheckboxGroupProps
   }
 
   return (
-    <fieldset>
+    <fieldset className="py-2">
       <FieldLabel label={label} />
       <div className="mt-1 space-y-1">
         {optList.map((opt) => {
@@ -261,7 +261,7 @@ export function CheckboxRender({ label, name }: CheckboxProps) {
   }, [name]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <label className="flex items-center gap-2 text-sm text-neutral-700">
+    <label className="flex items-center gap-2 py-2 text-sm text-neutral-700">
       <input
         type="checkbox"
         name={name}
