@@ -80,7 +80,7 @@ export function FormWrapperRender({
 
     // Get honeypot value
     const hpInput = (e.target as HTMLFormElement).querySelector<HTMLInputElement>(
-      'input[name="_hp_field"]'
+      'input[name="_sa_p"]'
     );
 
     try {
@@ -93,7 +93,7 @@ export function FormWrapperRender({
           _requiredFields: requiredFields,
           _emailFields: emailFields,
           _recipientEmail: recipientEmail || undefined,
-          _hp_field: hpInput?.value ?? "",
+          _sa_p: hpInput?.value ?? "",
         }),
       });
 
@@ -123,8 +123,11 @@ export function FormWrapperRender({
     <FormContext.Provider value={{ register, update }}>
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Honeypot — hidden from real users */}
-        <div style={{ position: "absolute", left: "-9999px" }} aria-hidden="true">
-          <input type="text" name="_hp_field" tabIndex={-1} autoComplete="off" />
+        <div style={{ position: "absolute", left: "-9999px", opacity: 0, height: 0, overflow: "hidden" }} aria-hidden="true">
+          <label>
+            Do not fill this in
+            <input type="text" name="_sa_p" tabIndex={-1} autoComplete="nope" />
+          </label>
         </div>
 
         <DropZone zone="form-fields" />
