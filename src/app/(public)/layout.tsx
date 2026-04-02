@@ -51,6 +51,7 @@ export default async function PublicLayout({
         className="flex min-h-dvh flex-col"
         style={{
           fontFamily: "var(--theme-font-body)",
+          fontSize: "var(--theme-body-font-size)",
           backgroundColor: "var(--theme-color-site-bg)",
           color: "var(--theme-color-text)",
         }}

@@ -227,6 +227,20 @@ export default function ThemesPage() {
               <FontSelect label="Footer" value={themeDraft.fontFooter} onChange={(v) => updateTheme("fontFooter", v)} />
               <FontSelect label="Captions" value={themeDraft.fontCaptions} onChange={(v) => updateTheme("fontCaptions", v)} />
               <FontSelect label="Overlay Text" value={themeDraft.fontOverlay} onChange={(v) => updateTheme("fontOverlay", v)} />
+              <div>
+                <label className="mb-1 block text-sm font-medium text-neutral-700">
+                  Body Font Size — {themeDraft.bodyFontSize}px
+                </label>
+                <input
+                  type="range"
+                  min={12}
+                  max={24}
+                  step={1}
+                  value={themeDraft.bodyFontSize}
+                  onChange={(e) => updateTheme("bodyFontSize", Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
             </div>
           </div>
 
@@ -249,7 +263,7 @@ export default function ThemesPage() {
                 <input
                   type="range"
                   min={20}
-                  max={80}
+                  max={400}
                   step={2}
                   value={themeDraft.logoSize}
                   onChange={(e) => updateTheme("logoSize", Number(e.target.value))}
