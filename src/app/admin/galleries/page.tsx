@@ -4,19 +4,14 @@ import { useEffect, useState, useCallback } from "react";
 import {
   DndContext,
   closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
 } from "@dnd-kit/core";
 import {
-  arrayMove,
   SortableContext,
-  sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "@/components/admin/SortableItem";
+import { useSortableList } from "@/lib/hooks/useSortableList";
+import { useMessage } from "@/lib/hooks/useMessage";
 import Link from "next/link";
 
 interface Gallery {
@@ -35,12 +30,14 @@ export default function GalleriesPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
+  const { message, showSuccess, showError, alertClass } = useMessage();
 
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
+  const { sensors, handleDragEnd } = useSortableList({
+    items: galleries,
+    setItems: setGalleries,
+    endpoint: "/api/galleries",
+    onError: showError,
+  });
 
   const fetchGalleries = useCallback(async () => {
     const res = await fetch("/api/galleries");
@@ -52,25 +49,6 @@ export default function GalleriesPage() {
   useEffect(() => {
     fetchGalleries();
   }, [fetchGalleries]);
-
-  async function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    const oldIndex = galleries.findIndex((g) => g.id === active.id);
-    const newIndex = galleries.findIndex((g) => g.id === over.id);
-    const reordered = arrayMove(galleries, oldIndex, newIndex);
-    setGalleries(reordered);
-
-    const res = await fetch("/api/galleries", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        items: reordered.map((g, index) => ({ id: g.id, position: index })),
-      }),
-    });
-    if (!res.ok) setMessage("Failed to save order. Refresh to sync.");
-  }
 
   async function handleAdd(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -89,10 +67,10 @@ export default function GalleriesPage() {
 
     if (res.ok) {
       setShowForm(false);
-      setMessage("Gallery created!");
+      showSuccess("Gallery created!");
       fetchGalleries();
     } else {
-      setMessage("Failed to create gallery");
+      showError("Failed to create gallery");
     }
   }
 
@@ -113,7 +91,7 @@ export default function GalleriesPage() {
 
     if (res.ok) {
       setEditingId(null);
-      setMessage("Gallery updated!");
+      showSuccess("Gallery updated!");
       fetchGalleries();
     }
   }
@@ -122,10 +100,10 @@ export default function GalleriesPage() {
     if (!confirm("Delete this gallery and all its photos?")) return;
     const res = await fetch(`/api/galleries?id=${id}`, { method: "DELETE" });
     if (res.ok) {
-      setMessage("Gallery deleted");
+      showSuccess("Gallery deleted");
       fetchGalleries();
     } else {
-      setMessage("Failed to delete gallery");
+      showError("Failed to delete gallery");
     }
   }
 
@@ -138,7 +116,7 @@ export default function GalleriesPage() {
     if (res.ok) {
       fetchGalleries();
     } else {
-      setMessage("Failed to update gallery");
+      showError("Failed to update gallery");
     }
   }
 
@@ -159,8 +137,8 @@ export default function GalleriesPage() {
       </div>
 
       {message && (
-        <div className={message.includes("Failed") ? "alert-error" : "alert-success"}>
-          {message}
+        <div className={alertClass}>
+          {message.text}
         </div>
       )}
 

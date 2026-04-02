@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { adminUsers } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import bcrypt from "bcryptjs";
+import { hashPassword, verifyPassword } from "@/lib/password";
 
 export async function PUT(req: Request) {
   const session = await auth();
@@ -36,7 +36,7 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+  const valid = await verifyPassword(currentPassword, user.passwordHash);
   if (!valid) {
     return NextResponse.json(
       { error: "Current password is incorrect" },
@@ -44,7 +44,7 @@ export async function PUT(req: Request) {
     );
   }
 
-  const passwordHash = await bcrypt.hash(newPassword, 12);
+  const passwordHash = await hashPassword(newPassword);
   await db
     .update(adminUsers)
     .set({ passwordHash })

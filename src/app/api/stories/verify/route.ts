@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { pages } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import bcrypt from "bcryptjs";
+import { verifyPassword } from "@/lib/password";
 
 export async function POST(req: Request) {
   try {
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Story not found" }, { status: 404 });
     }
 
-    const valid = await bcrypt.compare(password, story.passwordHash);
+    const valid = await verifyPassword(password, story.passwordHash);
     if (!valid) {
       return NextResponse.json({ error: "Incorrect password" }, { status: 401 });
     }

@@ -3,7 +3,7 @@ import { galleries, photos, siteSettings } from "@/lib/db/schema";
 import { eq, asc, and } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import type { LightboxSettings } from "@/components/public/Lightbox";
+import { DEFAULT_LIGHTBOX_SETTINGS, type LightboxSettings } from "@/components/public/Lightbox";
 import GalleryGrid from "./GalleryGrid";
 
 interface Props {
@@ -46,11 +46,11 @@ export default async function GalleryPage({ params }: Props) {
   ]);
 
   const lightboxSettings: LightboxSettings = {
-    metadataFields: settingsRow?.lightboxMetadataFields ?? ["title", "location"],
-    cornerRadius: settingsRow?.lightboxCornerRadius ?? 0,
-    captionPosition: (settingsRow?.lightboxCaptionPosition ?? "below") as LightboxSettings["captionPosition"],
-    fadeSpeed: (settingsRow?.lightboxFadeSpeed ?? "medium") as LightboxSettings["fadeSpeed"],
-    captionAlignment: (settingsRow?.lightboxCaptionAlignment ?? "left") as LightboxSettings["captionAlignment"],
+    metadataFields: settingsRow?.lightboxMetadataFields ?? DEFAULT_LIGHTBOX_SETTINGS.metadataFields,
+    cornerRadius: settingsRow?.lightboxCornerRadius ?? DEFAULT_LIGHTBOX_SETTINGS.cornerRadius,
+    captionPosition: (settingsRow?.lightboxCaptionPosition ?? DEFAULT_LIGHTBOX_SETTINGS.captionPosition) as LightboxSettings["captionPosition"],
+    fadeSpeed: (settingsRow?.lightboxFadeSpeed ?? DEFAULT_LIGHTBOX_SETTINGS.fadeSpeed) as LightboxSettings["fadeSpeed"],
+    captionAlignment: (settingsRow?.lightboxCaptionAlignment ?? DEFAULT_LIGHTBOX_SETTINGS.captionAlignment) as LightboxSettings["captionAlignment"],
   };
 
   return (

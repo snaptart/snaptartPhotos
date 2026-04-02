@@ -1,23 +1,18 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   DndContext,
   closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
 } from "@dnd-kit/core";
 import {
-  arrayMove,
   SortableContext,
-  sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "@/components/admin/SortableItem";
+import { useSortableList } from "@/lib/hooks/useSortableList";
+import { useMessage } from "@/lib/hooks/useMessage";
 import FocalPointPicker from "@/components/admin/FocalPointPicker";
 import Link from "next/link";
 
@@ -55,12 +50,17 @@ export default function PhotosPage() {
   const [uploading, setUploading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingFocal, setEditingFocal] = useState<{ x: number; y: number }>({ x: 50, y: 50 });
-  const [message, setMessage] = useState("");
+  const { message, showSuccess, showError, alertClass } = useMessage();
 
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
+  const extraBody = useMemo(() => ({ galleryId: selectedGallery }), [selectedGallery]);
+
+  const { sensors, handleDragEnd } = useSortableList({
+    items: photos,
+    setItems: setPhotos,
+    endpoint: "/api/photos",
+    onError: showError,
+    extraBody,
+  });
 
   const fetchGalleries = useCallback(async () => {
     const res = await fetch("/api/galleries");
@@ -92,7 +92,6 @@ export default function PhotosPage() {
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     if (!selectedGallery || !e.target.files?.length) return;
     setUploading(true);
-    setMessage("");
 
     const files = Array.from(e.target.files);
     let uploaded = 0;
@@ -111,7 +110,7 @@ export default function PhotosPage() {
 
       const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
       if (!uploadRes.ok) {
-        setMessage(`Failed to upload ${file.name}`);
+        showError(`Failed to upload ${file.name}`);
         continue;
       }
 
@@ -132,36 +131,16 @@ export default function PhotosPage() {
         }),
       });
       if (!photoRes.ok) {
-        setMessage(`Failed to save ${file.name}`);
+        showError(`Failed to save ${file.name}`);
         continue;
       }
       uploaded++;
     }
 
-    setMessage(`${uploaded} photo${uploaded !== 1 ? "s" : ""} uploaded!`);
+    showSuccess(`${uploaded} photo${uploaded !== 1 ? "s" : ""} uploaded!`);
     setUploading(false);
     e.target.value = "";
     fetchPhotos();
-  }
-
-  async function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    const oldIndex = photos.findIndex((p) => p.id === active.id);
-    const newIndex = photos.findIndex((p) => p.id === over.id);
-    const reordered = arrayMove(photos, oldIndex, newIndex);
-    setPhotos(reordered);
-
-    const res = await fetch("/api/photos", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        galleryId: selectedGallery,
-        items: reordered.map((p, index) => ({ id: p.id, position: index })),
-      }),
-    });
-    if (!res.ok) setMessage("Failed to save order. Refresh to sync.");
   }
 
   async function handleUpdate(e: React.FormEvent<HTMLFormElement>) {
@@ -184,7 +163,7 @@ export default function PhotosPage() {
 
     if (res.ok) {
       setEditingId(null);
-      setMessage("Photo updated!");
+      showSuccess("Photo updated!");
       fetchPhotos();
     }
   }
@@ -193,10 +172,10 @@ export default function PhotosPage() {
     if (!confirm("Delete this photo?")) return;
     const res = await fetch(`/api/photos?id=${id}`, { method: "DELETE" });
     if (res.ok) {
-      setMessage("Photo deleted");
+      showSuccess("Photo deleted");
       fetchPhotos();
     } else {
-      setMessage("Failed to delete photo");
+      showError("Failed to delete photo");
     }
   }
 
@@ -207,9 +186,9 @@ export default function PhotosPage() {
       body: JSON.stringify({ id: selectedGallery, coverImageUrl: photo.thumbnailUrl }),
     });
     if (res.ok) {
-      setMessage("Cover image updated!");
+      showSuccess("Cover image updated!");
     } else {
-      setMessage("Failed to set cover image");
+      showError("Failed to set cover image");
     }
   }
 
@@ -257,8 +236,8 @@ export default function PhotosPage() {
       </div>
 
       {message && (
-        <div className={message.includes("Failed") ? "alert-error" : "alert-success"}>
-          {message}
+        <div className={alertClass}>
+          {message.text}
         </div>
       )}
 
@@ -285,7 +264,7 @@ export default function PhotosPage() {
                   type="button"
                   onClick={() => {
                     navigator.clipboard.writeText(editingPhoto.url);
-                    setMessage("URL copied!");
+                    showSuccess("URL copied!");
                   }}
                   className="shrink-0 rounded bg-neutral-200 px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-300"
                 >
@@ -365,7 +344,7 @@ export default function PhotosPage() {
                             onClick={(e) => {
                               e.stopPropagation();
                               navigator.clipboard.writeText(photo.url);
-                              setMessage("URL copied!");
+                              showSuccess("URL copied!");
                             }}
                             className="shrink-0 btn-text"
                             title="Copy URL"

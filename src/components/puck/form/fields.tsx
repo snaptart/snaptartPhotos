@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useFormContext } from "./FormContext";
+import { useFormField } from "@/lib/hooks/useFormField";
 
 // ---------- Shared label ----------
 
@@ -28,12 +27,7 @@ export type TextFieldProps = {
 };
 
 export function TextFieldRender({ label, name, placeholder, required, fieldType }: TextFieldProps) {
-  const ctx = useFormContext();
-  const [value, setValue] = useState("");
-
-  useEffect(() => {
-    ctx?.register(name, "", { required, type: fieldType });
-  }, [name, required, fieldType]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { value, update } = useFormField(name, "", { required, type: fieldType });
 
   return (
     <div className="py-2">
@@ -43,11 +37,8 @@ export function TextFieldRender({ label, name, placeholder, required, fieldType 
         name={name}
         placeholder={placeholder}
         required={required}
-        value={value}
-        onChange={(e) => {
-          setValue(e.target.value);
-          ctx?.update(name, e.target.value);
-        }}
+        value={value as string}
+        onChange={(e) => update(e.target.value)}
         className={inputClasses}
       />
     </div>
@@ -65,12 +56,7 @@ export type TextAreaProps = {
 };
 
 export function TextAreaRender({ label, name, placeholder, required, rows }: TextAreaProps) {
-  const ctx = useFormContext();
-  const [value, setValue] = useState("");
-
-  useEffect(() => {
-    ctx?.register(name, "", { required });
-  }, [name, required]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { value, update } = useFormField(name, "", { required });
 
   return (
     <div className="py-2">
@@ -80,11 +66,8 @@ export function TextAreaRender({ label, name, placeholder, required, rows }: Tex
         placeholder={placeholder}
         required={required}
         rows={rows}
-        value={value}
-        onChange={(e) => {
-          setValue(e.target.value);
-          ctx?.update(name, e.target.value);
-        }}
+        value={value as string}
+        onChange={(e) => update(e.target.value)}
         className={inputClasses + " resize-y"}
       />
     </div>
@@ -101,17 +84,12 @@ export type SelectFieldProps = {
 };
 
 export function SelectFieldRender({ label, name, required, options }: SelectFieldProps) {
-  const ctx = useFormContext();
-  const [value, setValue] = useState("");
+  const { value, update } = useFormField(name, "", { required });
 
   const optList = options
     .split("\n")
     .map((s) => s.trim())
     .filter(Boolean);
-
-  useEffect(() => {
-    ctx?.register(name, "", { required });
-  }, [name, required]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="py-2">
@@ -119,11 +97,8 @@ export function SelectFieldRender({ label, name, required, options }: SelectFiel
       <select
         name={name}
         required={required}
-        value={value}
-        onChange={(e) => {
-          setValue(e.target.value);
-          ctx?.update(name, e.target.value);
-        }}
+        value={value as string}
+        onChange={(e) => update(e.target.value)}
         className={inputClasses}
       >
         <option value="">Select...</option>
@@ -150,17 +125,12 @@ export type RadioGroupProps = {
 };
 
 export function RadioGroupRender({ label, name, required, options }: RadioGroupProps) {
-  const ctx = useFormContext();
-  const [value, setValue] = useState("");
+  const { value, update } = useFormField(name, "", { required });
 
   const optList = options
     .split("\n")
     .map((s) => s.trim())
     .filter(Boolean);
-
-  useEffect(() => {
-    ctx?.register(name, "", { required });
-  }, [name, required]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <fieldset className="py-2">
@@ -176,10 +146,7 @@ export function RadioGroupRender({ label, name, required, options }: RadioGroupP
                 value={val}
                 required={required}
                 checked={value === val}
-                onChange={() => {
-                  setValue(val);
-                  ctx?.update(name, val);
-                }}
+                onChange={() => update(val)}
                 className="accent-neutral-900"
               />
               {lbl}
@@ -200,24 +167,19 @@ export type CheckboxGroupProps = {
 };
 
 export function CheckboxGroupRender({ label, name, options }: CheckboxGroupProps) {
-  const ctx = useFormContext();
-  const [selected, setSelected] = useState<string[]>([]);
+  const { value, update } = useFormField(name, [] as string[]);
 
+  const selected = value as string[];
   const optList = options
     .split("\n")
     .map((s) => s.trim())
     .filter(Boolean);
 
-  useEffect(() => {
-    ctx?.register(name, []);
-  }, [name]); // eslint-disable-line react-hooks/exhaustive-deps
-
   function toggle(val: string) {
     const next = selected.includes(val)
       ? selected.filter((s) => s !== val)
       : [...selected, val];
-    setSelected(next);
-    ctx?.update(name, next);
+    update(next);
   }
 
   return (
@@ -253,23 +215,15 @@ export type CheckboxProps = {
 };
 
 export function CheckboxRender({ label, name }: CheckboxProps) {
-  const ctx = useFormContext();
-  const [checked, setChecked] = useState(false);
-
-  useEffect(() => {
-    ctx?.register(name, "false");
-  }, [name]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { value, update } = useFormField(name, "false");
 
   return (
     <label className="flex items-center gap-2 py-2 text-sm text-neutral-700">
       <input
         type="checkbox"
         name={name}
-        checked={checked}
-        onChange={(e) => {
-          setChecked(e.target.checked);
-          ctx?.update(name, e.target.checked ? "true" : "false");
-        }}
+        checked={value === "true"}
+        onChange={(e) => update(e.target.checked ? "true" : "false")}
         className="accent-neutral-900"
       />
       {label}

@@ -4,19 +4,14 @@ import { useEffect, useState, useCallback } from "react";
 import {
   DndContext,
   closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
 } from "@dnd-kit/core";
 import {
-  arrayMove,
   SortableContext,
-  sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "@/components/admin/SortableItem";
+import { useSortableList } from "@/lib/hooks/useSortableList";
+import { useMessage } from "@/lib/hooks/useMessage";
 
 interface MenuItem {
   id: string;
@@ -49,16 +44,18 @@ export default function MenusPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
   const [form, setForm] = useState<FormState>(emptyForm);
+  const { message, showSuccess, showError, alertClass } = useMessage();
 
   const [pageOptions, setPageOptions] = useState<LinkOption[]>([]);
   const [galleryOptions, setGalleryOptions] = useState<LinkOption[]>([]);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
+  const { sensors, handleDragEnd } = useSortableList({
+    items,
+    setItems,
+    endpoint: "/api/menu-items",
+    onError: showError,
+  });
 
   const fetchItems = useCallback(async () => {
     const res = await fetch("/api/menu-items");
@@ -118,26 +115,6 @@ export default function MenusPage() {
     }));
   }
 
-  async function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    const oldIndex = items.findIndex((i) => i.id === active.id);
-    const newIndex = items.findIndex((i) => i.id === over.id);
-    const reordered = arrayMove(items, oldIndex, newIndex);
-
-    setItems(reordered);
-
-    const res = await fetch("/api/menu-items", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        items: reordered.map((item, index) => ({ id: item.id, position: index })),
-      }),
-    });
-    if (!res.ok) setMessage("Failed to save order. Refresh to sync.");
-  }
-
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
@@ -155,10 +132,10 @@ export default function MenusPage() {
       setShowForm(false);
       setEditingId(null);
       setForm(emptyForm);
-      setMessage(editingId ? "Menu item updated!" : "Menu item added!");
+      showSuccess(editingId ? "Menu item updated!" : "Menu item added!");
       fetchItems();
     } else {
-      setMessage("Failed to save menu item");
+      showError("Failed to save menu item");
     }
   }
 
@@ -166,10 +143,10 @@ export default function MenusPage() {
     if (!confirm("Delete this menu item?")) return;
     const res = await fetch(`/api/menu-items?id=${id}`, { method: "DELETE" });
     if (res.ok) {
-      setMessage("Menu item deleted");
+      showSuccess("Menu item deleted");
       fetchItems();
     } else {
-      setMessage("Failed to delete menu item");
+      showError("Failed to delete menu item");
     }
   }
 
@@ -191,7 +168,9 @@ export default function MenusPage() {
       </div>
 
       {message && (
-        <div className="alert-success">{message}</div>
+        <div className={alertClass}>
+          {message.text}
+        </div>
       )}
 
       {/* Add / Edit Form */}

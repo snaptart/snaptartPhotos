@@ -4,19 +4,14 @@ import { useEffect, useState, useCallback } from "react";
 import {
   DndContext,
   closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
 } from "@dnd-kit/core";
 import {
-  arrayMove,
   SortableContext,
-  sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "@/components/admin/SortableItem";
+import { useSortableList } from "@/lib/hooks/useSortableList";
+import { useMessage } from "@/lib/hooks/useMessage";
 import { useRouter } from "next/navigation";
 
 interface Page {
@@ -35,15 +30,17 @@ export default function PagesPage() {
   const [pages, setPages] = useState<Page[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewForm, setShowNewForm] = useState(false);
-  const [message, setMessage] = useState("");
   const [editMeta, setEditMeta] = useState<string | null>(null);
   const [homepageId, setHomepageId] = useState<string | null>(null);
+  const { message, showSuccess, showError, alertClass } = useMessage();
   const router = useRouter();
 
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
+  const { sensors, handleDragEnd } = useSortableList({
+    items: pages,
+    setItems: setPages,
+    endpoint: "/api/pages",
+    onError: showError,
+  });
 
   const fetchPages = useCallback(async () => {
     const [pagesRes, settingsRes] = await Promise.all([
@@ -71,27 +68,8 @@ export default function PagesPage() {
     if (res.ok) {
       setHomepageId(newId);
     } else {
-      setMessage("Failed to update homepage");
+      showError("Failed to update homepage");
     }
-  }
-
-  async function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    const oldIndex = pages.findIndex((p) => p.id === active.id);
-    const newIndex = pages.findIndex((p) => p.id === over.id);
-    const reordered = arrayMove(pages, oldIndex, newIndex);
-    setPages(reordered);
-
-    const res = await fetch("/api/pages", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        items: reordered.map((p, index) => ({ id: p.id, position: index })),
-      }),
-    });
-    if (!res.ok) setMessage("Failed to save order. Refresh to sync.");
   }
 
   async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
@@ -112,7 +90,7 @@ export default function PagesPage() {
       const page = await res.json();
       router.push(`/admin/pages/${page.id}/edit`);
     } else {
-      setMessage("Failed to create page");
+      showError("Failed to create page");
     }
   }
 
@@ -135,7 +113,7 @@ export default function PagesPage() {
 
     if (res.ok) {
       setEditMeta(null);
-      setMessage("Page updated!");
+      showSuccess("Page updated!");
       fetchPages();
     }
   }
@@ -147,10 +125,10 @@ export default function PagesPage() {
       body: JSON.stringify({ duplicateId: id, position: pages.length }),
     });
     if (res.ok) {
-      setMessage("Page duplicated!");
+      showSuccess("Page duplicated!");
       fetchPages();
     } else {
-      setMessage("Failed to duplicate page");
+      showError("Failed to duplicate page");
     }
   }
 
@@ -158,10 +136,10 @@ export default function PagesPage() {
     if (!confirm("Delete this page?")) return;
     const res = await fetch(`/api/pages?id=${id}`, { method: "DELETE" });
     if (res.ok) {
-      setMessage("Page deleted");
+      showSuccess("Page deleted");
       fetchPages();
     } else {
-      setMessage("Failed to delete page");
+      showError("Failed to delete page");
     }
   }
 
@@ -174,7 +152,7 @@ export default function PagesPage() {
     if (res.ok) {
       fetchPages();
     } else {
-      setMessage("Failed to update page");
+      showError("Failed to update page");
     }
   }
 
@@ -192,8 +170,8 @@ export default function PagesPage() {
       </div>
 
       {message && (
-        <div className={message.includes("Failed") ? "alert-error" : "alert-success"}>
-          {message}
+        <div className={alertClass}>
+          {message.text}
         </div>
       )}
 

@@ -113,7 +113,7 @@ export function FormWrapperRender({
 
   if (status === "success") {
     return (
-      <div className="rounded border border-green-200 bg-green-50 px-6 py-8 text-center text-green-800">
+      <div className="alert-success px-6 py-8 text-center">
         {successMessage || "Thank you! Your submission has been received."}
       </div>
     );
@@ -139,7 +139,7 @@ export function FormWrapperRender({
         <button
           type="submit"
           disabled={status === "submitting"}
-          className="rounded bg-neutral-900 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-neutral-700 disabled:opacity-50"
+          className="btn-primary px-6 py-2.5"
         >
           {status === "submitting" ? "Submitting..." : submitLabel || "Submit"}
         </button>

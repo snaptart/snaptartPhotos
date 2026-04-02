@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { pages } from "@/lib/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { generateSlug } from "@/lib/utils";
-import bcrypt from "bcryptjs";
+import { hashPassword } from "@/lib/password";
 
 export async function GET() {
   try {
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
 
     let passwordHash: string | undefined;
     if (body.isPasswordProtected && body.password) {
-      passwordHash = await bcrypt.hash(body.password, 10);
+      passwordHash = await hashPassword(body.password);
     }
 
     const [item] = await db.insert(pages).values({
@@ -83,7 +83,7 @@ export async function PUT(req: Request) {
 
     // Handle password changes
     if (data.isPasswordProtected && password) {
-      data.passwordHash = await bcrypt.hash(password, 10);
+      data.passwordHash = await hashPassword(password);
     } else if (data.isPasswordProtected === false) {
       data.passwordHash = null;
     }

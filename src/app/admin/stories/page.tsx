@@ -4,19 +4,14 @@ import { useEffect, useState, useCallback } from "react";
 import {
   DndContext,
   closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
 } from "@dnd-kit/core";
 import {
-  arrayMove,
   SortableContext,
-  sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "@/components/admin/SortableItem";
+import { useSortableList } from "@/lib/hooks/useSortableList";
+import { useMessage } from "@/lib/hooks/useMessage";
 import { useRouter } from "next/navigation";
 import { CURATED_FONTS } from "@/lib/theme/fonts";
 
@@ -47,14 +42,16 @@ export default function StoriesPage() {
   const [stories, setStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewForm, setShowNewForm] = useState(false);
-  const [message, setMessage] = useState("");
   const [editSettings, setEditSettings] = useState<string | null>(null);
+  const { message, showSuccess, showError, alertClass } = useMessage();
   const router = useRouter();
 
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
+  const { sensors, handleDragEnd } = useSortableList({
+    items: stories,
+    setItems: setStories,
+    endpoint: "/api/stories",
+    onError: showError,
+  });
 
   const fetchStories = useCallback(async () => {
     const res = await fetch("/api/stories");
@@ -66,25 +63,6 @@ export default function StoriesPage() {
   useEffect(() => {
     fetchStories();
   }, [fetchStories]);
-
-  async function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    const oldIndex = stories.findIndex((s) => s.id === active.id);
-    const newIndex = stories.findIndex((s) => s.id === over.id);
-    const reordered = arrayMove(stories, oldIndex, newIndex);
-    setStories(reordered);
-
-    const res = await fetch("/api/stories", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        items: reordered.map((s, index) => ({ id: s.id, position: index })),
-      }),
-    });
-    if (!res.ok) setMessage("Failed to save order. Refresh to sync.");
-  }
 
   async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -103,7 +81,7 @@ export default function StoriesPage() {
       const story = await res.json();
       router.push(`/admin/stories/${story.id}/edit`);
     } else {
-      setMessage("Failed to create story");
+      showError("Failed to create story");
     }
   }
 
@@ -144,7 +122,7 @@ export default function StoriesPage() {
 
     if (res.ok) {
       setEditSettings(null);
-      setMessage("Story updated!");
+      showSuccess("Story updated!");
       fetchStories();
     }
   }
@@ -153,10 +131,10 @@ export default function StoriesPage() {
     if (!confirm("Delete this story?")) return;
     const res = await fetch(`/api/stories?id=${id}`, { method: "DELETE" });
     if (res.ok) {
-      setMessage("Story deleted");
+      showSuccess("Story deleted");
       fetchStories();
     } else {
-      setMessage("Failed to delete story");
+      showError("Failed to delete story");
     }
   }
 
@@ -169,7 +147,7 @@ export default function StoriesPage() {
     if (res.ok) {
       fetchStories();
     } else {
-      setMessage("Failed to update story");
+      showError("Failed to update story");
     }
   }
 
@@ -187,8 +165,8 @@ export default function StoriesPage() {
       </div>
 
       {message && (
-        <div className={message.includes("Failed") ? "alert-error" : "alert-success"}>
-          {message}
+        <div className={alertClass}>
+          {message.text}
         </div>
       )}
 
@@ -390,7 +368,7 @@ export default function StoriesPage() {
   );
 }
 
-/* ─── Helper Components ─── */
+/* --- Helper Components --- */
 
 function FontSelect({
   label,
