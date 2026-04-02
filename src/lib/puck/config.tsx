@@ -8,6 +8,10 @@ import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import TextAlign from "@tiptap/extension-text-align";
 import Underline from "@tiptap/extension-underline";
+import { TextStyle } from "@tiptap/extension-text-style";
+import Color from "@tiptap/extension-color";
+import FontFamily from "@tiptap/extension-font-family";
+import { FontSize } from "@/lib/tiptap/font-size";
 import { Indent } from "@/lib/tiptap/indent";
 import type { JSONContent } from "@tiptap/react";
 import TiptapEditor from "@/components/admin/TiptapEditor";
@@ -38,6 +42,10 @@ import type {
 const tiptapExtensions = [
   StarterKit,
   Underline,
+  TextStyle,
+  Color,
+  FontFamily,
+  FontSize,
   Image,
   Link,
   TextAlign.configure({ types: ["heading", "paragraph"] }),

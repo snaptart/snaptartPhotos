@@ -6,8 +6,37 @@ import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import TextAlign from "@tiptap/extension-text-align";
 import Underline from "@tiptap/extension-underline";
+import { TextStyle } from "@tiptap/extension-text-style";
+import Color from "@tiptap/extension-color";
+import FontFamily from "@tiptap/extension-font-family";
+import { FontSize } from "@/lib/tiptap/font-size";
 import { Indent } from "@/lib/tiptap/indent";
 import type { JSONContent } from "@tiptap/react";
+
+const FONT_FAMILIES = [
+  { label: "Default", value: "" },
+  { label: "EB Garamond", value: "EB Garamond" },
+  { label: "Inter", value: "Inter" },
+  { label: "Georgia", value: "Georgia" },
+  { label: "Times New Roman", value: "Times New Roman" },
+  { label: "Arial", value: "Arial" },
+  { label: "Verdana", value: "Verdana" },
+  { label: "Courier New", value: "Courier New" },
+];
+
+const FONT_SIZES = [
+  { label: "Default", value: "" },
+  { label: "12px", value: "12px" },
+  { label: "14px", value: "14px" },
+  { label: "16px", value: "16px" },
+  { label: "18px", value: "18px" },
+  { label: "20px", value: "20px" },
+  { label: "24px", value: "24px" },
+  { label: "28px", value: "28px" },
+  { label: "32px", value: "32px" },
+  { label: "36px", value: "36px" },
+  { label: "48px", value: "48px" },
+];
 
 interface TiptapEditorProps {
   content: JSONContent | null;
@@ -37,6 +66,66 @@ function MenuBar({ editor }: { editor: Editor | null }) {
       </button>
       <button type="button" onClick={() => editor.chain().focus().toggleStrike().run()} className={btnClass(editor.isActive("strike"))}>
         S
+      </button>
+
+      <span className="mx-1 border-l border-neutral-300" />
+
+      <select
+        value={editor.getAttributes("textStyle").fontFamily || ""}
+        onChange={(e) => {
+          if (e.target.value) {
+            editor.chain().focus().setFontFamily(e.target.value).run();
+          } else {
+            editor.chain().focus().unsetFontFamily().run();
+          }
+        }}
+        className="rounded border border-neutral-300 bg-white px-1.5 py-1 text-sm text-neutral-700"
+      >
+        {FONT_FAMILIES.map((f) => (
+          <option key={f.value} value={f.value}>
+            {f.label}
+          </option>
+        ))}
+      </select>
+
+      <select
+        value={editor.getAttributes("textStyle").fontSize || ""}
+        onChange={(e) => {
+          if (e.target.value) {
+            editor.chain().focus().setFontSize(e.target.value).run();
+          } else {
+            editor.chain().focus().unsetFontSize().run();
+          }
+        }}
+        className="rounded border border-neutral-300 bg-white px-1.5 py-1 text-sm text-neutral-700"
+      >
+        {FONT_SIZES.map((s) => (
+          <option key={s.value} value={s.value}>
+            {s.label}
+          </option>
+        ))}
+      </select>
+
+      <label className="relative flex items-center gap-1 rounded px-1.5 py-1 text-sm bg-neutral-100 text-neutral-700 hover:bg-neutral-200 cursor-pointer">
+        <span
+          className="inline-block h-4 w-4 rounded border border-neutral-300"
+          style={{ backgroundColor: editor.getAttributes("textStyle").color || "#000000" }}
+        />
+        A
+        <input
+          type="color"
+          value={editor.getAttributes("textStyle").color || "#000000"}
+          onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+        />
+      </label>
+      <button
+        type="button"
+        onClick={() => editor.chain().focus().unsetColor().run()}
+        className={btnClass(false)}
+        title="Reset color"
+      >
+        ✕
       </button>
 
       <span className="mx-1 border-l border-neutral-300" />
@@ -133,6 +222,10 @@ export default function TiptapEditor({ content, onChange }: TiptapEditorProps) {
     extensions: [
       StarterKit,
       Underline,
+      TextStyle,
+      Color,
+      FontFamily,
+      FontSize,
       Image,
       Link.configure({ openOnClick: false }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
