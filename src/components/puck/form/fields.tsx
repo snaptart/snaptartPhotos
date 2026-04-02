@@ -6,7 +6,7 @@ import { useFormField } from "@/lib/hooks/useFormField";
 
 function FieldLabel({ label, required }: { label: string; required?: boolean }) {
   return (
-    <label className="mb-1 block text-sm font-medium text-neutral-700">
+    <label className="mb-1 block font-medium text-neutral-700">
       {label}
       {required && <span className="ml-0.5 text-red-500">*</span>}
     </label>
