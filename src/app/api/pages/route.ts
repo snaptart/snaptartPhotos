@@ -2,15 +2,15 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { pages } from "@/lib/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, ne, and } from "drizzle-orm";
 import { generateSlug } from "@/lib/utils";
 
 export async function GET() {
   try {
     const session = await auth();
     const items = session
-      ? await db.select().from(pages).orderBy(asc(pages.position))
-      : await db.select().from(pages).where(eq(pages.isPublished, true)).orderBy(asc(pages.position));
+      ? await db.select().from(pages).where(ne(pages.pageType, "story")).orderBy(asc(pages.position))
+      : await db.select().from(pages).where(and(eq(pages.isPublished, true), ne(pages.pageType, "story"))).orderBy(asc(pages.position));
     return NextResponse.json(items);
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -40,11 +40,9 @@ export async function PUT(req: Request) {
 
     // Bulk reorder
     if (body.items && Array.isArray(body.items)) {
-      await db.transaction(async (tx) => {
-        for (const item of body.items) {
-          await tx.update(pages).set({ position: item.position }).where(eq(pages.id, item.id));
-        }
-      });
+      for (const item of body.items) {
+        await db.update(pages).set({ position: item.position }).where(eq(pages.id, item.id));
+      }
       const updated = await db.select().from(pages).orderBy(asc(pages.position));
       return NextResponse.json(updated);
     }

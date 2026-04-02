@@ -307,6 +307,7 @@ export default function ThemesPage() {
               <ColorInput label="Site Background" value={themeDraft.colorSiteBg} onChange={(v) => updateTheme("colorSiteBg", v)} />
               <ColorInput label="Header Background" value={themeDraft.colorHeaderBg} onChange={(v) => updateTheme("colorHeaderBg", v)} />
               <ColorInput label="Footer Background" value={themeDraft.colorFooterBg} onChange={(v) => updateTheme("colorFooterBg", v)} />
+              <ColorInput label="Footer Text Color" value={themeDraft.colorFooterText} onChange={(v) => updateTheme("colorFooterText", v)} />
               <ColorInput label="Text Color" value={themeDraft.colorText} onChange={(v) => updateTheme("colorText", v)} />
               <ColorInput label="Accent / Link Color" value={themeDraft.colorAccent} onChange={(v) => updateTheme("colorAccent", v)} />
             </div>

@@ -71,11 +71,9 @@ export async function PUT(req: Request) {
 
     // Bulk reorder
     if (body.items && Array.isArray(body.items)) {
-      await db.transaction(async (tx) => {
-        for (const item of body.items) {
-          await tx.update(photos).set({ position: item.position }).where(eq(photos.id, item.id));
-        }
-      });
+      for (const item of body.items) {
+        await db.update(photos).set({ position: item.position }).where(eq(photos.id, item.id));
+      }
       const galleryId = body.galleryId;
       const updated = galleryId
         ? await db.select().from(photos).where(eq(photos.galleryId, galleryId)).orderBy(asc(photos.position))

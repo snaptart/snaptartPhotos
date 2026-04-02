@@ -6,6 +6,7 @@ import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import TextAlign from "@tiptap/extension-text-align";
 import Underline from "@tiptap/extension-underline";
+import { Indent } from "@/lib/tiptap/indent";
 import type { JSONContent } from "@tiptap/react";
 
 interface TiptapEditorProps {
@@ -40,6 +41,9 @@ function MenuBar({ editor }: { editor: Editor | null }) {
 
       <span className="mx-1 border-l border-neutral-300" />
 
+      <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} className={btnClass(editor.isActive("heading", { level: 1 }))}>
+        H1
+      </button>
       <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className={btnClass(editor.isActive("heading", { level: 2 }))}>
         H2
       </button>
@@ -57,6 +61,9 @@ function MenuBar({ editor }: { editor: Editor | null }) {
       </button>
       <button type="button" onClick={() => editor.chain().focus().setTextAlign("right").run()} className={btnClass(editor.isActive({ textAlign: "right" }))}>
         Right
+      </button>
+      <button type="button" onClick={() => editor.chain().focus().setTextAlign("justify").run()} className={btnClass(editor.isActive({ textAlign: "justify" }))}>
+        Justify
       </button>
 
       <span className="mx-1 border-l border-neutral-300" />
@@ -96,6 +103,18 @@ function MenuBar({ editor }: { editor: Editor | null }) {
 
       <span className="mx-1 border-l border-neutral-300" />
 
+      <button type="button" onClick={() => editor.chain().focus().indent().run()} className={btnClass(false)}>
+        Indent
+      </button>
+      <button type="button" onClick={() => editor.chain().focus().outdent().run()} className={btnClass(false)}>
+        Outdent
+      </button>
+      <button type="button" onClick={() => editor.chain().focus().toggleFirstLineIndent().run()} className={btnClass(editor.isActive({ firstLineIndent: true }))}>
+        ¶ Indent
+      </button>
+
+      <span className="mx-1 border-l border-neutral-300" />
+
       <button type="button" onClick={() => editor.chain().focus().setHorizontalRule().run()} className={btnClass(false)}>
         HR
       </button>
@@ -117,6 +136,7 @@ export default function TiptapEditor({ content, onChange }: TiptapEditorProps) {
       Image,
       Link.configure({ openOnClick: false }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
+      Indent,
     ],
     immediatelyRender: false,
     content: content ?? { type: "doc", content: [{ type: "paragraph" }] },
@@ -130,7 +150,7 @@ export default function TiptapEditor({ content, onChange }: TiptapEditorProps) {
       <MenuBar editor={editor} />
       <EditorContent
         editor={editor}
-        className="prose prose-sm max-w-none p-4 min-h-[200px] focus:outline-none [&_.ProseMirror]:min-h-[200px] [&_.ProseMirror]:outline-none"
+        className="prose prose-sm prose-p:my-1 prose-headings:my-2 max-w-none p-4 min-h-[200px] focus:outline-none [&_.ProseMirror]:min-h-[200px] [&_.ProseMirror]:outline-none"
       />
     </div>
   );
