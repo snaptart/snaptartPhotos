@@ -157,6 +157,33 @@ type HeroSlideshowProps = {
   overlayOpacity: number;
 };
 
+type CarouselSlide = {
+  id: string;
+  type: "image" | "text" | "mixed";
+  imageUrl: string;
+  title: string;
+  subtitle: string;
+  bgColor: string;
+  textColor: string;
+};
+
+type CarouselProps = {
+  slides: CarouselSlide[];
+  slidesPerView: number;
+  gap: number;
+  aspectRatio: "none" | "16:9" | "3:2" | "4:3" | "1:1";
+  height: string;
+  transition: "slide" | "fade";
+  transitionDuration: number;
+  autoPlay: boolean;
+  interval: number;
+  pauseOnHover: boolean;
+  showArrows: boolean;
+  showDots: boolean;
+  objectFit: "cover" | "contain";
+  borderRadius: number;
+};
+
 type Components = {
   RichText: RichTextProps;
   Hero: HeroProps;
@@ -166,6 +193,7 @@ type Components = {
   Container: ContainerProps;
   Columns: ColumnsProps;
   GalleryEmbed: GalleryEmbedProps;
+  Carousel: CarouselProps;
   Form: FormWrapperProps;
   TextField: TextFieldProps;
   TextArea: TextAreaProps;
@@ -179,7 +207,7 @@ type Components = {
 
 export const puckConfig: Config<Components> = {
   categories: {
-    content: { components: ["RichText", "ImageBlock", "GalleryEmbed"] },
+    content: { components: ["RichText", "ImageBlock", "GalleryEmbed", "Carousel"] },
     layout: { components: ["Columns", "Spacer", "Container"] },
     hero: { components: ["Hero", "HeroSlideshow"] },
     forms: { components: ["Form", "TextField", "TextArea", "SelectField", "RadioGroup", "CheckboxGroup", "Checkbox"] },
@@ -818,6 +846,140 @@ export const puckConfig: Config<Components> = {
           />
         );
       },
+    },
+
+    Carousel: {
+      label: "Carousel",
+      fields: {
+        slides: {
+          type: "custom",
+          label: "Slides",
+          render: ({ value, onChange }) => (
+            <CarouselSlideEditor value={value} onChange={onChange} />
+          ),
+        },
+        slidesPerView: {
+          type: "custom",
+          label: "Slides Per View",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={1} max={5} step={1} unit="" label="Slides Per View" />
+          ),
+        },
+        gap: {
+          type: "custom",
+          label: "Gap Between Slides (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={48} step={2} unit="px" label="Gap" />
+          ),
+        },
+        aspectRatio: {
+          type: "select",
+          label: "Aspect Ratio",
+          options: [
+            { label: "None (use height)", value: "none" },
+            { label: "16:9", value: "16:9" },
+            { label: "3:2", value: "3:2" },
+            { label: "4:3", value: "4:3" },
+            { label: "1:1 (square)", value: "1:1" },
+          ],
+        },
+        height: {
+          type: "select",
+          label: "Height (when no aspect ratio)",
+          options: [
+            { label: "200px", value: "200px" },
+            { label: "300px", value: "300px" },
+            { label: "400px", value: "400px" },
+            { label: "500px", value: "500px" },
+          ],
+        },
+        transition: {
+          type: "select",
+          label: "Transition Style",
+          options: [
+            { label: "Slide", value: "slide" },
+            { label: "Fade (single slide only)", value: "fade" },
+          ],
+        },
+        transitionDuration: {
+          type: "custom",
+          label: "Transition Duration (ms)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={100} max={2000} step={100} unit="ms" label="Duration" />
+          ),
+        },
+        objectFit: {
+          type: "select",
+          label: "Image Fit",
+          options: [
+            { label: "Cover (fill & crop)", value: "cover" },
+            { label: "Contain (letterbox)", value: "contain" },
+          ],
+        },
+        borderRadius: {
+          type: "custom",
+          label: "Corner Radius (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={32} step={1} unit="px" label="Corner Radius" />
+          ),
+        },
+        autoPlay: {
+          type: "radio",
+          label: "Auto-play",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        interval: {
+          type: "custom",
+          label: "Interval (seconds)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={1} max={15} step={1} unit="s" label="Interval" />
+          ),
+        },
+        pauseOnHover: {
+          type: "radio",
+          label: "Pause on Hover",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        showArrows: {
+          type: "radio",
+          label: "Show Arrows",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        showDots: {
+          type: "radio",
+          label: "Show Dots",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+      },
+      defaultProps: {
+        slides: [],
+        slidesPerView: 3,
+        gap: 16,
+        aspectRatio: "4:3",
+        height: "300px",
+        transition: "slide",
+        transitionDuration: 500,
+        autoPlay: false,
+        interval: 5,
+        pauseOnHover: true,
+        showArrows: true,
+        showDots: true,
+        objectFit: "cover",
+        borderRadius: 8,
+      },
+      render: (props) => <CarouselClient {...props} />,
     },
 
     GalleryEmbed: {
@@ -1525,6 +1687,363 @@ function HeroSlideshowClient({
               className="h-2 w-2 rounded-full transition-colors"
               style={{ backgroundColor: i === current ? "white" : "rgba(255,255,255,0.45)" }}
             />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ----- Carousel slide editor -----
+
+function CarouselSlideEditor({ value, onChange }: { value: CarouselSlide[]; onChange: (v: CarouselSlide[]) => void }) {
+  const slides = value ?? [];
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const addSlide = (type: CarouselSlide["type"]) => {
+    const newSlide: CarouselSlide = {
+      id: crypto.randomUUID(),
+      type,
+      imageUrl: "",
+      title: "",
+      subtitle: "",
+      bgColor: "#f5f5f5",
+      textColor: "#171717",
+    };
+    onChange([...slides, newSlide]);
+    setExpandedId(newSlide.id);
+  };
+
+  const updateSlide = (id: string, patch: Partial<CarouselSlide>) => {
+    onChange(slides.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  };
+
+  const removeSlide = (id: string) => {
+    onChange(slides.filter((s) => s.id !== id));
+    if (expandedId === id) setExpandedId(null);
+  };
+
+  const moveSlide = (index: number, dir: -1 | 1) => {
+    const next = index + dir;
+    if (next < 0 || next >= slides.length) return;
+    const updated = [...slides];
+    [updated[index], updated[next]] = [updated[next], updated[index]];
+    onChange(updated);
+  };
+
+  const typeLabels: Record<CarouselSlide["type"], string> = { image: "Image", text: "Text", mixed: "Image + Text" };
+
+  return (
+    <div className="space-y-2">
+      {slides.map((slide, i) => (
+        <div key={slide.id} className="rounded border border-neutral-200 bg-white">
+          <div className="flex items-center gap-1 px-2 py-1.5 text-sm">
+            <button onClick={() => moveSlide(i, -1)} disabled={i === 0} className="px-1 text-neutral-400 hover:text-neutral-700 disabled:opacity-30" title="Move up">&#8593;</button>
+            <button onClick={() => moveSlide(i, 1)} disabled={i === slides.length - 1} className="px-1 text-neutral-400 hover:text-neutral-700 disabled:opacity-30" title="Move down">&#8595;</button>
+            <button onClick={() => setExpandedId(expandedId === slide.id ? null : slide.id)} className="flex-1 text-left font-medium truncate">
+              {typeLabels[slide.type]} {i + 1}{slide.title ? `: ${slide.title}` : ""}
+            </button>
+            <button onClick={() => removeSlide(slide.id)} className="px-1 text-red-400 hover:text-red-600" title="Remove">&times;</button>
+          </div>
+          {expandedId === slide.id && (
+            <div className="space-y-2 border-t border-neutral-100 px-2 py-2">
+              <div>
+                <label className="text-xs font-medium text-neutral-500">Type</label>
+                <select
+                  value={slide.type}
+                  onChange={(e) => updateSlide(slide.id, { type: e.target.value as CarouselSlide["type"] })}
+                  className="mt-0.5 w-full rounded border border-neutral-200 px-2 py-1 text-sm"
+                >
+                  <option value="image">Image</option>
+                  <option value="text">Text</option>
+                  <option value="mixed">Image + Text</option>
+                </select>
+              </div>
+              {(slide.type === "image" || slide.type === "mixed") && (
+                <div>
+                  <label className="text-xs font-medium text-neutral-500">Image</label>
+                  <ImagePicker value={slide.imageUrl} onChange={(url) => updateSlide(slide.id, { imageUrl: url })} />
+                </div>
+              )}
+              {(slide.type === "text" || slide.type === "mixed") && (
+                <>
+                  <div>
+                    <label className="text-xs font-medium text-neutral-500">Title</label>
+                    <input type="text" value={slide.title} onChange={(e) => updateSlide(slide.id, { title: e.target.value })} className="mt-0.5 w-full rounded border border-neutral-200 px-2 py-1 text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-neutral-500">Subtitle</label>
+                    <input type="text" value={slide.subtitle} onChange={(e) => updateSlide(slide.id, { subtitle: e.target.value })} className="mt-0.5 w-full rounded border border-neutral-200 px-2 py-1 text-sm" />
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <label className="text-xs font-medium text-neutral-500">Background</label>
+                      <input type="color" value={slide.bgColor} onChange={(e) => updateSlide(slide.id, { bgColor: e.target.value })} className="mt-0.5 h-8 w-full cursor-pointer rounded border border-neutral-200" />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-xs font-medium text-neutral-500">Text Color</label>
+                      <input type="color" value={slide.textColor} onChange={(e) => updateSlide(slide.id, { textColor: e.target.value })} className="mt-0.5 h-8 w-full cursor-pointer rounded border border-neutral-200" />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+      <div className="flex gap-1">
+        <button onClick={() => addSlide("image")} className="flex-1 rounded border border-dashed border-neutral-300 px-2 py-1.5 text-xs text-neutral-500 hover:border-neutral-400 hover:text-neutral-700">+ Image</button>
+        <button onClick={() => addSlide("text")} className="flex-1 rounded border border-dashed border-neutral-300 px-2 py-1.5 text-xs text-neutral-500 hover:border-neutral-400 hover:text-neutral-700">+ Text</button>
+        <button onClick={() => addSlide("mixed")} className="flex-1 rounded border border-dashed border-neutral-300 px-2 py-1.5 text-xs text-neutral-500 hover:border-neutral-400 hover:text-neutral-700">+ Mixed</button>
+      </div>
+    </div>
+  );
+}
+
+// ----- Carousel client renderer -----
+
+function CarouselClient({
+  slides,
+  slidesPerView,
+  gap,
+  aspectRatio,
+  height,
+  transition,
+  transitionDuration,
+  autoPlay,
+  interval,
+  pauseOnHover,
+  showArrows,
+  showDots,
+  objectFit,
+  borderRadius,
+}: CarouselProps) {
+  const [current, setCurrent] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(true);
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  const totalSlides = slides.length;
+  const canLoop = transition === "slide" && totalSlides > slidesPerView;
+
+  // For fade mode, maxIndex is simple; for slide mode we loop infinitely
+  const fadeMaxIndex = totalSlides - 1;
+
+  useEffect(() => {
+    if (!autoPlay || totalSlides <= (transition === "fade" ? 1 : slidesPerView)) return;
+    if (pauseOnHover && isHovered) return;
+    const timer = setInterval(() => {
+      setCurrent((prev) => {
+        if (transition === "fade") return prev >= fadeMaxIndex ? 0 : prev + 1;
+        return prev + 1;
+      });
+    }, interval * 1000);
+    return () => clearInterval(timer);
+  }, [autoPlay, interval, pauseOnHover, isHovered, totalSlides, slidesPerView, fadeMaxIndex, transition]);
+
+  // After sliding to a clone, silently snap to the real slide
+  useEffect(() => {
+    if (transition !== "slide" || !canLoop) return;
+    if (current >= totalSlides || current < 0) {
+      const timeout = setTimeout(() => {
+        setIsTransitioning(false);
+        // Wrap index into the real range
+        setCurrent(((current % totalSlides) + totalSlides) % totalSlides);
+        // Re-enable transitions on the next frame
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => setIsTransitioning(true));
+        });
+      }, transitionDuration);
+      return () => clearTimeout(timeout);
+    }
+  }, [current, totalSlides, transition, canLoop, transitionDuration]);
+
+  const prev = () => {
+    if (transition === "fade") {
+      setCurrent((c) => (c <= 0 ? fadeMaxIndex : c - 1));
+    } else {
+      setCurrent((c) => c - 1);
+    }
+  };
+  const next = () => {
+    if (transition === "fade") {
+      setCurrent((c) => (c >= fadeMaxIndex ? 0 : c + 1));
+    } else {
+      setCurrent((c) => c + 1);
+    }
+  };
+
+  const arMap: Record<string, string> = { "16:9": "16/9", "3:2": "3/2", "4:3": "4/3", "1:1": "1/1" };
+
+  if (totalSlides === 0) {
+    return (
+      <div className="flex h-48 items-center justify-center rounded bg-neutral-100 text-neutral-400">
+        Add slides to the carousel
+      </div>
+    );
+  }
+
+  const renderSlideContent = (slide: CarouselSlide, index: number) => {
+    const slideStyle: React.CSSProperties = {
+      borderRadius: `${borderRadius}px`,
+      overflow: "hidden",
+      height: "100%",
+      ...(aspectRatio !== "none" ? { aspectRatio: arMap[aspectRatio] } : { height }),
+    };
+
+    if (slide.type === "image") {
+      return (
+        <div className="relative" style={slideStyle}>
+          {slide.imageUrl ? (
+            <img
+              src={slide.imageUrl}
+              alt={slide.title || ""}
+              className="h-full w-full opacity-0 transition-opacity duration-300"
+              style={{ objectFit, borderRadius: `${borderRadius}px` }}
+              loading={index < slidesPerView ? "eager" : "lazy"}
+              ref={(el) => { if (el?.complete) el.classList.remove("opacity-0"); }}
+              onLoad={(e) => { (e.target as HTMLImageElement).classList.remove("opacity-0"); }}
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center bg-neutral-100 text-neutral-400 text-sm">No image</div>
+          )}
+        </div>
+      );
+    }
+
+    if (slide.type === "text") {
+      return (
+        <div
+          className="flex flex-col items-center justify-center p-6 text-center"
+          style={{ ...slideStyle, backgroundColor: slide.bgColor, color: slide.textColor }}
+        >
+          {slide.title && <h3 className="text-xl font-semibold mb-2" style={{ fontFamily: "var(--theme-font-headings)" }}>{slide.title}</h3>}
+          {slide.subtitle && <p className="text-sm opacity-80">{slide.subtitle}</p>}
+        </div>
+      );
+    }
+
+    // mixed
+    return (
+      <div className="relative" style={slideStyle}>
+        {slide.imageUrl ? (
+          <img
+            src={slide.imageUrl}
+            alt={slide.title || ""}
+            className="h-full w-full opacity-0 transition-opacity duration-300"
+            style={{ objectFit, borderRadius: `${borderRadius}px` }}
+            loading={index < slidesPerView ? "eager" : "lazy"}
+            ref={(el) => { if (el?.complete) el.classList.remove("opacity-0"); }}
+            onLoad={(e) => { (e.target as HTMLImageElement).classList.remove("opacity-0"); }}
+          />
+        ) : (
+          <div className="h-full w-full" style={{ backgroundColor: slide.bgColor }} />
+        )}
+        <div className="absolute inset-0 bg-black/30" style={{ borderRadius: `${borderRadius}px` }} />
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center" style={{ color: slide.textColor || "#fff" }}>
+          {slide.title && <h3 className="text-xl font-semibold mb-1" style={{ fontFamily: "var(--theme-font-headings)" }}>{slide.title}</h3>}
+          {slide.subtitle && <p className="text-sm opacity-90">{slide.subtitle}</p>}
+        </div>
+      </div>
+    );
+  };
+
+  // Fade mode: stack all slides, show one at a time
+  if (transition === "fade") {
+    return (
+      <div
+        className="relative overflow-hidden"
+        style={{ ...(aspectRatio !== "none" ? { aspectRatio: arMap[aspectRatio] } : { height }), borderRadius: `${borderRadius}px` }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        {slides.map((slide, i) => (
+          <div
+            key={slide.id}
+            className="absolute inset-0"
+            style={{
+              opacity: i === current ? 1 : 0,
+              transition: `opacity ${transitionDuration}ms ease-in-out`,
+              zIndex: i === current ? 1 : 0,
+            }}
+          >
+            {renderSlideContent(slide, i)}
+          </div>
+        ))}
+        {showArrows && totalSlides > 1 && (
+          <>
+            <button onClick={prev} aria-label="Previous slide" className="absolute left-4 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/30 text-white hover:bg-black/50 transition-colors" style={{ zIndex: 3 }}>&#8249;</button>
+            <button onClick={next} aria-label="Next slide" className="absolute right-4 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/30 text-white hover:bg-black/50 transition-colors" style={{ zIndex: 3 }}>&#8250;</button>
+          </>
+        )}
+        {showDots && totalSlides > 1 && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2" style={{ zIndex: 3 }}>
+            {slides.map((_, i) => (
+              <button key={i} onClick={() => setCurrent(i)} aria-label={`Go to slide ${i + 1}`} className="h-2 w-2 rounded-full transition-colors" style={{ backgroundColor: i === current ? "white" : "rgba(255,255,255,0.45)" }} />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Slide mode: infinite loop with cloned slides
+  // Each slide width = (container - total gaps) / slidesPerView
+  // We use a CSS variable on the container so translateX can reference it
+  const gapTotal = (slidesPerView - 1) * gap;
+  const slideWidth = `calc((100% - ${gapTotal}px) / ${slidesPerView})`;
+
+  // Build extended slide array: [clones of last N] + [real slides] + [clones of first N]
+  const cloneCount = slidesPerView;
+  const extendedSlides = canLoop
+    ? [
+        ...slides.slice(-cloneCount).map((s, i) => ({ ...s, _key: `clone-end-${i}` })),
+        ...slides.map((s) => ({ ...s, _key: s.id })),
+        ...slides.slice(0, cloneCount).map((s, i) => ({ ...s, _key: `clone-start-${i}` })),
+      ]
+    : slides.map((s) => ({ ...s, _key: s.id }));
+
+  // Offset current index to account for prepended clones
+  const trackIndex = canLoop ? current + cloneCount : Math.max(0, Math.min(current, totalSlides - slidesPerView));
+
+  // Map current to a real index for dot highlighting
+  const realIndex = ((current % totalSlides) + totalSlides) % totalSlides;
+
+  return (
+    <div
+      className="relative overflow-hidden"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div
+        ref={trackRef}
+        className="flex"
+        style={{
+          gap: `${gap}px`,
+          transform: `translateX(calc(-${trackIndex} * (${slideWidth} + ${gap}px)))`,
+          transition: isTransitioning ? `transform ${transitionDuration}ms ease-in-out` : "none",
+        }}
+      >
+        {extendedSlides.map((slide, i) => (
+          <div
+            key={slide._key}
+            className="flex-shrink-0"
+            style={{ width: slideWidth }}
+          >
+            {renderSlideContent(slide, i)}
+          </div>
+        ))}
+      </div>
+      {showArrows && totalSlides > slidesPerView && (
+        <>
+          <button onClick={prev} aria-label="Previous slide" className="absolute left-4 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/30 text-white hover:bg-black/50 transition-colors" style={{ zIndex: 3 }}>&#8249;</button>
+          <button onClick={next} aria-label="Next slide" className="absolute right-4 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/30 text-white hover:bg-black/50 transition-colors" style={{ zIndex: 3 }}>&#8250;</button>
+        </>
+      )}
+      {showDots && totalSlides > slidesPerView && (
+        <div className="flex justify-center gap-2 mt-4">
+          {Array.from({ length: totalSlides }).map((_, i) => (
+            <button key={i} onClick={() => setCurrent(i)} aria-label={`Go to slide ${i + 1}`} className="h-2 w-2 rounded-full transition-colors" style={{ backgroundColor: i === realIndex ? "#171717" : "#d4d4d4" }} />
           ))}
         </div>
       )}
