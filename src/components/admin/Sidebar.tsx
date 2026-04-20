@@ -4,107 +4,151 @@ import Link from "next/link";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
+import {
+  LayoutDashboard,
+  Images,
+  LayoutGrid,
+  FileText,
+  BookOpen,
+  Inbox,
+  Settings as SettingsIcon,
+  ExternalLink,
+  LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
+  type LucideIcon,
+} from "lucide-react";
 import siteConfig from "@/lib/site.config";
+import { cn } from "@/lib/utils";
 
-const navItems = [
-  { label: "Dashboard", href: "/admin" },
-  { label: siteConfig.labels.galleries, href: "/admin/galleries" },
-  { label: siteConfig.labels.photos, href: "/admin/photos" },
-  { label: "Pages", href: "/admin/pages" },
-  ...(siteConfig.features.stories ? [{ label: "Stories", href: "/admin/stories" }] : []),
-  ...(siteConfig.features.submissions ? [{ label: "Submissions", href: "/admin/submissions" }] : []),
-  { label: "Menus", href: "/admin/menus" },
-  { label: "Themes", href: "/admin/themes" },
-  { label: "Settings", href: "/admin/settings" },
+type NavItem = { label: string; href: string; icon: LucideIcon };
+
+const navItems: NavItem[] = [
+  { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
+  { label: siteConfig.labels.galleries, href: "/admin/galleries", icon: LayoutGrid },
+  { label: siteConfig.labels.photos, href: "/admin/photos", icon: Images },
+  { label: "Pages", href: "/admin/pages", icon: FileText },
+  ...(siteConfig.features.stories
+    ? [{ label: "Stories", href: "/admin/stories", icon: BookOpen }]
+    : []),
+  ...(siteConfig.features.submissions
+    ? [{ label: "Submissions", href: "/admin/submissions", icon: Inbox }]
+    : []),
+  { label: "Settings", href: "/admin/settings", icon: SettingsIcon },
 ];
 
-function HamburgerIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-    </svg>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-    </svg>
-  );
-}
-
-export function AdminSidebar() {
+export function AdminSidebar({ userEmail = "" }: { userEmail?: string }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(true);
+  const avatarLetter = userEmail.charAt(0).toUpperCase() || "S";
 
   return (
     <>
-      {/* Collapsed toggle button */}
+      {/* Collapsed toggle (shown when sidebar is hidden entirely on small screens) */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed left-0 top-0 z-30 flex h-14 w-12 items-center justify-center border-r border-b border-neutral-200 bg-white text-neutral-600 hover:text-neutral-900"
+          className="fixed left-0 top-0 z-30 flex h-14 w-12 items-center justify-center border-r border-b border-admin-border bg-admin-surface text-admin-ink-soft hover:text-admin-ink"
           aria-label="Open sidebar"
         >
-          <HamburgerIcon />
+          <PanelLeftOpen className="h-5 w-5" />
         </button>
       )}
 
       <aside
-        className={`flex flex-col border-r border-neutral-200 bg-white transition-all duration-200 ${
-          open ? "w-56" : "w-0 overflow-hidden border-r-0"
-        }`}
+        className={cn(
+          "flex flex-col bg-admin-surface border-r border-admin-border transition-all duration-200",
+          open ? "w-[220px]" : "w-0 overflow-hidden border-r-0",
+        )}
       >
-        <div className="border-b border-neutral-200 px-5 py-4">
-          <Link href="/admin" className="font-serif text-lg tracking-wide">
-            {siteConfig.siteName}
-          </Link>
-          <p className="text-xs text-neutral-400">Admin</p>
+        {/* Brand */}
+        <div className="border-b border-admin-border px-[18px] py-5 flex items-center gap-2.5">
+          <div className="w-8 h-8 flex-shrink-0 bg-admin-ink text-admin-surface rounded-md flex items-center justify-center font-serif italic text-lg">
+            {siteConfig.siteName.charAt(0).toLowerCase()}
+          </div>
+          <div className="min-w-0">
+            <Link
+              href="/admin"
+              className="font-serif italic text-base leading-none text-admin-ink block truncate"
+            >
+              {siteConfig.siteName}
+            </Link>
+            <div className="font-mono text-[9px] tracking-[1.5px] text-admin-ink-soft mt-0.5">
+              ADMIN
+            </div>
+          </div>
         </div>
 
-        <nav className="flex-1 px-3 py-4">
+        {/* Nav */}
+        <nav className="flex-1 p-2 flex flex-col gap-0.5 overflow-y-auto">
           {navItems.map((item) => {
             const isActive =
               pathname === item.href ||
               (item.href !== "/admin" && pathname.startsWith(item.href));
+            const Icon = item.icon;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`mb-1 block rounded px-3 py-2 text-sm transition-colors ${
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-md text-[13px] transition-colors",
                   isActive
-                    ? "bg-neutral-100 text-neutral-900 font-medium"
-                    : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
-                }`}
+                    ? "bg-admin-accent-soft text-admin-ink font-medium"
+                    : "text-admin-ink-soft hover:bg-admin-surface-2 hover:text-admin-ink",
+                )}
               >
-                {item.label}
+                <Icon
+                  className={cn(
+                    "h-4 w-4 shrink-0",
+                    isActive ? "text-admin-accent" : "text-admin-ink-faint",
+                  )}
+                />
+                <span className="truncate">{item.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="border-t border-neutral-200 px-3 py-4">
-          <Link
-            href="/"
-            target="_blank"
-            className="mb-1 block rounded px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
-          >
-            View Site &rarr;
-          </Link>
-          <button
-            onClick={() => signOut({ callbackUrl: "/admin/login" })}
-            className="w-full rounded px-3 py-2 text-left text-sm text-neutral-600 hover:bg-neutral-50"
-          >
-            Sign Out
-          </button>
-          <button
-            onClick={() => setOpen(false)}
-            className="mt-1 w-full rounded px-3 py-2 text-left text-sm text-neutral-400 hover:bg-neutral-50 hover:text-neutral-600"
-            aria-label="Close sidebar"
-          >
-            ← Hide sidebar
-          </button>
+        {/* Footer — user + actions */}
+        <div className="border-t border-admin-border flex flex-col">
+          <div className="px-3.5 py-3 flex items-center gap-2.5 border-b border-admin-border">
+            <div className="w-7 h-7 rounded-full bg-[#ddd4c2] text-admin-ink flex items-center justify-center text-[11px] font-semibold flex-shrink-0">
+              {avatarLetter}
+            </div>
+            <div className="min-w-0 text-[12px] leading-tight">
+              <div className="font-medium text-admin-ink truncate">
+                {userEmail || "Signed in"}
+              </div>
+              <div className="text-admin-ink-soft text-[11px] truncate">
+                Owner
+              </div>
+            </div>
+          </div>
+          <div className="p-2 flex flex-col gap-0.5">
+            <Link
+              href="/"
+              target="_blank"
+              className="flex items-center gap-3 px-3 py-2 rounded-md text-[13px] text-admin-ink-soft hover:bg-admin-surface-2 hover:text-admin-ink transition-colors"
+            >
+              <ExternalLink className="h-4 w-4 text-admin-ink-faint" />
+              <span>View Site</span>
+            </Link>
+            <button
+              onClick={() => signOut({ callbackUrl: "/admin/login" })}
+              className="flex items-center gap-3 px-3 py-2 rounded-md text-[13px] text-admin-ink-soft hover:bg-admin-surface-2 hover:text-admin-ink transition-colors text-left"
+            >
+              <LogOut className="h-4 w-4 text-admin-ink-faint" />
+              <span>Sign Out</span>
+            </button>
+            <button
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 px-3 py-2 rounded-md text-[13px] text-admin-ink-faint hover:bg-admin-surface-2 hover:text-admin-ink-soft transition-colors text-left"
+              aria-label="Hide sidebar"
+            >
+              <PanelLeftClose className="h-4 w-4" />
+              <span>Hide sidebar</span>
+            </button>
+          </div>
         </div>
       </aside>
     </>

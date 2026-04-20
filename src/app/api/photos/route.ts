@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { photos, galleries } from "@/lib/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, inArray } from "drizzle-orm";
 import { del } from "@vercel/blob";
 
 export async function GET(req: Request) {
@@ -81,6 +81,29 @@ export async function PUT(req: Request) {
       return NextResponse.json(updated);
     }
 
+    // Bulk metadata update — body: { bulk: { ids: string[], patch: { ... } } }
+    if (body.bulk && Array.isArray(body.bulk.ids) && body.bulk.ids.length > 0) {
+      const allowed = [
+        "galleryId",
+        "title",
+        "description",
+        "location",
+        "tags",
+      ] as const;
+      const patch: Record<string, unknown> = {};
+      for (const key of allowed) {
+        if (Object.prototype.hasOwnProperty.call(body.bulk.patch ?? {}, key)) {
+          patch[key] = body.bulk.patch[key];
+        }
+      }
+      if (Object.keys(patch).length === 0) {
+        return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+      }
+      patch.updatedAt = new Date();
+      await db.update(photos).set(patch).where(inArray(photos.id, body.bulk.ids));
+      return NextResponse.json({ success: true, updated: body.bulk.ids.length });
+    }
+
     // Single update
     if (!body.id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
     const { id, ...data } = body;
@@ -100,6 +123,20 @@ export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
+    const idsParam = searchParams.get("ids");
+
+    // Bulk delete: ?ids=a,b,c
+    if (idsParam) {
+      const ids = idsParam.split(",").filter(Boolean);
+      if (ids.length === 0) {
+        return NextResponse.json({ error: "Missing ids" }, { status: 400 });
+      }
+      const rows = await db.select().from(photos).where(inArray(photos.id, ids));
+      await Promise.allSettled(rows.map((r) => del(r.blobUrl)));
+      await db.delete(photos).where(inArray(photos.id, ids));
+      return NextResponse.json({ success: true, deleted: ids.length });
+    }
+
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
     const [photo] = await db.select().from(photos).where(eq(photos.id, id));

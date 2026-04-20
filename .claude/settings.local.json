@@ -5,10 +5,14 @@
       "Read(//c/Users/Dad/Documents/Web/**)",
       "Bash(npx create-next-app@latest snaptart-new --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm --no-turbopack)",
       "Skill(update-config)",
-      "Skill(update-config:*)"
+      "Skill(update-config:*)",
+      "Read(//tmp/design_extract/unpacked/snaptart-photos-ideas/project/**)",
+      "Read(//c/tmp/design_extract/unpacked/snaptart-photos-ideas/project/**)",
+      "WebFetch(domain:api.anthropic.com)"
     ],
     "additionalDirectories": [
-      "C:\\Users\\Dad\\.claude"
+      "C:\\Users\\Dad\\.claude",
+      "c:\\Users\\Dad\\Documents\\Web\\gardensalacarte.com\\src\\lib"
     ]
   }
 }

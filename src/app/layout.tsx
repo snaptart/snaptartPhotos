@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { EB_Garamond, Inter } from "next/font/google";
+import { EB_Garamond, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { db } from "@/lib/db";
 import { siteSettings } from "@/lib/db/schema";
@@ -13,6 +13,12 @@ const ebGaramond = EB_Garamond({
 const inter = Inter({
   variable: "--font-sans",
   subsets: ["latin"],
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-mono",
+  subsets: ["latin"],
+  weight: ["400", "500"],
 });
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -36,7 +42,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${ebGaramond.variable} ${inter.variable} antialiased`}>
+      <body
+        className={`${ebGaramond.variable} ${inter.variable} ${jetbrainsMono.variable} antialiased`}
+      >
         {children}
       </body>
     </html>

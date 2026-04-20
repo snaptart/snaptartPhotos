@@ -19,6 +19,10 @@ export const adminUsers = pgTable("admin_users", {
 export const siteSettings = pgTable("site_settings", {
   id: uuid("id").defaultRandom().primaryKey(),
   siteTitle: text("site_title").notNull().default("My Site"),
+  tagline: text("tagline"),
+  ownerName: text("owner_name"),
+  bio: text("bio"),
+  location: text("location"),
   logoUrl: text("logo_url"),
   instagramUrl: text("instagram_url"),
   footerText: text("footer_text"),

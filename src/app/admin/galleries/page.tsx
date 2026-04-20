@@ -1,19 +1,28 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import {
-  DndContext,
-  closestCenter,
-} from "@dnd-kit/core";
+import Link from "next/link";
+import Image from "next/image";
+import { DndContext, closestCenter } from "@dnd-kit/core";
 import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
+import { Plus, X } from "lucide-react";
 import { SortableItem } from "@/components/admin/SortableItem";
 import { useSortableList } from "@/lib/hooks/useSortableList";
 import { useMessage } from "@/lib/hooks/useMessage";
-import Link from "next/link";
 import siteConfig from "@/lib/site.config";
+import {
+  Button,
+  Card,
+  Field,
+  Input,
+  Pill,
+  SectionLabel,
+  Textarea,
+  Topbar,
+} from "@/components/admin/ui";
 
 interface Gallery {
   id: string;
@@ -54,7 +63,6 @@ export default function GalleriesPage() {
   async function handleAdd(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
-
     const res = await fetch("/api/galleries", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -65,20 +73,18 @@ export default function GalleriesPage() {
         position: galleries.length,
       }),
     });
-
     if (res.ok) {
       setShowForm(false);
-      showSuccess(`${siteConfig.labels.gallery} created!`);
+      showSuccess(`${siteConfig.labels.gallery} created.`);
       fetchGalleries();
     } else {
-      showError(`Failed to create ${siteConfig.labels.gallery.toLowerCase()}`);
+      showError(`Failed to create ${siteConfig.labels.gallery.toLowerCase()}.`);
     }
   }
 
   async function handleUpdate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
-
     const res = await fetch("/api/galleries", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -89,22 +95,26 @@ export default function GalleriesPage() {
         isPublished: form.get("isPublished") === "on",
       }),
     });
-
     if (res.ok) {
       setEditingId(null);
-      showSuccess(`${siteConfig.labels.gallery} updated!`);
+      showSuccess(`${siteConfig.labels.gallery} updated.`);
       fetchGalleries();
     }
   }
 
   async function handleDelete(id: string) {
-    if (!confirm(`Delete this ${siteConfig.labels.gallery.toLowerCase()} and all its ${siteConfig.labels.photos.toLowerCase()}?`)) return;
+    if (
+      !confirm(
+        `Delete this ${siteConfig.labels.gallery.toLowerCase()} and all its ${siteConfig.labels.photos.toLowerCase()}?`,
+      )
+    )
+      return;
     const res = await fetch(`/api/galleries?id=${id}`, { method: "DELETE" });
     if (res.ok) {
-      showSuccess(`${siteConfig.labels.gallery} deleted`);
+      showSuccess(`${siteConfig.labels.gallery} deleted.`);
       fetchGalleries();
     } else {
-      showError(`Failed to delete ${siteConfig.labels.gallery.toLowerCase()}`);
+      showError(`Failed to delete.`);
     }
   }
 
@@ -114,151 +124,210 @@ export default function GalleriesPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: gallery.id, isPublished: !gallery.isPublished }),
     });
-    if (res.ok) {
-      fetchGalleries();
-    } else {
-      showError(`Failed to update ${siteConfig.labels.gallery.toLowerCase()}`);
-    }
+    if (res.ok) fetchGalleries();
+    else showError("Failed to update.");
   }
 
-  if (loading) return <div className="text-neutral-500">Loading...</div>;
-
   const editingGallery = galleries.find((g) => g.id === editingId);
+  const isFormOpen = showForm || !!editingId;
 
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{siteConfig.labels.galleries}</h1>
-        <button
-          onClick={() => { setShowForm(true); setEditingId(null); }}
-          className="btn-primary"
-        >
-          New {siteConfig.labels.gallery}
-        </button>
-      </div>
-
-      {message && (
-        <div className={alertClass}>
-          {message.text}
-        </div>
-      )}
-
-      {(showForm || editingId) && (
-        <form
-          onSubmit={editingId ? handleUpdate : handleAdd}
-          className="mb-6 rounded-lg border border-neutral-200 bg-white p-4"
-        >
-          <h2 className="mb-3 text-sm font-medium">
-            {editingId ? `Edit ${siteConfig.labels.gallery}` : `New ${siteConfig.labels.gallery}`}
-          </h2>
-          <div className="space-y-3">
-            <input
-              name="title"
-              placeholder={`${siteConfig.labels.gallery} title`}
-              defaultValue={editingGallery?.title ?? ""}
-              required
-              className="input-base"
-            />
-            <textarea
-              name="description"
-              placeholder="Description (optional)"
-              defaultValue={editingGallery?.description ?? ""}
-              rows={2}
-              className="input-base"
-            />
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                name="isPublished"
-                defaultChecked={editingGallery?.isPublished ?? false}
-              />
-              Published
-            </label>
-            <div className="flex gap-2">
-              <button type="submit" className="btn-primary">
-                {editingId ? "Update" : "Create"}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setShowForm(false); setEditingId(null); }}
-                className="btn-secondary"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </form>
-      )}
-
-      {galleries.length === 0 ? (
-        <p className="text-sm text-neutral-500">No {siteConfig.labels.galleries.toLowerCase()} yet. Create one to get started.</p>
-      ) : (
-        <div className="rounded-lg border border-neutral-200 bg-white">
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
+    <div className="-m-8 min-h-[calc(100vh-0px)] bg-admin-bg">
+      <Topbar
+        title={siteConfig.labels.galleries}
+        subtitle={`${galleries.length} total · drag to reorder`}
+        actions={
+          <Button
+            kind="primary"
+            onClick={() => {
+              setShowForm(true);
+              setEditingId(null);
+            }}
+            icon={<Plus className="h-3.5 w-3.5" />}
           >
-            <SortableContext items={galleries.map((g) => g.id)} strategy={verticalListSortingStrategy}>
-              {galleries.map((gallery) => (
-                <SortableItem key={gallery.id} id={gallery.id}>
-                  <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-3 last:border-0">
-                    <div className="flex items-center gap-3">
-                      {gallery.coverImageUrl ? (
-                        <img
-                          src={gallery.coverImageUrl}
-                          alt=""
-                          className="h-10 w-10 rounded object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-10 w-10 items-center justify-center rounded bg-neutral-100 text-neutral-400 text-xs">
-                          No img
+            New {siteConfig.labels.gallery.toLowerCase()}
+          </Button>
+        }
+      />
+
+      <div className="p-7 space-y-4">
+        {message && (
+          <div className={alertClass}>{message.text}</div>
+        )}
+
+        {isFormOpen && (
+          <Card
+            header={
+              <>
+                <SectionLabel>
+                  {editingId
+                    ? `Edit ${siteConfig.labels.gallery.toLowerCase()}`
+                    : `New ${siteConfig.labels.gallery.toLowerCase()}`}
+                </SectionLabel>
+                <button
+                  onClick={() => {
+                    setShowForm(false);
+                    setEditingId(null);
+                  }}
+                  className="p-1 text-admin-ink-soft hover:text-admin-ink"
+                  aria-label="Close form"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </>
+            }
+          >
+            <form
+              onSubmit={editingId ? handleUpdate : handleAdd}
+              className="space-y-4"
+            >
+              <Field label="Title" htmlFor="g-title">
+                <Input
+                  id="g-title"
+                  name="title"
+                  defaultValue={editingGallery?.title ?? ""}
+                  placeholder={`${siteConfig.labels.gallery} title`}
+                  required
+                />
+              </Field>
+              <Field label="Description" htmlFor="g-description">
+                <Textarea
+                  id="g-description"
+                  name="description"
+                  defaultValue={editingGallery?.description ?? ""}
+                  placeholder="Optional"
+                  rows={2}
+                />
+              </Field>
+              <label className="flex items-center gap-2 text-[13px] text-admin-ink cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="isPublished"
+                  defaultChecked={editingGallery?.isPublished ?? false}
+                  className="accent-admin-accent"
+                />
+                Published
+              </label>
+              <div className="flex gap-2">
+                <Button type="submit" kind="primary">
+                  {editingId ? "Update" : "Create"}
+                </Button>
+                <Button
+                  type="button"
+                  kind="ghost"
+                  onClick={() => {
+                    setShowForm(false);
+                    setEditingId(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </Card>
+        )}
+
+        {loading ? (
+          <div className="text-admin-ink-soft">Loading...</div>
+        ) : galleries.length === 0 ? (
+          <EmptyState
+            title={`No ${siteConfig.labels.galleries.toLowerCase()} yet`}
+            body={`Create one to get started.`}
+          />
+        ) : (
+          <Card padded={false}>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={galleries.map((g) => g.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {galleries.map((gallery) => (
+                  <SortableItem key={gallery.id} id={gallery.id}>
+                    <div className="flex items-center justify-between gap-4 border-b border-admin-border px-4 py-3 last:border-0">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-md bg-admin-surface-2 border border-admin-border">
+                          {gallery.coverImageUrl && (
+                            <Image
+                              src={gallery.coverImageUrl}
+                              alt=""
+                              fill
+                              sizes="44px"
+                              className="object-cover"
+                            />
+                          )}
                         </div>
-                      )}
-                      <div>
-                        <span className="font-medium">{gallery.title}</span>
-                        <span className="ml-2 text-sm text-neutral-400">/{gallery.slug}</span>
-                        <span
-                          className={`ml-2 rounded px-1.5 py-0.5 text-xs ${
-                            gallery.isPublished
-                              ? "bg-green-50 text-green-600"
-                              : "bg-neutral-100 text-neutral-500"
-                          }`}
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="truncate font-medium text-admin-ink">
+                              {gallery.title}
+                            </span>
+                            <Pill
+                              tone={gallery.isPublished ? "success" : "neutral"}
+                            >
+                              {gallery.isPublished ? "Published" : "Draft"}
+                            </Pill>
+                          </div>
+                          <div className="text-[12px] text-admin-ink-soft truncate">
+                            /{gallery.slug}
+                            {gallery.description && ` · ${gallery.description}`}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Link
+                          href={`/admin/photos?galleryId=${gallery.id}`}
+                          className="text-[12px] text-admin-ink-soft hover:text-admin-ink"
                         >
-                          {gallery.isPublished ? "Published" : "Draft"}
-                        </span>
+                          {siteConfig.labels.photos}
+                        </Link>
+                        <Button
+                          kind="subtle"
+                          size="sm"
+                          onClick={() => togglePublish(gallery)}
+                        >
+                          {gallery.isPublished ? "Unpublish" : "Publish"}
+                        </Button>
+                        <Button
+                          kind="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEditingId(gallery.id);
+                            setShowForm(false);
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          kind="danger"
+                          size="sm"
+                          onClick={() => handleDelete(gallery.id)}
+                        >
+                          Delete
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Link
-                        href={`/admin/photos?galleryId=${gallery.id}`}
-                        className="btn-text"
-                      >
-                        {siteConfig.labels.photos}
-                      </Link>
-                      <button onClick={() => togglePublish(gallery)} className="btn-text">
-                        {gallery.isPublished ? "Unpublish" : "Publish"}
-                      </button>
-                      <button
-                        onClick={() => { setEditingId(gallery.id); setShowForm(false); }}
-                        className="btn-text"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(gallery.id)}
-                        className="btn-danger"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                </SortableItem>
-              ))}
-            </SortableContext>
-          </DndContext>
-        </div>
-      )}
+                  </SortableItem>
+                ))}
+              </SortableContext>
+            </DndContext>
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 text-center">
+      <div className="font-serif italic text-[22px] text-admin-ink mb-2">
+        {title}
+      </div>
+      <p className="text-[13px] text-admin-ink-soft max-w-sm">{body}</p>
     </div>
   );
 }

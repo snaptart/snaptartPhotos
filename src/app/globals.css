@@ -4,6 +4,23 @@
 @theme {
   --font-serif: "EB Garamond", Georgia, serif;
   --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Admin design tokens — scoped to /admin via className on the admin layout.
+     Public site never sees these. */
+  --color-admin-bg: #ffffff;
+  --color-admin-surface: #ffffff;
+  --color-admin-surface-2: #fafaf8;
+  --color-admin-border: #e4e1db;
+  --color-admin-border-strong: #c9c4bb;
+  --color-admin-ink: #1a1714;
+  --color-admin-ink-soft: #6b6258;
+  --color-admin-ink-faint: #9b9286;
+  --color-admin-accent: #b8824a;
+  --color-admin-accent-soft: #f3e8d8;
+  --color-admin-danger: #c44536;
+  --color-admin-success: #4a7a4a;
+  --color-admin-warn: #b88c2a;
 }
 
 /* Prevent 100vw from causing horizontal scroll due to scrollbar width */

@@ -2,75 +2,69 @@
 
 import { useEffect, useState } from "react";
 import ImagePicker from "@/components/admin/ImagePicker";
-import { DEFAULT_LIGHTBOX_SETTINGS } from "@/components/public/Lightbox";
 import { useMessage } from "@/lib/hooks/useMessage";
+import { Button, Field, Input, Textarea } from "@/components/admin/ui";
+import { SettingGroup } from "@/components/admin/settings/SettingGroup";
 import siteConfig from "@/lib/site.config";
 
-interface SiteSettings {
-  id: string;
+interface IdentityDraft {
   siteTitle: string;
-  logoUrl: string | null;
-  instagramUrl: string | null;
-  footerText: string | null;
-  footerAlignment: string;
-  contactEmail: string | null;
-  lightboxMetadataFields: string[] | null;
-  lightboxCornerRadius: number | null;
-  lightboxCaptionPosition: string | null;
-  lightboxFadeSpeed: string | null;
-  lightboxCaptionAlignment: string | null;
-}
-
-interface SettingsDraft {
+  tagline: string;
+  ownerName: string;
   logoUrl: string;
-  footerAlignment: string;
-  lbMetadataFields: string[];
-  lbCornerRadius: number;
-  lbCaptionPosition: string;
-  lbFadeSpeed: string;
-  lbCaptionAlignment: string;
+  bio: string;
+  contactEmail: string;
+  instagramUrl: string;
+  location: string;
 }
 
-const LIGHTBOX_METADATA_OPTIONS = siteConfig.lightboxMetadataOptions.filter((o) => o.enabled);
+const DEFAULT_DRAFT: IdentityDraft = {
+  siteTitle: "",
+  tagline: "",
+  ownerName: "",
+  logoUrl: "",
+  bio: "",
+  contactEmail: "",
+  instagramUrl: "",
+  location: "",
+};
 
-function draftFromSettings(data: SiteSettings): SettingsDraft {
-  return {
-    logoUrl: data.logoUrl ?? "",
-    footerAlignment: data.footerAlignment ?? "center",
-    lbMetadataFields: data.lightboxMetadataFields ?? DEFAULT_LIGHTBOX_SETTINGS.metadataFields,
-    lbCornerRadius: data.lightboxCornerRadius ?? DEFAULT_LIGHTBOX_SETTINGS.cornerRadius,
-    lbCaptionPosition: data.lightboxCaptionPosition ?? DEFAULT_LIGHTBOX_SETTINGS.captionPosition,
-    lbFadeSpeed: data.lightboxFadeSpeed ?? DEFAULT_LIGHTBOX_SETTINGS.fadeSpeed,
-    lbCaptionAlignment: data.lightboxCaptionAlignment ?? DEFAULT_LIGHTBOX_SETTINGS.captionAlignment,
-  };
-}
-
-export default function SettingsPage() {
-  const [settings, setSettings] = useState<SiteSettings | null>(null);
-  const [draft, setDraft] = useState<SettingsDraft>({
-    logoUrl: "",
-    footerAlignment: "center",
-    lbMetadataFields: DEFAULT_LIGHTBOX_SETTINGS.metadataFields,
-    lbCornerRadius: DEFAULT_LIGHTBOX_SETTINGS.cornerRadius,
-    lbCaptionPosition: DEFAULT_LIGHTBOX_SETTINGS.captionPosition,
-    lbFadeSpeed: DEFAULT_LIGHTBOX_SETTINGS.fadeSpeed,
-    lbCaptionAlignment: DEFAULT_LIGHTBOX_SETTINGS.captionAlignment,
-  });
+export default function IdentitySettingsPage() {
+  const [loaded, setLoaded] = useState(false);
+  const [draft, setDraft] = useState<IdentityDraft>(DEFAULT_DRAFT);
   const [saving, setSaving] = useState(false);
   const { message, showSuccess, showError, clear, alertClass } = useMessage();
+
   const [pwSaving, setPwSaving] = useState(false);
-  const { message: pwMessage, showSuccess: pwShowSuccess, showError: pwShowError, clear: pwClear, alertClass: pwAlertClass } = useMessage();
+  const {
+    message: pwMessage,
+    showSuccess: pwShowSuccess,
+    showError: pwShowError,
+    clear: pwClear,
+    alertClass: pwAlertClass,
+  } = useMessage();
 
   useEffect(() => {
     fetch("/api/settings")
       .then((r) => r.json())
       .then((data) => {
-        setSettings(data);
-        if (data) setDraft(draftFromSettings(data));
+        if (data) {
+          setDraft({
+            siteTitle: data.siteTitle ?? "",
+            tagline: data.tagline ?? "",
+            ownerName: data.ownerName ?? "",
+            logoUrl: data.logoUrl ?? "",
+            bio: data.bio ?? "",
+            contactEmail: data.contactEmail ?? "",
+            instagramUrl: data.instagramUrl ?? "",
+            location: data.location ?? "",
+          });
+        }
+        setLoaded(true);
       });
   }, []);
 
-  function updateDraft<K extends keyof SettingsDraft>(key: K, value: SettingsDraft[K]) {
+  function update<K extends keyof IdentityDraft>(key: K, value: IdentityDraft[K]) {
     setDraft((d) => ({ ...d, [key]: value }));
   }
 
@@ -78,36 +72,22 @@ export default function SettingsPage() {
     e.preventDefault();
     setSaving(true);
     clear();
-
-    const form = new FormData(e.currentTarget);
-    const data = {
-      siteTitle: form.get("siteTitle"),
-      logoUrl: draft.logoUrl || null,
-      instagramUrl: form.get("instagramUrl") || null,
-      footerText: form.get("footerText") || null,
-      footerAlignment: draft.footerAlignment,
-      contactEmail: form.get("contactEmail") || null,
-      lightboxMetadataFields: draft.lbMetadataFields,
-      lightboxCornerRadius: draft.lbCornerRadius,
-      lightboxCaptionPosition: draft.lbCaptionPosition,
-      lightboxFadeSpeed: draft.lbFadeSpeed,
-      lightboxCaptionAlignment: draft.lbCaptionAlignment,
-    };
-
     const res = await fetch("/api/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        siteTitle: draft.siteTitle,
+        tagline: draft.tagline || null,
+        ownerName: draft.ownerName || null,
+        logoUrl: draft.logoUrl || null,
+        bio: draft.bio || null,
+        contactEmail: draft.contactEmail || null,
+        instagramUrl: draft.instagramUrl || null,
+        location: draft.location || null,
+      }),
     });
-
-    if (res.ok) {
-      const updated = await res.json();
-      setSettings(updated);
-      setDraft(draftFromSettings(updated));
-      showSuccess("Settings saved!");
-    } else {
-      showError("Failed to save settings");
-    }
+    if (res.ok) showSuccess("Identity saved.");
+    else showError("Failed to save.");
     setSaving(false);
   }
 
@@ -116,7 +96,6 @@ export default function SettingsPage() {
     const formEl = e.currentTarget;
     setPwSaving(true);
     pwClear();
-
     const form = new FormData(e.currentTarget);
     const res = await fetch("/api/change-password", {
       method: "PUT",
@@ -126,189 +105,153 @@ export default function SettingsPage() {
         newPassword: form.get("newPassword"),
       }),
     });
-
     if (res.ok) {
-      pwShowSuccess("Password updated!");
+      pwShowSuccess("Password updated.");
       formEl.reset();
     } else {
       const data = await res.json();
-      pwShowError(data.error || "Failed to update password");
+      pwShowError(data.error || "Failed to update password.");
     }
     setPwSaving(false);
   }
 
-  if (!settings) return <div className="text-neutral-500">Loading...</div>;
+  if (!loaded) return <div className="text-admin-ink-soft">Loading...</div>;
+
+  const avatarLetter =
+    (draft.siteTitle || siteConfig.siteName || "s").charAt(0).toLowerCase();
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold">Site Settings</h1>
+      {message && <div className={`${alertClass} mb-4`}>{message.text}</div>}
 
-      {message && (
-        <div className={alertClass}>
-          {message.text}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="max-w-lg space-y-4">
-        <Field label="Site Title" name="siteTitle" defaultValue={settings.siteTitle} required />
-        <div>
-          <label className="mb-1 block text-sm font-medium text-neutral-700">Logo</label>
-          <ImagePicker value={draft.logoUrl} onChange={(v) => updateDraft("logoUrl", v)} />
-        </div>
-        <Field label="Instagram URL" name="instagramUrl" defaultValue={settings.instagramUrl ?? ""} placeholder="https://instagram.com/..." />
-        <Field label="Contact Email" name="contactEmail" type="email" defaultValue={settings.contactEmail ?? ""} />
-        <div>
-          <label className="mb-1 block text-sm font-medium text-neutral-700">Footer Text</label>
-          <textarea
-            name="footerText"
-            defaultValue={settings.footerText ?? ""}
-            rows={3}
-            className="input-base"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-neutral-700">Footer Alignment</label>
-          <select
-            value={draft.footerAlignment}
-            onChange={(e) => updateDraft("footerAlignment", e.target.value)}
-            className="input-base"
-          >
-            <option value="left">Left</option>
-            <option value="center">Center</option>
-            <option value="right">Right</option>
-          </select>
-        </div>
-
-        {/* Lightbox Defaults */}
-        <div className="border-t border-neutral-200 pt-4">
-          <h2 className="mb-3 text-base font-semibold text-neutral-800">Lightbox Defaults</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-neutral-700">Metadata to Show</label>
-              <div className="flex flex-col gap-1">
-                {LIGHTBOX_METADATA_OPTIONS.map((opt) => (
-                  <label key={opt.key} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={draft.lbMetadataFields.includes(opt.key)}
-                      onChange={(e) => {
-                        const fields = e.target.checked
-                          ? [...draft.lbMetadataFields, opt.key]
-                          : draft.lbMetadataFields.filter((k) => k !== opt.key);
-                        updateDraft("lbMetadataFields", fields);
-                      }}
-                    />
-                    {opt.label}
-                  </label>
-                ))}
+      <form onSubmit={handleSubmit}>
+        <SettingGroup title="Identity" desc="How your site introduces itself.">
+          <Field label="Site name" htmlFor="siteTitle" inline>
+            <Input
+              id="siteTitle"
+              value={draft.siteTitle}
+              onChange={(e) => update("siteTitle", e.target.value)}
+              required
+            />
+          </Field>
+          <Field label="Tagline" htmlFor="tagline" inline hint="(optional)">
+            <Input
+              id="tagline"
+              value={draft.tagline}
+              onChange={(e) => update("tagline", e.target.value)}
+              placeholder="A short line about your work"
+            />
+          </Field>
+          <Field label="Owner name" htmlFor="ownerName" inline>
+            <Input
+              id="ownerName"
+              value={draft.ownerName}
+              onChange={(e) => update("ownerName", e.target.value)}
+              placeholder="Your name"
+            />
+          </Field>
+          <Field label="Logo / avatar" inline>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 shrink-0 overflow-hidden rounded-md bg-admin-ink text-admin-surface flex items-center justify-center font-serif italic text-2xl">
+                {draft.logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={draft.logoUrl}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  avatarLetter
+                )}
+              </div>
+              <div className="flex-1">
+                <ImagePicker
+                  value={draft.logoUrl}
+                  onChange={(v) => update("logoUrl", v)}
+                />
               </div>
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-neutral-700">
-                Corner Radius — {draft.lbCornerRadius}px
-              </label>
-              <input
-                type="range"
-                min={0}
-                max={32}
-                step={1}
-                value={draft.lbCornerRadius}
-                onChange={(e) => updateDraft("lbCornerRadius", Number(e.target.value))}
-                className="w-full"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-neutral-700">Caption Position</label>
-              <select
-                value={draft.lbCaptionPosition}
-                onChange={(e) => updateDraft("lbCaptionPosition", e.target.value)}
-                className="input-base"
-              >
-                <option value="below">Below image</option>
-                <option value="overlay-top">Overlay — top</option>
-                <option value="overlay-bottom">Overlay — bottom</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-neutral-700">Fade Speed</label>
-              <select
-                value={draft.lbFadeSpeed}
-                onChange={(e) => updateDraft("lbFadeSpeed", e.target.value)}
-                className="input-base"
-              >
-                <option value="none">None (instant)</option>
-                <option value="fast">Fast (150ms)</option>
-                <option value="medium">Medium (300ms)</option>
-                <option value="slow">Slow (500ms)</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-neutral-700">Caption Alignment</label>
-              <select
-                value={draft.lbCaptionAlignment}
-                onChange={(e) => updateDraft("lbCaptionAlignment", e.target.value)}
-                className="input-base"
-              >
-                <option value="left">Left</option>
-                <option value="center">Center</option>
-                <option value="right">Right</option>
-              </select>
-            </div>
-          </div>
-        </div>
+          </Field>
+          <Field label="Bio" htmlFor="bio" inline hint="(shown on About page)">
+            <Textarea
+              id="bio"
+              rows={3}
+              value={draft.bio}
+              onChange={(e) => update("bio", e.target.value)}
+              placeholder="A few sentences about who you are."
+            />
+          </Field>
+        </SettingGroup>
 
-        <button type="submit" disabled={saving} className="btn-primary">
-          {saving ? "Saving..." : "Save Settings"}
-        </button>
+        <SettingGroup
+          title="Contact"
+          desc="Optional. Shows on the About page and in site footer."
+        >
+          <Field label="Email" htmlFor="contactEmail" inline>
+            <Input
+              id="contactEmail"
+              type="email"
+              value={draft.contactEmail}
+              onChange={(e) => update("contactEmail", e.target.value)}
+              placeholder="hello@example.com"
+            />
+          </Field>
+          <Field label="Instagram" htmlFor="instagramUrl" inline>
+            <Input
+              id="instagramUrl"
+              value={draft.instagramUrl}
+              onChange={(e) => update("instagramUrl", e.target.value)}
+              placeholder="https://instagram.com/..."
+            />
+          </Field>
+          <Field
+            label="Location"
+            htmlFor="location"
+            inline
+            hint="(vague is fine)"
+          >
+            <Input
+              id="location"
+              value={draft.location}
+              onChange={(e) => update("location", e.target.value)}
+              placeholder="Pacific Northwest, USA"
+            />
+          </Field>
+        </SettingGroup>
+
+        <div className="flex justify-end mb-12">
+          <Button type="submit" kind="primary" disabled={saving}>
+            {saving ? "Saving..." : "Save changes"}
+          </Button>
+        </div>
       </form>
 
-      <hr className="my-8 border-neutral-200" />
-
-      <h2 className="mb-4 text-xl font-semibold">Change Password</h2>
-
-      {pwMessage && (
-        <div className={pwAlertClass}>
-          {pwMessage.text}
+      <form onSubmit={handlePasswordChange}>
+        <SettingGroup
+          title="Security"
+          desc="Change the admin credentials for this site."
+        >
+          {pwMessage && (
+            <div className={`${pwAlertClass} mb-2`}>{pwMessage.text}</div>
+          )}
+          <Field label="Current password" htmlFor="currentPassword" inline>
+            <Input
+              id="currentPassword"
+              name="currentPassword"
+              type="password"
+              required
+            />
+          </Field>
+          <Field label="New password" htmlFor="newPassword" inline>
+            <Input id="newPassword" name="newPassword" type="password" required />
+          </Field>
+        </SettingGroup>
+        <div className="flex justify-end">
+          <Button type="submit" kind="primary" disabled={pwSaving}>
+            {pwSaving ? "Updating..." : "Update password"}
+          </Button>
         </div>
-      )}
-
-      <form onSubmit={handlePasswordChange} className="max-w-lg space-y-4">
-        <Field label="Current Password" name="currentPassword" type="password" defaultValue="" required />
-        <Field label="New Password" name="newPassword" type="password" defaultValue="" required />
-        <button type="submit" disabled={pwSaving} className="btn-primary">
-          {pwSaving ? "Updating..." : "Update Password"}
-        </button>
       </form>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  name,
-  defaultValue,
-  type = "text",
-  placeholder,
-  required,
-}: {
-  label: string;
-  name: string;
-  defaultValue: string;
-  type?: string;
-  placeholder?: string;
-  required?: boolean;
-}) {
-  return (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-neutral-700">{label}</label>
-      <input
-        name={name}
-        type={type}
-        defaultValue={defaultValue}
-        placeholder={placeholder}
-        required={required}
-        className="input-base"
-      />
     </div>
   );
 }
