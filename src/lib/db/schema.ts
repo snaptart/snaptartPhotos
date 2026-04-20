@@ -29,6 +29,7 @@ export const siteSettings = pgTable("site_settings", {
   footerAlignment: text("footer_alignment").notNull().default("center"),
   contactEmail: text("contact_email"),
   homepageId: uuid("homepage_id"),
+  homepageType: text("homepage_type").notNull().default("page"), // "page" | "floor_plan"
   // Global lightbox defaults
   lightboxMetadataFields: text("lightbox_metadata_fields").array().default(["title", "description"]),
   lightboxCornerRadius: integer("lightbox_corner_radius").default(0),
@@ -74,6 +75,14 @@ export const pages = pgTable("pages", {
     fontBody?: string;
     bodyFontSize?: "small" | "medium" | "large";
   }>(),
+  storyMeta: jsonb("story_meta").$type<{
+    dek?: string;
+    kind?: string;
+    year?: string | number;
+    readTime?: string;
+    wordCount?: number;
+    frontispieceUrl?: string;
+  }>(),
   showTitle: boolean("show_title").notNull().default(true),
   isPublished: boolean("is_published").notNull().default(false),
   position: integer("position").notNull().default(0),
@@ -86,6 +95,13 @@ export const galleries = pgTable("galleries", {
   title: text("title").notNull(),
   slug: text("slug").notNull().unique(),
   description: text("description"),
+  tagline: text("tagline"),
+  accentColor: text("accent_color"),
+  floorX: real("floor_x"),
+  floorY: real("floor_y"),
+  floorW: real("floor_w"),
+  floorH: real("floor_h"),
+  previewPhotoIds: text("preview_photo_ids").array(),
   coverImageUrl: text("cover_image_url"),
   parentId: uuid("parent_id"),
   position: integer("position").notNull().default(0),
@@ -106,6 +122,8 @@ export const photos = pgTable("photos", {
   title: text("title"),
   description: text("description"),
   location: text("location"), // optional — photography/portfolio metadata
+  latitude: real("latitude"),
+  longitude: real("longitude"),
   cameraSettings: jsonb("camera_settings"), // optional — { camera, lens, iso, aperture, shutter }
   tags: text("tags").array(),
   width: integer("width").notNull(),

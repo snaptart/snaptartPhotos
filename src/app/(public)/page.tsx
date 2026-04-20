@@ -11,6 +11,8 @@ import PuckRenderer from "@/components/public/PuckRenderer";
 import type { Data } from "@puckeditor/core";
 import type { EmbedPhoto, GlobalLightboxSettings } from "@/lib/puck/config";
 import siteConfig from "@/lib/site.config";
+import HallPage from "./hall/page";
+import { fontRole } from "@/lib/theme/role-style";
 
 const tiptapExtensions = [
   StarterKit,
@@ -31,6 +33,10 @@ function isPuckData(content: unknown): content is Data {
 
 export default async function HomePage() {
   const [settingsRow] = await db.select().from(siteSettings).limit(1);
+
+  if (settingsRow?.homepageType === "floor_plan") {
+    return <HallPage />;
+  }
 
   if (!settingsRow?.homepageId) {
     return (
@@ -109,7 +115,7 @@ export default async function HomePage() {
     return (
       <div className={`mx-auto max-w-5xl px-4 ${heroFirst ? "pt-0 pb-12" : "py-12"}`}>
         {page.showTitle && (
-          <h1 className="mb-8 text-center text-4xl font-semibold tracking-tight" style={{ fontFamily: "var(--theme-font-headings)" }}>
+          <h1 className="mb-8 text-center text-4xl tracking-tight" style={fontRole("headings")}>
             {page.title}
           </h1>
         )}
@@ -125,7 +131,7 @@ export default async function HomePage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
       {page.showTitle && (
-        <h1 className="mb-8 text-center text-4xl font-semibold tracking-tight">
+        <h1 className="mb-8 text-center text-4xl tracking-tight" style={fontRole("headings")}>
           {page.title}
         </h1>
       )}

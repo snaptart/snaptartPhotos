@@ -49,7 +49,10 @@ interface FormState {
 
 interface FooterDraft {
   footerText: string;
-  footerAlignment: string;
+}
+
+interface HomepageDraft {
+  homepageType: "page" | "floor_plan";
 }
 
 const emptyForm: FormState = {
@@ -62,10 +65,20 @@ const emptyForm: FormState = {
 export default function NavigationSettingsPage() {
   const [loaded, setLoaded] = useState(false);
 
+  // Homepage behaviour
+  const [homepage, setHomepage] = useState<HomepageDraft>({ homepageType: "page" });
+  const [savingHomepage, setSavingHomepage] = useState(false);
+  const {
+    message: hpMsg,
+    showSuccess: hpOK,
+    showError: hpBad,
+    clear: hpClear,
+    alertClass: hpAlert,
+  } = useMessage();
+
   // Footer settings
   const [footer, setFooter] = useState<FooterDraft>({
     footerText: "",
-    footerAlignment: "center",
   });
   const [savingFooter, setSavingFooter] = useState(false);
   const {
@@ -111,7 +124,9 @@ export default function NavigationSettingsPage() {
     if (settings) {
       setFooter({
         footerText: settings.footerText ?? "",
-        footerAlignment: settings.footerAlignment ?? "center",
+      });
+      setHomepage({
+        homepageType: settings.homepageType === "floor_plan" ? "floor_plan" : "page",
       });
     }
     setItems(items);
@@ -124,6 +139,21 @@ export default function NavigationSettingsPage() {
     fetchEverything();
   }, [fetchEverything]);
 
+  // ── Homepage save ────────────────────────────────────────────
+  async function handleHomepageSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSavingHomepage(true);
+    hpClear();
+    const res = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ homepageType: homepage.homepageType }),
+    });
+    if (res.ok) hpOK("Homepage saved.");
+    else hpBad("Failed to save homepage.");
+    setSavingHomepage(false);
+  }
+
   // ── Footer save ────────────────────────────────────────────────
   async function handleFooterSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -134,7 +164,6 @@ export default function NavigationSettingsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         footerText: footer.footerText || null,
-        footerAlignment: footer.footerAlignment,
       }),
     });
     if (res.ok) footerOK("Footer saved.");
@@ -233,7 +262,36 @@ export default function NavigationSettingsPage() {
   const isFormOpen = showForm || !!editingId;
 
   return (
-    <div>
+    <div className="max-w-[640px]">
+      {/* ── Homepage behaviour ──────────────────────── */}
+      <form onSubmit={handleHomepageSubmit}>
+        <SettingGroup
+          title="Homepage"
+          desc="What visitors see at the site root."
+        >
+          {hpMsg && <div className={`${hpAlert} mb-2`}>{hpMsg.text}</div>}
+          <Field label="Show at /" htmlFor="homepageType" inline hint="Pick an existing page by setting the homepage in the page editor; pick the Hall here to serve /hall content at /.">
+            <Select
+              id="homepageType"
+              value={homepage.homepageType}
+              onChange={(e) =>
+                setHomepage({
+                  homepageType: e.target.value === "floor_plan" ? "floor_plan" : "page",
+                })
+              }
+            >
+              <option value="page">A page (default — uses your selected homepage)</option>
+              <option value="floor_plan">The Hall (floor plan)</option>
+            </Select>
+          </Field>
+        </SettingGroup>
+        <div className="flex justify-end mb-4">
+          <Button type="submit" kind="primary" disabled={savingHomepage}>
+            {savingHomepage ? "Saving..." : "Save homepage"}
+          </Button>
+        </div>
+      </form>
+
       {/* ── Main menu ───────────────────────────────── */}
       <SettingGroup
         title="Main menu"
@@ -431,19 +489,6 @@ export default function NavigationSettingsPage() {
               }
               placeholder="© Your name, 2026"
             />
-          </Field>
-          <Field label="Alignment" htmlFor="footerAlignment" inline>
-            <Select
-              id="footerAlignment"
-              value={footer.footerAlignment}
-              onChange={(e) =>
-                setFooter((f) => ({ ...f, footerAlignment: e.target.value }))
-              }
-            >
-              <option value="left">Left</option>
-              <option value="center">Center</option>
-              <option value="right">Right</option>
-            </Select>
           </Field>
         </SettingGroup>
         <div className="flex justify-end">

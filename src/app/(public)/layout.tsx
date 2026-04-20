@@ -40,6 +40,7 @@ export default async function PublicLayout({
     theme.fontFooter,
     theme.fontCaptions,
     theme.fontOverlay,
+    theme.fontLabels,
   ]);
   const cssVars = buildThemeCssVars(theme);
 

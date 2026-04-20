@@ -57,6 +57,8 @@ interface Photo {
   title: string | null;
   description: string | null;
   location: string | null;
+  latitude: number | null;
+  longitude: number | null;
   tags: string[] | null;
   width: number;
   height: number;
@@ -247,6 +249,8 @@ export default function PhotosPage() {
         title: form.get("title") || null,
         description: form.get("description") || null,
         location: form.get("location") || null,
+        latitude: parseNullableFloat(form.get("latitude")),
+        longitude: parseNullableFloat(form.get("longitude")),
         focalX: editingFocal.x,
         focalY: editingFocal.y,
       }),
@@ -744,6 +748,14 @@ export default function PhotosPage() {
   );
 }
 
+function parseNullableFloat(v: FormDataEntryValue | null): number | null {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (s === "") return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
 function FilterChip({
   active,
   onClick,
@@ -1032,13 +1044,39 @@ function EditPhotoModal({
                 defaultValue={photo.description ?? ""}
               />
             </Field>
-            <Field label="Location" htmlFor="p-location">
+            <Field label="Location" htmlFor="p-location" hint="Human-readable name (e.g. 'Paris, France')">
               <Input
                 id="p-location"
                 name="location"
                 defaultValue={photo.location ?? ""}
               />
             </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Latitude" htmlFor="p-lat" hint="Decimal (e.g. 48.8566)">
+                <Input
+                  id="p-lat"
+                  name="latitude"
+                  type="number"
+                  step="any"
+                  min={-90}
+                  max={90}
+                  defaultValue={photo.latitude ?? ""}
+                  placeholder=""
+                />
+              </Field>
+              <Field label="Longitude" htmlFor="p-lng" hint="Decimal (e.g. 2.3522)">
+                <Input
+                  id="p-lng"
+                  name="longitude"
+                  type="number"
+                  step="any"
+                  min={-180}
+                  max={180}
+                  defaultValue={photo.longitude ?? ""}
+                  placeholder=""
+                />
+              </Field>
+            </div>
             <div className="flex gap-2 pt-2">
               <Button type="submit" kind="primary">
                 Update

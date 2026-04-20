@@ -31,8 +31,8 @@ export async function Footer() {
       className={`border-t border-neutral-200 px-4 py-4 md:px-6 md:py-8 ${alignment}`}
       style={{
         backgroundColor: "var(--theme-color-footer-bg)",
-        fontFamily: "var(--theme-font-footer)",
-        fontSize: "var(--theme-footer-font-size)",
+        fontFamily: "var(--theme-font-footer-family, var(--theme-font-footer))",
+        fontSize: "var(--theme-font-footer-size, var(--theme-footer-font-size))",
         color: "var(--theme-color-footer-text)",
       }}
     >

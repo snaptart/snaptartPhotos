@@ -8,7 +8,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Plus, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, LayoutGrid, Plus, X } from "lucide-react";
 import { SortableItem } from "@/components/admin/SortableItem";
 import { useSortableList } from "@/lib/hooks/useSortableList";
 import { useMessage } from "@/lib/hooks/useMessage";
@@ -29,10 +29,26 @@ interface Gallery {
   title: string;
   slug: string;
   description: string | null;
+  tagline: string | null;
+  accentColor: string | null;
+  previewPhotoIds: string[] | null;
   coverImageUrl: string | null;
   parentId: string | null;
   position: number;
   isPublished: boolean;
+}
+
+interface PickerPhoto {
+  id: string;
+  thumbnailUrl: string;
+  title: string | null;
+  position: number;
+}
+
+const MAX_PREVIEW = 4;
+
+function isValidHex(v: string): boolean {
+  return /^#[0-9a-fA-F]{6}$/.test(v);
 }
 
 export default function GalleriesPage() {
@@ -40,6 +56,9 @@ export default function GalleriesPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [pickerPhotos, setPickerPhotos] = useState<PickerPhoto[]>([]);
+  const [previewIds, setPreviewIds] = useState<string[]>([]);
+  const [accentColor, setAccentColor] = useState<string>("");
   const { message, showSuccess, showError, alertClass } = useMessage();
 
   const { sensors, handleDragEnd } = useSortableList({
@@ -60,6 +79,29 @@ export default function GalleriesPage() {
     fetchGalleries();
   }, [fetchGalleries]);
 
+  useEffect(() => {
+    if (!editingId) {
+      setPickerPhotos([]);
+      setPreviewIds([]);
+      setAccentColor("");
+      return;
+    }
+    const gallery = galleries.find((g) => g.id === editingId);
+    if (!gallery) return;
+    setPreviewIds(gallery.previewPhotoIds ?? []);
+    setAccentColor(gallery.accentColor ?? "");
+    let cancelled = false;
+    (async () => {
+      const res = await fetch(`/api/photos?galleryId=${editingId}`);
+      if (!res.ok) return;
+      const data = (await res.json()) as PickerPhoto[];
+      if (!cancelled) setPickerPhotos(data);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [editingId, galleries]);
+
   async function handleAdd(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
@@ -69,6 +111,8 @@ export default function GalleriesPage() {
       body: JSON.stringify({
         title: form.get("title"),
         description: form.get("description") || null,
+        tagline: form.get("tagline") || null,
+        accentColor: accentColor || null,
         isPublished: form.get("isPublished") === "on",
         position: galleries.length,
       }),
@@ -92,6 +136,9 @@ export default function GalleriesPage() {
         id: editingId,
         title: form.get("title"),
         description: form.get("description") || null,
+        tagline: form.get("tagline") || null,
+        accentColor: accentColor || null,
+        previewPhotoIds: previewIds.length > 0 ? previewIds : null,
         isPublished: form.get("isPublished") === "on",
       }),
     });
@@ -137,16 +184,24 @@ export default function GalleriesPage() {
         title={siteConfig.labels.galleries}
         subtitle={`${galleries.length} total · drag to reorder`}
         actions={
-          <Button
-            kind="primary"
-            onClick={() => {
-              setShowForm(true);
-              setEditingId(null);
-            }}
-            icon={<Plus className="h-3.5 w-3.5" />}
-          >
-            New {siteConfig.labels.gallery.toLowerCase()}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/admin/galleries/layout"
+              className="inline-flex items-center gap-1.5 text-[12px] font-mono uppercase tracking-[1.5px] text-admin-ink-soft hover:text-admin-ink"
+            >
+              <LayoutGrid className="h-3.5 w-3.5" /> Floor plan
+            </Link>
+            <Button
+              kind="primary"
+              onClick={() => {
+                setShowForm(true);
+                setEditingId(null);
+              }}
+              icon={<Plus className="h-3.5 w-3.5" />}
+            >
+              New {siteConfig.labels.gallery.toLowerCase()}
+            </Button>
+          </div>
         }
       />
 
@@ -199,6 +254,60 @@ export default function GalleriesPage() {
                   rows={2}
                 />
               </Field>
+              <Field label="Tagline" htmlFor="g-tagline" hint="Shown as wall text inside the Hall room view">
+                <Textarea
+                  id="g-tagline"
+                  name="tagline"
+                  defaultValue={editingGallery?.tagline ?? ""}
+                  placeholder="A short italic line that greets visitors."
+                  rows={2}
+                />
+              </Field>
+              <Field label="Accent color" htmlFor="g-accent" hint="Used on hover and the drawer underline. Click the swatch to pick.">
+                <div className="flex items-center gap-2">
+                  <label className="relative inline-block h-9 w-9 cursor-pointer rounded overflow-hidden border border-admin-border-strong shrink-0">
+                    <input
+                      type="color"
+                      value={isValidHex(accentColor) ? accentColor : "#b8824a"}
+                      onChange={(e) => setAccentColor(e.target.value)}
+                      className="absolute inset-0 h-full w-full opacity-0 cursor-pointer"
+                      aria-label="Pick accent color"
+                    />
+                    <span
+                      className="absolute inset-0 block"
+                      style={{
+                        background: isValidHex(accentColor) ? accentColor : "transparent",
+                        backgroundImage: !isValidHex(accentColor)
+                          ? "repeating-conic-gradient(#e4e1db 0% 25%, #fff 0% 50%) 50% / 8px 8px"
+                          : undefined,
+                      }}
+                    />
+                  </label>
+                  <Input
+                    id="g-accent"
+                    value={accentColor}
+                    onChange={(e) => setAccentColor(e.target.value)}
+                    placeholder="#b8824a"
+                    pattern="^#[0-9a-fA-F]{6}$"
+                  />
+                  {accentColor && (
+                    <button
+                      type="button"
+                      onClick={() => setAccentColor("")}
+                      className="text-[11px] font-mono uppercase tracking-[1.5px] text-admin-ink-soft hover:text-admin-danger"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </Field>
+              {editingId && (
+                <PreviewPicker
+                  photos={pickerPhotos}
+                  selected={previewIds}
+                  onChange={setPreviewIds}
+                />
+              )}
               <label className="flex items-center gap-2 text-[13px] text-admin-ink cursor-pointer">
                 <input
                   type="checkbox"
@@ -328,6 +437,156 @@ function EmptyState({ title, body }: { title: string; body: string }) {
         {title}
       </div>
       <p className="text-[13px] text-admin-ink-soft max-w-sm">{body}</p>
+    </div>
+  );
+}
+
+function PreviewPicker({
+  photos,
+  selected,
+  onChange,
+}: {
+  photos: PickerPhoto[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const byId = new Map(photos.map((p) => [p.id, p]));
+  const selectedPhotos = selected
+    .map((id) => byId.get(id))
+    .filter((p): p is PickerPhoto => !!p);
+  const available = photos.filter((p) => !selected.includes(p.id));
+
+  const toggle = (id: string) => {
+    if (selected.includes(id)) {
+      onChange(selected.filter((x) => x !== id));
+    } else if (selected.length < MAX_PREVIEW) {
+      onChange([...selected, id]);
+    }
+  };
+
+  const move = (id: string, delta: -1 | 1) => {
+    const i = selected.indexOf(id);
+    const j = i + delta;
+    if (i < 0 || j < 0 || j >= selected.length) return;
+    const next = [...selected];
+    [next[i], next[j]] = [next[j], next[i]];
+    onChange(next);
+  };
+
+  return (
+    <div className="rounded-md border border-admin-border p-3">
+      <div className="text-[13px] font-medium text-admin-ink mb-1">
+        Hall preview thumbs
+      </div>
+      <p className="text-[12px] text-admin-ink-soft mb-3">
+        Up to {MAX_PREVIEW} photos shown inside this gallery&apos;s room on{" "}
+        <code>/hall</code>. Order sets rotation/position. Leave empty to fall
+        back to the first two photos by position.
+      </p>
+
+      {photos.length === 0 ? (
+        <p className="text-[12px] text-admin-ink-faint italic">
+          No photos in this gallery yet.
+        </p>
+      ) : (
+        <>
+          {/* Selected slots */}
+          <div className="mb-3">
+            <div className="text-[11px] font-mono uppercase tracking-[1.5px] text-admin-ink-soft mb-2">
+              Selected ({selected.length} / {MAX_PREVIEW})
+            </div>
+            {selectedPhotos.length === 0 ? (
+              <p className="text-[12px] text-admin-ink-faint italic">
+                Click photos below to add them.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {selectedPhotos.map((photo, i) => (
+                  <div
+                    key={photo.id}
+                    className="relative group w-20 h-20 rounded overflow-hidden border border-admin-border-strong bg-white"
+                  >
+                    <Image
+                      src={photo.thumbnailUrl}
+                      alt={photo.title ?? ""}
+                      fill
+                      sizes="80px"
+                      className="object-cover"
+                    />
+                    <div className="absolute top-1 left-1 h-5 w-5 rounded-full bg-admin-accent text-white text-[11px] font-medium flex items-center justify-center shadow">
+                      {i + 1}
+                    </div>
+                    <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        onClick={() => move(photo.id, -1)}
+                        disabled={i === 0}
+                        className="flex-1 py-1 text-white disabled:opacity-30 hover:bg-black/40"
+                        aria-label="Move earlier"
+                      >
+                        <ArrowLeft className="h-3 w-3 mx-auto" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggle(photo.id)}
+                        className="flex-1 py-1 text-white hover:bg-admin-danger"
+                        aria-label="Remove"
+                      >
+                        <X className="h-3 w-3 mx-auto" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => move(photo.id, 1)}
+                        disabled={i === selectedPhotos.length - 1}
+                        className="flex-1 py-1 text-white disabled:opacity-30 hover:bg-black/40"
+                        aria-label="Move later"
+                      >
+                        <ArrowRight className="h-3 w-3 mx-auto" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Available photos */}
+          <div>
+            <div className="text-[11px] font-mono uppercase tracking-[1.5px] text-admin-ink-soft mb-2">
+              Available ({available.length})
+            </div>
+            {available.length === 0 ? (
+              <p className="text-[12px] text-admin-ink-faint italic">
+                All photos are in the preview set.
+              </p>
+            ) : (
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(64px,1fr))] gap-2 max-h-48 overflow-y-auto">
+                {available.map((photo) => {
+                  const atCap = selected.length >= MAX_PREVIEW;
+                  return (
+                    <button
+                      key={photo.id}
+                      type="button"
+                      onClick={() => toggle(photo.id)}
+                      disabled={atCap}
+                      className="relative w-full aspect-square rounded overflow-hidden border border-admin-border hover:border-admin-accent disabled:opacity-40 disabled:hover:border-admin-border transition-colors"
+                      title={atCap ? `Max ${MAX_PREVIEW} photos` : photo.title ?? ""}
+                    >
+                      <Image
+                        src={photo.thumbnailUrl}
+                        alt={photo.title ?? ""}
+                        fill
+                        sizes="80px"
+                        className="object-cover"
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

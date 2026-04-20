@@ -18,6 +18,11 @@ export const CURATED_FONTS = [
   { name: "Oswald", category: "display" as const },
   { name: "Bebas Neue", category: "display" as const },
   { name: "Archivo Black", category: "display" as const },
+  // Monospace
+  { name: "JetBrains Mono", category: "mono" as const },
+  { name: "IBM Plex Mono", category: "mono" as const },
+  { name: "Space Mono", category: "mono" as const },
+  { name: "Roboto Mono", category: "mono" as const },
 ];
 
 export type FontCategory = (typeof CURATED_FONTS)[number]["category"];
@@ -26,6 +31,7 @@ const CATEGORY_FALLBACKS: Record<FontCategory, string> = {
   serif: "Georgia, serif",
   "sans-serif": "system-ui, sans-serif",
   display: "system-ui, sans-serif",
+  mono: "ui-monospace, monospace",
 };
 
 export function getFontCategory(fontName: string): FontCategory {

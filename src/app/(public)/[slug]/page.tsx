@@ -12,6 +12,7 @@ import Underline from "@tiptap/extension-underline";
 import PuckRenderer from "@/components/public/PuckRenderer";
 import type { Data } from "@puckeditor/core";
 import type { EmbedPhoto, GlobalLightboxSettings } from "@/lib/puck/config";
+import { fontRole } from "@/lib/theme/role-style";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -116,7 +117,7 @@ export default async function DynamicPage({ params }: Props) {
     return (
       <div className="mx-auto max-w-5xl px-4 py-12">
         {page.showTitle && (
-          <h1 className="mb-8 text-center text-4xl font-semibold tracking-tight" style={{ fontFamily: "var(--theme-font-headings)" }}>
+          <h1 className="mb-8 text-center text-4xl tracking-tight" style={fontRole("headings")}>
             {page.title}
           </h1>
         )}
@@ -133,7 +134,7 @@ export default async function DynamicPage({ params }: Props) {
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
       {page.showTitle && (
-        <h1 className="mb-8 text-center text-4xl font-semibold tracking-tight">
+        <h1 className="mb-8 text-center text-4xl tracking-tight" style={fontRole("headings")}>
           {page.title}
         </h1>
       )}

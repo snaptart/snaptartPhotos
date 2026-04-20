@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { DEFAULT_LIGHTBOX_SETTINGS } from "@/components/public/Lightbox";
 import { useMessage } from "@/lib/hooks/useMessage";
 import siteConfig from "@/lib/site.config";
-import { THEME_DEFAULTS, type ThemeSettings } from "@/lib/theme/types";
+import { THEME_DEFAULTS, resolveTheme, type ThemeSettings } from "@/lib/theme/types";
 import {
   Button,
   Field,
@@ -13,6 +13,9 @@ import {
   SectionLabel,
 } from "@/components/admin/ui";
 import { SettingGroup } from "@/components/admin/settings/SettingGroup";
+import ThemePreview from "@/components/admin/ThemePreview";
+import HallPreview from "@/components/admin/HallPreview";
+import LightboxPreview from "@/components/admin/LightboxPreview";
 
 interface ThemeRecord {
   id: string;
@@ -49,6 +52,9 @@ export default function LookAndFeelPage() {
   });
   const [themeName, setThemeName] = useState("Default");
   const [lightbox, setLightbox] = useState<LightboxDraft>(LIGHTBOX_DEFAULT);
+  const [footerAlignment, setFooterAlignment] = useState<string>("center");
+  const [siteTitle, setSiteTitle] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const { message, showSuccess, showError, clear, alertClass } = useMessage();
 
@@ -59,6 +65,8 @@ export default function LookAndFeelPage() {
         const themes: ThemeRecord[] = await themesRes.json();
         setThemeList(themes);
         setActiveThemeId(settings?.activeThemeId ?? null);
+        setSiteTitle(settings?.siteTitle ?? "");
+        setLogoUrl(settings?.logoUrl ?? "");
         if (settings) {
           setLightbox({
             metadataFields:
@@ -74,6 +82,7 @@ export default function LookAndFeelPage() {
               settings.lightboxCaptionAlignment ??
               LIGHTBOX_DEFAULT.captionAlignment,
           });
+          setFooterAlignment(settings.footerAlignment ?? "center");
         }
         setLoaded(true);
       })
@@ -84,11 +93,11 @@ export default function LookAndFeelPage() {
     if (activeThemeId && themeList.length > 0) {
       const active = themeList.find((t) => t.id === activeThemeId);
       if (active) {
-        setThemeDraft({ ...THEME_DEFAULTS, ...active.themeSettings });
+        setThemeDraft(resolveTheme(active.themeSettings));
         setThemeName(active.name);
       }
     } else if (!activeThemeId) {
-      setThemeDraft({ ...THEME_DEFAULTS });
+      setThemeDraft(resolveTheme(null));
       setThemeName("Default");
     }
   }, [activeThemeId, themeList]);
@@ -145,12 +154,13 @@ export default function LookAndFeelPage() {
         }
       }
 
-      // Save lightbox
+      // Save lightbox + footer alignment
       const lbRes = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           activeThemeId,
+          footerAlignment,
           lightboxMetadataFields: lightbox.metadataFields,
           lightboxCornerRadius: lightbox.cornerRadius,
           lightboxCaptionPosition: lightbox.captionPosition,
@@ -227,7 +237,8 @@ export default function LookAndFeelPage() {
   if (!loaded) return <div className="text-admin-ink-soft">Loading...</div>;
 
   return (
-    <div>
+    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,640px)_minmax(0,1fr)] xl:gap-10 gap-6">
+      <div>
       {message && <div className={`${alertClass} mb-4`}>{message.text}</div>}
 
       {/* Theme preset */}
@@ -313,7 +324,7 @@ export default function LookAndFeelPage() {
       </SettingGroup>
 
       {/* Menu layout */}
-      <SettingGroup title="Menu" desc="How the navigation menu appears in the header.">
+      <SettingGroup title="Menu" desc="How the navigation menu appears in the header. Size is set in Typography.">
         <Field label="Position" inline>
           <RadioGroup
             options={["left", "center", "right"]}
@@ -323,34 +334,15 @@ export default function LookAndFeelPage() {
             }
           />
         </Field>
-        <Field label={`Font size — ${themeDraft.menuFontSize}px`} inline>
-          <input
-            type="range"
-            min={10}
-            max={24}
-            step={1}
-            value={themeDraft.menuFontSize}
-            onChange={(e) =>
-              updateTheme("menuFontSize", Number(e.target.value))
-            }
-            className="w-full accent-admin-accent"
-          />
-        </Field>
       </SettingGroup>
 
       {/* Footer */}
-      <SettingGroup title="Footer" desc="Footer typography on the public site.">
-        <Field label={`Font size — ${themeDraft.footerFontSize}px`} inline>
-          <input
-            type="range"
-            min={10}
-            max={24}
-            step={1}
-            value={themeDraft.footerFontSize}
-            onChange={(e) =>
-              updateTheme("footerFontSize", Number(e.target.value))
-            }
-            className="w-full accent-admin-accent"
+      <SettingGroup title="Footer" desc="Footer alignment on the public site. Size is set in Typography.">
+        <Field label="Position" inline>
+          <RadioGroup
+            options={["left", "center", "right"]}
+            value={footerAlignment}
+            onChange={(v) => setFooterAlignment(v)}
           />
         </Field>
       </SettingGroup>
@@ -492,6 +484,28 @@ export default function LookAndFeelPage() {
         </a>{" "}
         section and save to the same preset.
       </p>
+      </div>
+
+      <aside className="xl:sticky xl:top-8 xl:self-start xl:max-h-[calc(100vh-4rem)] xl:overflow-y-auto space-y-5">
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-[2px] text-admin-ink-soft mb-2">
+            Public pages
+          </div>
+          <ThemePreview theme={themeDraft} siteTitle={siteTitle} logoUrl={logoUrl} />
+        </div>
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-[2px] text-admin-ink-soft mb-2">
+            The Hall
+          </div>
+          <HallPreview theme={themeDraft} />
+        </div>
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-[2px] text-admin-ink-soft mb-2">
+            Lightbox
+          </div>
+          <LightboxPreview theme={themeDraft} />
+        </div>
+      </aside>
     </div>
   );
 }

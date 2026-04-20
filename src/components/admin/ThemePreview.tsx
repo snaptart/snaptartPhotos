@@ -1,12 +1,32 @@
 "use client";
 
-import type { ThemeSettings } from "@/lib/theme/types";
+import type { FontRoleKey, FontRoleStyle, ThemeSettings } from "@/lib/theme/types";
 import { buildGoogleFontsUrl, getFontFallback } from "@/lib/theme/fonts";
 
 interface ThemePreviewProps {
   theme: ThemeSettings;
   siteTitle: string;
   logoUrl: string;
+}
+
+function roleStyle(theme: ThemeSettings, key: FontRoleKey): FontRoleStyle {
+  return theme.fontStyles?.[key] ?? {};
+}
+
+function roleCss(
+  theme: ThemeSettings,
+  key: FontRoleKey,
+  family: string,
+  defaultSize: number,
+): React.CSSProperties {
+  const s = roleStyle(theme, key);
+  return {
+    fontFamily: getFontFallback(family),
+    fontWeight: s.weight ?? 400,
+    fontStyle: s.italic ? "italic" : "normal",
+    textTransform: s.uppercase ? "uppercase" : "none",
+    fontSize: s.size ?? defaultSize,
+  };
 }
 
 export default function ThemePreview({ theme, siteTitle, logoUrl }: ThemePreviewProps) {
@@ -17,6 +37,7 @@ export default function ThemePreview({ theme, siteTitle, logoUrl }: ThemePreview
     theme.fontFooter,
     theme.fontCaptions,
     theme.fontOverlay,
+    theme.fontLabels,
   ]);
 
   const justifyMap: Record<string, string> = {
@@ -81,8 +102,7 @@ export default function ThemePreview({ theme, siteTitle, logoUrl }: ThemePreview
             className="flex gap-3"
             style={{
               justifySelf: "end",
-              fontFamily: getFontFallback(theme.fontNavMenu),
-              fontSize: `${theme.menuFontSize * 0.75}px`,
+              ...roleCss(theme, "navMenu", theme.fontNavMenu, theme.menuFontSize * 0.75),
               justifyContent: justifyMap[theme.menuJustify],
             }}
           >
@@ -118,21 +138,26 @@ export default function ThemePreview({ theme, siteTitle, logoUrl }: ThemePreview
           color: theme.colorText,
         }}
       >
-        <h2
+        <div
           className="mb-2"
           style={{
-            fontFamily: getFontFallback(theme.fontHeadings),
-            fontSize: "18px",
-            fontWeight: 400,
+            ...roleCss(theme, "labels", theme.fontLabels, 9),
+            letterSpacing: "2px",
+            opacity: 0.7,
           }}
+        >
+          Plan View · Sample Label
+        </div>
+        <h2
+          className="mb-2"
+          style={roleCss(theme, "headings", theme.fontHeadings, 18)}
         >
           Sample Heading
         </h2>
         <p
           className="mb-3"
           style={{
-            fontFamily: getFontFallback(theme.fontBody),
-            fontSize: "13px",
+            ...roleCss(theme, "body", theme.fontBody, 13),
             lineHeight: 1.6,
           }}
         >
@@ -147,8 +172,7 @@ export default function ThemePreview({ theme, siteTitle, logoUrl }: ThemePreview
         <p
           className="mt-2"
           style={{
-            fontFamily: getFontFallback(theme.fontCaptions),
-            fontSize: "11px",
+            ...roleCss(theme, "captions", theme.fontCaptions, 11),
             color: theme.colorGalleryCaptions,
           }}
         >
@@ -160,8 +184,7 @@ export default function ThemePreview({ theme, siteTitle, logoUrl }: ThemePreview
         >
           <p
             style={{
-              fontFamily: getFontFallback(theme.fontOverlay),
-              fontSize: "11px",
+              ...roleCss(theme, "overlay", theme.fontOverlay, 11),
               color: theme.colorHeroOverlay,
             }}
           >
@@ -175,9 +198,8 @@ export default function ThemePreview({ theme, siteTitle, logoUrl }: ThemePreview
         className="border-t border-neutral-200 px-4 py-3 text-center"
         style={{
           backgroundColor: theme.colorFooterBg,
-          fontFamily: getFontFallback(theme.fontFooter),
           color: theme.colorFooterText,
-          fontSize: `${theme.footerFontSize * 0.75}px`,
+          ...roleCss(theme, "footer", theme.fontFooter, theme.footerFontSize * 0.75),
         }}
       >
         <p>&copy; {new Date().getFullYear()} {siteTitle || "Your Site"}. All rights reserved.</p>

@@ -30,6 +30,15 @@ interface StoryTypography {
   bodyFontSize?: "small" | "medium" | "large";
 }
 
+interface StoryMeta {
+  dek?: string;
+  kind?: string;
+  year?: string | number;
+  readTime?: string;
+  wordCount?: number;
+  frontispieceUrl?: string;
+}
+
 interface Story {
   id: string;
   title: string;
@@ -41,6 +50,7 @@ interface Story {
   metaTitle: string | null;
   metaDescription: string | null;
   typography: StoryTypography | null;
+  storyMeta: StoryMeta | null;
 }
 
 const SERIF_FONTS = CURATED_FONTS.filter((f) => f.category === "serif");
@@ -108,6 +118,23 @@ export default function StoriesPage() {
     if (bodyFontSize)
       typography.bodyFontSize = bodyFontSize as StoryTypography["bodyFontSize"];
 
+    const storyMeta: StoryMeta = {};
+    const dek = (form.get("dek") as string) || "";
+    const kind = (form.get("kind") as string) || "";
+    const year = (form.get("year") as string) || "";
+    const readTime = (form.get("readTime") as string) || "";
+    const wordCount = (form.get("wordCount") as string) || "";
+    const frontispieceUrl = (form.get("frontispieceUrl") as string) || "";
+    if (dek) storyMeta.dek = dek;
+    if (kind) storyMeta.kind = kind;
+    if (year) storyMeta.year = year;
+    if (readTime) storyMeta.readTime = readTime;
+    if (wordCount) {
+      const n = parseInt(wordCount, 10);
+      if (Number.isFinite(n) && n > 0) storyMeta.wordCount = n;
+    }
+    if (frontispieceUrl) storyMeta.frontispieceUrl = frontispieceUrl;
+
     const payload: Record<string, unknown> = {
       id: editSettings,
       title: form.get("title"),
@@ -116,6 +143,7 @@ export default function StoriesPage() {
       metaDescription: form.get("metaDescription") || null,
       isPasswordProtected,
       typography: Object.keys(typography).length > 0 ? typography : null,
+      storyMeta: Object.keys(storyMeta).length > 0 ? storyMeta : null,
     };
 
     if (isPasswordProtected && password) {
@@ -254,6 +282,72 @@ export default function StoriesPage() {
                 />
                 Show story title
               </label>
+
+              <details className="rounded-md border border-admin-border p-3" open>
+                <summary className="cursor-pointer text-[13px] font-medium text-admin-ink-soft">
+                  Literary meta
+                </summary>
+                <div className="mt-3 space-y-4">
+                  <Field label="Dek (subtitle)" htmlFor="es-dek" hint="Short italic description on contents page + title page">
+                    <Textarea
+                      id="es-dek"
+                      name="dek"
+                      defaultValue={editingStory.storyMeta?.dek ?? ""}
+                      rows={2}
+                      placeholder="e.g. A late-summer return to the orchard."
+                    />
+                  </Field>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Kind" htmlFor="es-kind" hint="e.g. Fiction · Flash · Essay">
+                      <Input
+                        id="es-kind"
+                        name="kind"
+                        defaultValue={editingStory.storyMeta?.kind ?? ""}
+                        placeholder="Fiction"
+                      />
+                    </Field>
+                    <Field label="Year" htmlFor="es-year">
+                      <Input
+                        id="es-year"
+                        name="year"
+                        defaultValue={
+                          editingStory.storyMeta?.year != null
+                            ? String(editingStory.storyMeta.year)
+                            : ""
+                        }
+                        placeholder="2026"
+                      />
+                    </Field>
+                    <Field label="Word count" htmlFor="es-wc" hint="Optional — drives read time if set">
+                      <Input
+                        id="es-wc"
+                        name="wordCount"
+                        type="number"
+                        min={0}
+                        defaultValue={editingStory.storyMeta?.wordCount ?? ""}
+                        placeholder=""
+                      />
+                    </Field>
+                    <Field label="Read time" htmlFor="es-rt" hint="Overrides the calculated value">
+                      <Input
+                        id="es-rt"
+                        name="readTime"
+                        defaultValue={editingStory.storyMeta?.readTime ?? ""}
+                        placeholder="7 min read"
+                      />
+                    </Field>
+                  </div>
+                  <Field label="Frontispiece image URL" htmlFor="es-frontispiece" hint="Shown on the contents preview and above the body">
+                    <Input
+                      id="es-frontispiece"
+                      name="frontispieceUrl"
+                      type="url"
+                      defaultValue={editingStory.storyMeta?.frontispieceUrl ?? ""}
+                      placeholder="https://…"
+                    />
+                  </Field>
+                </div>
+              </details>
 
               <details className="rounded-md border border-admin-border p-3">
                 <summary className="cursor-pointer text-[13px] font-medium text-admin-ink-soft">

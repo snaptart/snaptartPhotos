@@ -18,6 +18,7 @@ import TiptapEditor from "@/components/admin/TiptapEditor";
 import ImagePicker from "@/components/admin/ImagePicker";
 import { parseLinks } from "@/lib/parseLinks";
 import siteConfig from "@/lib/site.config";
+import { fontRole } from "@/lib/theme/role-style";
 import Lightbox from "@/components/public/Lightbox";
 import type { LightboxPhoto, LightboxSettings } from "@/components/public/Lightbox";
 import { FormWrapperRender } from "@/components/puck/form/FormWrapper";
@@ -237,10 +238,23 @@ export const puckConfig: Config<Components> = {
         return (
           <>
             <style>{`
-              .richtext-render p { margin: 0.125em 0; line-height: 1.5; font-size: 1.125rem; }
-              .richtext-render h1 { font-size: 2em; font-weight: 700; margin: 0.75em 0 0.25em; }
-              .richtext-render h2 { font-size: 1.5em; font-weight: 700; margin: 0.75em 0 0.25em; }
-              .richtext-render h3 { font-size: 1.25em; font-weight: 600; margin: 0.75em 0 0.25em; }
+              .richtext-render {
+                font-family: var(--theme-font-body-family);
+                font-weight: var(--theme-font-body-weight);
+                font-style: var(--theme-font-body-style);
+                text-transform: var(--theme-font-body-transform);
+              }
+              .richtext-render p { margin: 0.125em 0; line-height: 1.5; font-size: var(--theme-font-body-size, 1.125rem); }
+              .richtext-render h1, .richtext-render h2, .richtext-render h3 {
+                font-family: var(--theme-font-headings-family);
+                font-weight: var(--theme-font-headings-weight);
+                font-style: var(--theme-font-headings-style);
+                text-transform: var(--theme-font-headings-transform);
+                margin: 0.75em 0 0.25em;
+              }
+              .richtext-render h1 { font-size: 2em; }
+              .richtext-render h2 { font-size: 1.5em; }
+              .richtext-render h3 { font-size: 1.25em; }
               .richtext-render blockquote { border-left: 3px solid #d4d4d4; padding-left: 1em; margin: 0.5em 0; font-style: italic; }
               .richtext-render ul, .richtext-render ol { padding-left: 1.5em; margin: 0.25em 0; }
               .richtext-render a { text-decoration: underline; }
@@ -319,12 +333,12 @@ export const puckConfig: Config<Components> = {
           )}
           <div className="relative z-10 text-center px-4">
             {title && (
-              <h1 className="text-4xl md:text-6xl font-semibold tracking-tight mb-4" style={{ fontFamily: "var(--theme-font-headings)", color: "var(--theme-color-hero-overlay)" }}>
+              <h1 className="text-4xl md:text-6xl tracking-tight mb-4" style={{ ...fontRole("headings"), color: "var(--theme-color-hero-overlay)" }}>
                 {title}
               </h1>
             )}
             {subtitle && (
-              <p className="text-xl md:text-2xl" style={{ fontFamily: "var(--theme-font-overlay)", color: "var(--theme-color-hero-overlay)", opacity: 0.9 }}>
+              <p className="text-xl md:text-2xl" style={{ ...fontRole("overlay"), color: "var(--theme-color-hero-overlay)", opacity: 0.9 }}>
                 {subtitle}
               </p>
             )}
@@ -1917,7 +1931,7 @@ function CarouselClient({
           className="flex flex-col items-center justify-center p-6 text-center"
           style={{ ...slideStyle, backgroundColor: slide.bgColor, color: slide.textColor }}
         >
-          {slide.title && <h3 className="text-xl font-semibold mb-2" style={{ fontFamily: "var(--theme-font-headings)" }}>{slide.title}</h3>}
+          {slide.title && <h3 className="text-xl mb-2" style={fontRole("headings")}>{slide.title}</h3>}
           {slide.subtitle && <p className="text-sm opacity-80">{slide.subtitle}</p>}
         </div>
       );
@@ -1941,7 +1955,7 @@ function CarouselClient({
         )}
         <div className="absolute inset-0 bg-black/30" style={{ borderRadius: `${borderRadius}px` }} />
         <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center" style={{ color: slide.textColor || "#fff" }}>
-          {slide.title && <h3 className="text-xl font-semibold mb-1" style={{ fontFamily: "var(--theme-font-headings)" }}>{slide.title}</h3>}
+          {slide.title && <h3 className="text-xl mb-1" style={fontRole("headings")}>{slide.title}</h3>}
           {slide.subtitle && <p className="text-sm opacity-90">{slide.subtitle}</p>}
         </div>
       </div>

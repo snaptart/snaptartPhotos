@@ -3,8 +3,18 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { CURATED_FONTS } from "@/lib/theme/fonts";
-import { THEME_DEFAULTS, type ThemeSettings } from "@/lib/theme/types";
+import { CURATED_FONTS, buildGoogleFontsUrl, getFontFallback } from "@/lib/theme/fonts";
+import {
+  THEME_DEFAULTS,
+  resolveTheme,
+  type FontRoleKey,
+  type FontRoleStyle,
+  type FontStylesMap,
+  type ThemeSettings,
+} from "@/lib/theme/types";
+import ThemePreview from "@/components/admin/ThemePreview";
+import HallPreview from "@/components/admin/HallPreview";
+import LightboxPreview from "@/components/admin/LightboxPreview";
 import { useMessage } from "@/lib/hooks/useMessage";
 import { Button, Field, Select } from "@/components/admin/ui";
 import { SettingGroup } from "@/components/admin/settings/SettingGroup";
@@ -18,6 +28,7 @@ interface ThemeRecord {
 const SERIF_FONTS = CURATED_FONTS.filter((f) => f.category === "serif");
 const SANS_FONTS = CURATED_FONTS.filter((f) => f.category === "sans-serif");
 const DISPLAY_FONTS = CURATED_FONTS.filter((f) => f.category === "display");
+const MONO_FONTS = CURATED_FONTS.filter((f) => f.category === "mono");
 
 type FontFields = Pick<
   ThemeSettings,
@@ -27,8 +38,11 @@ type FontFields = Pick<
   | "fontFooter"
   | "fontCaptions"
   | "fontOverlay"
+  | "fontLabels"
   | "bodyFontSize"
->;
+> & {
+  fontStyles: FontStylesMap;
+};
 
 function pickFontFields(theme: ThemeSettings): FontFields {
   return {
@@ -38,9 +52,41 @@ function pickFontFields(theme: ThemeSettings): FontFields {
     fontFooter: theme.fontFooter,
     fontCaptions: theme.fontCaptions,
     fontOverlay: theme.fontOverlay,
+    fontLabels: theme.fontLabels,
+    fontStyles: theme.fontStyles ?? {},
     bodyFontSize: theme.bodyFontSize,
   };
 }
+
+const ROLE_META: {
+  key: FontRoleKey;
+  label: string;
+  familyField: keyof Pick<
+    ThemeSettings,
+    | "fontHeadings"
+    | "fontBody"
+    | "fontNavMenu"
+    | "fontFooter"
+    | "fontCaptions"
+    | "fontOverlay"
+    | "fontLabels"
+  >;
+  hint?: string;
+}[] = [
+  { key: "headings", label: "Headings", familyField: "fontHeadings" },
+  { key: "body", label: "Body", familyField: "fontBody" },
+  { key: "navMenu", label: "Nav menu", familyField: "fontNavMenu" },
+  { key: "footer", label: "Footer", familyField: "fontFooter" },
+  { key: "captions", label: "Captions", familyField: "fontCaptions" },
+  { key: "overlay", label: "Overlay text", familyField: "fontOverlay" },
+  {
+    key: "labels",
+    label: "Small-caps labels",
+    familyField: "fontLabels",
+    hint:
+      "Used on the Hall / Stories uppercase labels (PLAN VIEW · 1:1, CONTENTS). JetBrains Mono by default.",
+  },
+];
 
 export default function TypographySettingsPage() {
   const [loaded, setLoaded] = useState(false);
@@ -49,6 +95,8 @@ export default function TypographySettingsPage() {
   const [activeTheme, setActiveTheme] = useState<ThemeSettings>({
     ...THEME_DEFAULTS,
   });
+  const [siteTitle, setSiteTitle] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
   const [draft, setDraft] = useState<FontFields>(() =>
     pickFontFields(THEME_DEFAULTS),
   );
@@ -62,11 +110,10 @@ export default function TypographySettingsPage() {
         const themes: ThemeRecord[] = await themesRes.json();
         const id = settings?.activeThemeId ?? null;
         setActiveThemeId(id);
+        setSiteTitle(settings?.siteTitle ?? "");
+        setLogoUrl(settings?.logoUrl ?? "");
         const active = id ? themes.find((t) => t.id === id) : null;
-        const merged: ThemeSettings = {
-          ...THEME_DEFAULTS,
-          ...(active?.themeSettings ?? {}),
-        };
+        const merged: ThemeSettings = resolveTheme(active?.themeSettings ?? null);
         setActiveTheme(merged);
         setActiveThemeName(active?.name ?? null);
         setDraft(pickFontFields(merged));
@@ -74,6 +121,17 @@ export default function TypographySettingsPage() {
       })
       .catch(() => setLoaded(true));
   }, []);
+
+  const previewTheme: ThemeSettings = { ...activeTheme, ...draft };
+  const draftFontsUrl = buildGoogleFontsUrl([
+    draft.fontHeadings,
+    draft.fontBody,
+    draft.fontNavMenu,
+    draft.fontFooter,
+    draft.fontCaptions,
+    draft.fontOverlay,
+    draft.fontLabels,
+  ]);
 
   function update<K extends keyof FontFields>(key: K, value: FontFields[K]) {
     setDraft((d) => ({ ...d, [key]: value }));
@@ -107,7 +165,9 @@ export default function TypographySettingsPage() {
   if (!loaded) return <div className="text-admin-ink-soft">Loading...</div>;
 
   return (
-    <div>
+    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,640px)_minmax(0,1fr)] xl:gap-10 gap-6">
+      {draftFontsUrl && <link rel="stylesheet" href={draftFontsUrl} />}
+      <div>
       {message && <div className={`${alertClass} mb-4`}>{message.text}</div>}
 
       {/* Active preset banner */}
@@ -141,38 +201,27 @@ export default function TypographySettingsPage() {
 
       <SettingGroup
         title="Fonts"
-        desc="Typeface pairings for each part of the public site."
+        desc="Typeface pairings for each part of the public site. Expand a role to tweak weight, italic, caps, or size."
       >
-        <FontSelect
-          label="Headings"
-          value={draft.fontHeadings}
-          onChange={(v) => update("fontHeadings", v)}
-        />
-        <FontSelect
-          label="Body"
-          value={draft.fontBody}
-          onChange={(v) => update("fontBody", v)}
-        />
-        <FontSelect
-          label="Nav menu"
-          value={draft.fontNavMenu}
-          onChange={(v) => update("fontNavMenu", v)}
-        />
-        <FontSelect
-          label="Footer"
-          value={draft.fontFooter}
-          onChange={(v) => update("fontFooter", v)}
-        />
-        <FontSelect
-          label="Captions"
-          value={draft.fontCaptions}
-          onChange={(v) => update("fontCaptions", v)}
-        />
-        <FontSelect
-          label="Overlay text"
-          value={draft.fontOverlay}
-          onChange={(v) => update("fontOverlay", v)}
-        />
+        {ROLE_META.map((role) => (
+          <FontRoleBlock
+            key={role.key}
+            label={role.label}
+            hint={role.hint}
+            family={draft[role.familyField] as string}
+            onFamilyChange={(v) => update(role.familyField, v)}
+            style={draft.fontStyles[role.key] ?? {}}
+            onStyleChange={(patch) =>
+              setDraft((d) => ({
+                ...d,
+                fontStyles: {
+                  ...d.fontStyles,
+                  [role.key]: { ...(d.fontStyles[role.key] ?? {}), ...patch },
+                },
+              }))
+            }
+          />
+        ))}
       </SettingGroup>
 
       <SettingGroup title="Scale" desc="Base size for body text.">
@@ -200,23 +249,59 @@ export default function TypographySettingsPage() {
           {saving ? "Saving..." : "Save typography"}
         </Button>
       </div>
+      </div>
+
+      <aside className="xl:sticky xl:top-8 xl:self-start xl:max-h-[calc(100vh-4rem)] xl:overflow-y-auto space-y-5">
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-[2px] text-admin-ink-soft mb-2">
+            Public pages
+          </div>
+          <ThemePreview theme={previewTheme} siteTitle={siteTitle} logoUrl={logoUrl} />
+        </div>
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-[2px] text-admin-ink-soft mb-2">
+            The Hall
+          </div>
+          <HallPreview theme={previewTheme} />
+        </div>
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-[2px] text-admin-ink-soft mb-2">
+            Lightbox
+          </div>
+          <LightboxPreview theme={previewTheme} />
+        </div>
+      </aside>
     </div>
   );
 }
 
-function FontSelect({
+function FontRoleBlock({
   label,
-  value,
-  onChange,
+  hint,
+  family,
+  onFamilyChange,
+  style,
+  onStyleChange,
 }: {
   label: string;
-  value: string;
-  onChange: (v: string) => void;
+  hint?: string;
+  family: string;
+  onFamilyChange: (v: string) => void;
+  style: FontRoleStyle;
+  onStyleChange: (patch: FontRoleStyle) => void;
 }) {
+  const previewStyle: React.CSSProperties = {
+    fontFamily: getFontFallback(family),
+    fontWeight: style.weight ?? 400,
+    fontStyle: style.italic ? "italic" : "normal",
+    textTransform: style.uppercase ? "uppercase" : "none",
+    fontSize: style.size ?? 15,
+  };
+
   return (
-    <Field label={label} inline>
-      <div>
-        <Select value={value} onChange={(e) => onChange(e.target.value)}>
+    <Field label={label} inline hint={hint}>
+      <div className="flex flex-col gap-2">
+        <Select value={family} onChange={(e) => onFamilyChange(e.target.value)}>
           <optgroup label="Serif">
             {SERIF_FONTS.map((f) => (
               <option key={f.name} value={f.name}>
@@ -238,10 +323,68 @@ function FontSelect({
               </option>
             ))}
           </optgroup>
+          <optgroup label="Monospace">
+            {MONO_FONTS.map((f) => (
+              <option key={f.name} value={f.name}>
+                {f.name}
+              </option>
+            ))}
+          </optgroup>
         </Select>
+
+        <div className="grid grid-cols-[auto_auto_auto_auto] gap-3 items-center text-[12px] text-admin-ink-soft">
+          {/* Weight slider */}
+          <label className="flex items-center gap-2">
+            <span className="whitespace-nowrap">Weight {style.weight ?? 400}</span>
+            <input
+              type="range"
+              min={300}
+              max={800}
+              step={100}
+              value={style.weight ?? 400}
+              onChange={(e) => onStyleChange({ weight: Number(e.target.value) })}
+              className="w-20 accent-admin-accent"
+            />
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!style.italic}
+              onChange={(e) => onStyleChange({ italic: e.target.checked })}
+              className="accent-admin-accent"
+            />
+            <span className="italic">Italic</span>
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!style.uppercase}
+              onChange={(e) => onStyleChange({ uppercase: e.target.checked })}
+              className="accent-admin-accent"
+            />
+            <span style={{ textTransform: "uppercase", letterSpacing: "1px" }}>Caps</span>
+          </label>
+          <label className="flex items-center gap-1.5">
+            <span className="whitespace-nowrap">Size</span>
+            <input
+              type="number"
+              min={8}
+              max={200}
+              placeholder="auto"
+              value={style.size ?? ""}
+              onChange={(e) => {
+                const v = e.target.value.trim();
+                onStyleChange({ size: v === "" ? null : Number(v) });
+              }}
+              className="w-14 bg-admin-surface border border-admin-border-strong rounded px-1.5 py-1 text-[12px]"
+            />
+            <span className="opacity-70">px</span>
+          </label>
+        </div>
+
         <p
-          className="mt-1 text-[12px] text-admin-ink-faint"
-          style={{ fontFamily: `"${value}", serif` }}
+          className="text-[13px] text-admin-ink mt-0.5"
+          style={previewStyle}
         >
           The quick brown fox jumps over the lazy dog
         </p>

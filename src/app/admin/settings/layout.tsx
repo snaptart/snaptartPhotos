@@ -22,7 +22,7 @@ export default function SettingsLayout({
           </div>
         </aside>
         <section className="bg-admin-bg p-8 md:p-10">
-          <div className="max-w-[640px]">{children}</div>
+          {children}
         </section>
       </div>
     </div>

@@ -121,7 +121,7 @@ export default function IdentitySettingsPage() {
     (draft.siteTitle || siteConfig.siteName || "s").charAt(0).toLowerCase();
 
   return (
-    <div>
+    <div className="max-w-[640px]">
       {message && <div className={`${alertClass} mb-4`}>{message.text}</div>}
 
       <form onSubmit={handleSubmit}>
