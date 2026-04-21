@@ -251,6 +251,7 @@ export default function PhotosPage() {
         location: form.get("location") || null,
         latitude: parseNullableFloat(form.get("latitude")),
         longitude: parseNullableFloat(form.get("longitude")),
+        tags: parseTagsInput(form.get("tags")),
         focalX: editingFocal.x,
         focalY: editingFocal.y,
       }),
@@ -756,6 +757,14 @@ function parseNullableFloat(v: FormDataEntryValue | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function parseTagsInput(v: FormDataEntryValue | null): string[] {
+  if (v == null) return [];
+  return String(v)
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+}
+
 function FilterChip({
   active,
   onClick,
@@ -1049,6 +1058,13 @@ function EditPhotoModal({
                 id="p-location"
                 name="location"
                 defaultValue={photo.location ?? ""}
+              />
+            </Field>
+            <Field label="Tags" htmlFor="p-tags" hint="Comma-separated (e.g. 'Paris, France, Europe')">
+              <Input
+                id="p-tags"
+                name="tags"
+                defaultValue={photo.tags?.join(", ") ?? ""}
               />
             </Field>
             <div className="grid grid-cols-2 gap-3">
