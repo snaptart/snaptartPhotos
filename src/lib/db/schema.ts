@@ -29,7 +29,7 @@ export const siteSettings = pgTable("site_settings", {
   footerAlignment: text("footer_alignment").notNull().default("center"),
   contactEmail: text("contact_email"),
   homepageId: uuid("homepage_id"),
-  homepageType: text("homepage_type").notNull().default("page"), // "page" | "floor_plan"
+  homepageType: text("homepage_type").notNull().default("page"), // "page" | "field_map"
   // Global lightbox defaults
   lightboxMetadataFields: text("lightbox_metadata_fields").array().default(["title", "description"]),
   lightboxCornerRadius: integer("lightbox_corner_radius").default(0),

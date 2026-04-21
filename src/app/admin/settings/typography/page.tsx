@@ -13,7 +13,6 @@ import {
   type ThemeSettings,
 } from "@/lib/theme/types";
 import ThemePreview from "@/components/admin/ThemePreview";
-import HallPreview from "@/components/admin/HallPreview";
 import LightboxPreview from "@/components/admin/LightboxPreview";
 import { useMessage } from "@/lib/hooks/useMessage";
 import { Button, Field, Select } from "@/components/admin/ui";
@@ -257,12 +256,6 @@ export default function TypographySettingsPage() {
             Public pages
           </div>
           <ThemePreview theme={previewTheme} siteTitle={siteTitle} logoUrl={logoUrl} />
-        </div>
-        <div>
-          <div className="font-mono text-[10px] uppercase tracking-[2px] text-admin-ink-soft mb-2">
-            The Hall
-          </div>
-          <HallPreview theme={previewTheme} />
         </div>
         <div>
           <div className="font-mono text-[10px] uppercase tracking-[2px] text-admin-ink-soft mb-2">

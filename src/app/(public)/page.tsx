@@ -11,7 +11,6 @@ import PuckRenderer from "@/components/public/PuckRenderer";
 import type { Data } from "@puckeditor/core";
 import type { EmbedPhoto, GlobalLightboxSettings } from "@/lib/puck/config";
 import siteConfig from "@/lib/site.config";
-import HallPage from "./hall/page";
 import { fontRole } from "@/lib/theme/role-style";
 
 const tiptapExtensions = [
@@ -33,10 +32,6 @@ function isPuckData(content: unknown): content is Data {
 
 export default async function HomePage() {
   const [settingsRow] = await db.select().from(siteSettings).limit(1);
-
-  if (settingsRow?.homepageType === "floor_plan") {
-    return <HallPage />;
-  }
 
   if (!settingsRow?.homepageId) {
     return (

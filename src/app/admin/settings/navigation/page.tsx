@@ -52,7 +52,7 @@ interface FooterDraft {
 }
 
 interface HomepageDraft {
-  homepageType: "page" | "floor_plan";
+  homepageType: "page" | "field_map";
 }
 
 const emptyForm: FormState = {
@@ -126,7 +126,7 @@ export default function NavigationSettingsPage() {
         footerText: settings.footerText ?? "",
       });
       setHomepage({
-        homepageType: settings.homepageType === "floor_plan" ? "floor_plan" : "page",
+        homepageType: settings.homepageType === "field_map" ? "field_map" : "page",
       });
     }
     setItems(items);
@@ -270,18 +270,18 @@ export default function NavigationSettingsPage() {
           desc="What visitors see at the site root."
         >
           {hpMsg && <div className={`${hpAlert} mb-2`}>{hpMsg.text}</div>}
-          <Field label="Show at /" htmlFor="homepageType" inline hint="Pick an existing page by setting the homepage in the page editor; pick the Hall here to serve /hall content at /.">
+          <Field label="Show at /" htmlFor="homepageType" inline hint="Pick an existing page by setting the homepage in the page editor, or serve the Field Map at /.">
             <Select
               id="homepageType"
               value={homepage.homepageType}
               onChange={(e) =>
                 setHomepage({
-                  homepageType: e.target.value === "floor_plan" ? "floor_plan" : "page",
+                  homepageType: e.target.value === "field_map" ? "field_map" : "page",
                 })
               }
             >
               <option value="page">A page (default — uses your selected homepage)</option>
-              <option value="floor_plan">The Hall (floor plan)</option>
+              <option value="field_map">The Field Map</option>
             </Select>
           </Field>
         </SettingGroup>

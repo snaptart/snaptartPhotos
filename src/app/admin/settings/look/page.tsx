@@ -14,7 +14,6 @@ import {
 } from "@/components/admin/ui";
 import { SettingGroup } from "@/components/admin/settings/SettingGroup";
 import ThemePreview from "@/components/admin/ThemePreview";
-import HallPreview from "@/components/admin/HallPreview";
 import LightboxPreview from "@/components/admin/LightboxPreview";
 
 interface ThemeRecord {
@@ -492,12 +491,6 @@ export default function LookAndFeelPage() {
             Public pages
           </div>
           <ThemePreview theme={themeDraft} siteTitle={siteTitle} logoUrl={logoUrl} />
-        </div>
-        <div>
-          <div className="font-mono text-[10px] uppercase tracking-[2px] text-admin-ink-soft mb-2">
-            The Hall
-          </div>
-          <HallPreview theme={themeDraft} />
         </div>
         <div>
           <div className="font-mono text-[10px] uppercase tracking-[2px] text-admin-ink-soft mb-2">
