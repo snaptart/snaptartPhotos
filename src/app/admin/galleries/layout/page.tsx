@@ -365,8 +365,8 @@ export default function FieldMapPlacementEditor() {
                     onClick={() => setSelectedId(gallery.id)}
                     style={{
                       position: "absolute",
-                      left: px,
-                      top: py,
+                      left: Math.round(px),
+                      top: Math.round(py),
                       transform: "translate(-50%, -50%)",
                       cursor: "grab",
                       zIndex: isSelected ? 10 : 3,
@@ -374,33 +374,41 @@ export default function FieldMapPlacementEditor() {
                   >
                     <div
                       style={{
-                        width: 22,
-                        height: 22,
-                        borderRadius: "50%",
-                        background: accent,
-                        border: `2px solid ${palette.pinBorder}`,
-                        boxShadow: isSelected
-                          ? `0 0 0 3px ${accent}55, 0 6px 16px rgba(13,17,22,0.3)`
-                          : "0 2px 6px rgba(13,17,22,0.25)",
-                      }}
-                    />
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: 26,
-                        left: "50%",
-                        transform: "translateX(-50%)",
-                        whiteSpace: "nowrap",
-                        fontFamily: "ui-sans-serif, system-ui, sans-serif",
-                        fontSize: 11,
-                        color: palette.ink,
-                        background: "rgba(255,255,255,0.9)",
-                        padding: "1px 6px",
-                        borderRadius: 3,
-                        pointerEvents: "none",
+                        position: "relative",
+                        transform: `scale(${1 / view.s})`,
+                        transformOrigin: "center center",
                       }}
                     >
-                      {gallery.title}
+                      <div
+                        style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: "50%",
+                          background: accent,
+                          border: `2px solid ${palette.pinBorder}`,
+                          boxShadow: isSelected
+                            ? `0 0 0 3px ${accent}55, 0 6px 16px rgba(13,17,22,0.3)`
+                            : "0 2px 6px rgba(13,17,22,0.25)",
+                        }}
+                      />
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: 26,
+                          left: "50%",
+                          transform: "translateX(-50%)",
+                          whiteSpace: "nowrap",
+                          fontFamily: "ui-sans-serif, system-ui, sans-serif",
+                          fontSize: 11,
+                          color: palette.ink,
+                          background: "rgba(255,255,255,0.9)",
+                          padding: "1px 6px",
+                          borderRadius: 3,
+                          pointerEvents: "none",
+                        }}
+                      >
+                        {gallery.title}
+                      </div>
                     </div>
                   </div>
                 );

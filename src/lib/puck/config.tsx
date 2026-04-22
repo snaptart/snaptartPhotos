@@ -21,6 +21,8 @@ import siteConfig from "@/lib/site.config";
 import { fontRole } from "@/lib/theme/role-style";
 import Lightbox from "@/components/public/Lightbox";
 import type { LightboxPhoto, LightboxSettings } from "@/components/public/Lightbox";
+import StoriesIndex, { STORIES_INDEX_DEFAULTS } from "@/components/public/stories/StoriesIndex";
+import type { IndexStory } from "@/components/public/stories/StoriesIndex";
 import { FormWrapperRender } from "@/components/puck/form/FormWrapper";
 import type { FormWrapperProps } from "@/components/puck/form/FormWrapper";
 import {
@@ -168,6 +170,12 @@ type CarouselSlide = {
   textColor: string;
 };
 
+type StoriesIndexBlockProps = {
+  volumeLabel: string;
+  title: string;
+  dek: string;
+};
+
 type CarouselProps = {
   slides: CarouselSlide[];
   slidesPerView: number;
@@ -194,6 +202,7 @@ type Components = {
   Container: ContainerProps;
   Columns: ColumnsProps;
   GalleryEmbed: GalleryEmbedProps;
+  StoriesIndexBlock: StoriesIndexBlockProps;
   Carousel: CarouselProps;
   Form: FormWrapperProps;
   TextField: TextFieldProps;
@@ -211,6 +220,7 @@ export const puckConfig: Config<Components> = {
     content: { components: ["RichText", "ImageBlock", "GalleryEmbed", "Carousel"] },
     layout: { components: ["Columns", "Spacer", "Container"] },
     hero: { components: ["Hero", "HeroSlideshow"] },
+    stories: { title: "Stories", components: ["StoriesIndexBlock"] },
     forms: { components: ["Form", "TextField", "TextArea", "SelectField", "RadioGroup", "CheckboxGroup", "Checkbox"] },
   },
   components: {
@@ -1168,6 +1178,33 @@ export const puckConfig: Config<Components> = {
             lightboxCaptionAlignment={lightboxCaptionAlignment}
             globalLightbox={(puck?.metadata as Record<string, unknown>)?.globalLightbox as GlobalLightboxSettings | undefined}
             serverPhotos={serverPhotos?.[gallerySlug]}
+          />
+        );
+      },
+    },
+
+    StoriesIndexBlock: {
+      label: "Stories Contents",
+      fields: {
+        volumeLabel: { type: "text", label: "Volume label" },
+        title: { type: "text", label: "Masthead title" },
+        dek: { type: "textarea", label: "Dek (subtitle)" },
+      },
+      defaultProps: {
+        volumeLabel: STORIES_INDEX_DEFAULTS.volumeLabel,
+        title: STORIES_INDEX_DEFAULTS.title,
+        dek: STORIES_INDEX_DEFAULTS.dek,
+      },
+      render: ({ volumeLabel, title, dek, puck }) => {
+        const injected = (puck?.metadata as Record<string, unknown>)?.storiesIndex as
+          | IndexStory[]
+          | undefined;
+        return (
+          <StoriesIndexBlockRender
+            volumeLabel={volumeLabel}
+            title={title}
+            dek={dek}
+            injected={injected}
           />
         );
       },
@@ -2254,6 +2291,84 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
         settings={lb}
       />
     </>
+  );
+}
+
+// ----- Stories index block renderer -----
+
+type StoryRow = {
+  title: string;
+  slug: string;
+  isPublished: boolean;
+  metaDescription: string | null;
+  storyMeta: {
+    dek?: string;
+    kind?: string;
+    year?: string | number;
+    readTime?: string;
+    wordCount?: number;
+    frontispieceUrl?: string;
+  } | null;
+  ogImageUrl: string | null;
+  isPasswordProtected: boolean;
+  createdAt: string;
+};
+
+function storyRowsToIndex(rows: StoryRow[]): IndexStory[] {
+  return rows
+    .filter((r) => r.isPublished)
+    .map((r) => {
+      const meta = r.storyMeta ?? {};
+      return {
+        title: r.title,
+        slug: r.slug,
+        dek: meta.dek ?? r.metaDescription ?? "",
+        kind: meta.kind ?? "Short",
+        year: meta.year != null ? String(meta.year) : new Date(r.createdAt).getFullYear().toString(),
+        readTime:
+          meta.readTime ??
+          (meta.wordCount ? `${Math.max(1, Math.round(meta.wordCount / 220))} MIN READ` : ""),
+        wordCount: meta.wordCount ?? null,
+        frontispiece: meta.frontispieceUrl ?? r.ogImageUrl ?? null,
+        isProtected: r.isPasswordProtected,
+      };
+    });
+}
+
+function StoriesIndexBlockRender({
+  volumeLabel,
+  title,
+  dek,
+  injected,
+}: {
+  volumeLabel: string;
+  title: string;
+  dek: string;
+  injected: IndexStory[] | undefined;
+}) {
+  const [fetched, setFetched] = useState<IndexStory[] | null>(null);
+  useEffect(() => {
+    if (injected) return;
+    let cancelled = false;
+    fetch("/api/stories")
+      .then((r) => r.json())
+      .then((rows: StoryRow[]) => {
+        if (!cancelled) setFetched(storyRowsToIndex(rows));
+      })
+      .catch(() => {
+        if (!cancelled) setFetched([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [injected]);
+  return (
+    <StoriesIndex
+      stories={injected ?? fetched ?? []}
+      volumeLabel={volumeLabel}
+      title={title}
+      dek={dek}
+    />
   );
 }
 

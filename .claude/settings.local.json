@@ -10,7 +10,10 @@
       "Read(//c/tmp/design_extract/unpacked/snaptart-photos-ideas/project/**)",
       "WebFetch(domain:api.anthropic.com)",
       "WebFetch(domain:snaptart.squarespace.com)",
-      "WebFetch(domain:www.snaptart.com)"
+      "WebFetch(domain:www.snaptart.com)",
+      "Bash(cp \"/c/Users/Dad/.claude/projects/c--Users-Dad-Documents-Web-snaptart-com/7a5b6a51-28ac-4454-bdfd-4f3f6bf11880/tool-results/webfetch-1776809756735-q8mtjb.bin\" /tmp/field-map-handoff.tar.gz)",
+      "Bash(tar -xzf /tmp/field-map-handoff.tar.gz -C /tmp/field-map-handoff)",
+      "Read(//tmp/**)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Dad\\.claude",

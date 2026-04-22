@@ -58,7 +58,7 @@ export default async function PublicLayout({
         }}
       >
         <Navbar />
-        <main className="flex-1">{children}</main>
+        <main className="flex flex-1 flex-col">{children}</main>
         <Footer />
       </div>
     </>

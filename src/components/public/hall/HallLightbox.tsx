@@ -1,20 +1,8 @@
 "use client";
 
-import Image from "next/image";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { fontRole } from "@/lib/theme/role-style";
 import type { RoomPhoto } from "./RoomView";
-
-const NEIGHBOR_POSITIONS = [
-  { top: "8%", left: "6%", size: 80, rot: -3 },
-  { top: "14%", left: "82%", size: 90, rot: 4 },
-  { top: "62%", left: "4%", size: 100, rot: 2 },
-  { top: "72%", left: "88%", size: 80, rot: -4 },
-  { top: "4%", left: "38%", size: 70, rot: 1 },
-  { top: "82%", left: "42%", size: 75, rot: -2 },
-  { top: "36%", left: "2%", size: 85, rot: 3 },
-  { top: "48%", left: "92%", size: 85, rot: -2 },
-];
 
 export default function HallLightbox({
   galleryTitle,
@@ -33,17 +21,58 @@ export default function HallLightbox({
 }) {
   const [shown, setShown] = useState(false);
   const dirRef = useRef(0);
-  const photo = photos[index];
+
+  const FADE_MS = 300;
+  const [displayIndex, setDisplayIndex] = useState(index);
+  const [outgoingIndex, setOutgoingIndex] = useState<number | null>(null);
+  const [crossfading, setCrossfading] = useState(false);
+  const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const photo = photos[displayIndex];
+  const outgoingPhoto = outgoingIndex !== null ? photos[outgoingIndex] : null;
+  const incomingOpacity = outgoingIndex === null || crossfading ? 1 : 0;
 
   const go = useCallback(
     (delta: number) => {
-      const next = index + delta;
-      if (next < 0 || next >= photos.length) return;
+      if (photos.length === 0) return;
+      const next = (displayIndex + delta + photos.length) % photos.length;
       dirRef.current = delta;
       onIndexChange(next);
     },
-    [index, photos.length, onIndexChange],
+    [displayIndex, photos.length, onIndexChange],
   );
+
+  // Sync parent-driven index change into a crossfade
+  useLayoutEffect(() => {
+    if (index === displayIndex) return;
+    if (navTimerRef.current) clearTimeout(navTimerRef.current);
+    setOutgoingIndex(displayIndex);
+    setDisplayIndex(index);
+    setCrossfading(false);
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => setCrossfading(true)),
+    );
+    navTimerRef.current = setTimeout(() => {
+      setOutgoingIndex(null);
+      setCrossfading(false);
+    }, FADE_MS + 60);
+  }, [index, displayIndex]);
+
+  // Preload adjacent images so the next crossfade has no network hitch
+  useEffect(() => {
+    if (photos.length <= 1) return;
+    const nextIdx = (displayIndex + 1) % photos.length;
+    const prevIdx = (displayIndex - 1 + photos.length) % photos.length;
+    [nextIdx, prevIdx].forEach((i) => {
+      const img = new window.Image();
+      img.src = photos[i].url;
+    });
+  }, [displayIndex, photos]);
+
+  useEffect(() => {
+    return () => {
+      if (navTimerRef.current) clearTimeout(navTimerRef.current);
+    };
+  }, []);
 
   const handleClose = useCallback(() => {
     setShown(false);
@@ -72,10 +101,14 @@ export default function HallLightbox({
     };
   }, []);
 
-  const neighbors = photos
-    .map((p, i) => ({ p, i }))
-    .filter(({ i }) => i !== index)
-    .slice(0, NEIGHBOR_POSITIONS.length);
+  const locationLink = parseMarkdownLink(photo.location);
+  const locationHref =
+    locationLink.href ??
+    (photo.latitude != null && photo.longitude != null
+      ? `https://www.google.com/maps/search/?api=1&query=${photo.latitude},${photo.longitude}`
+      : locationLink.label
+        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationLink.label)}`
+        : null);
 
   const camera = photo.cameraSettings ?? null;
   const cameraLine = camera
@@ -98,56 +131,11 @@ export default function HallLightbox({
         position: "fixed",
         inset: 0,
         zIndex: 100,
-        background: shown
-          ? "color-mix(in oklab, var(--ex-ink) 75%, transparent)"
-          : "transparent",
+        background: shown ? "#000" : "transparent",
         backdropFilter: shown ? "blur(16px)" : "blur(0)",
         transition: "background 320ms ease-out, backdrop-filter 320ms",
       }}
     >
-      {shown &&
-        neighbors.map(({ p, i: neighborOriginalIndex }, ni) => {
-          const pos = NEIGHBOR_POSITIONS[ni];
-          if (!pos) return null;
-          return (
-            <button
-              key={p.id}
-              onClick={() => {
-                dirRef.current = neighborOriginalIndex > index ? 1 : -1;
-                onIndexChange(neighborOriginalIndex);
-              }}
-              aria-label={`View ${p.title ?? "photo"}`}
-              style={{
-                position: "absolute",
-                top: pos.top,
-                left: pos.left,
-                width: pos.size,
-                height: pos.size * 0.75,
-                transform: `rotate(${pos.rot}deg) scale(${shown ? 1 : 0.8})`,
-                opacity: shown ? 0.5 : 0,
-                transition: `opacity 500ms ${ni * 40}ms, transform 500ms ${ni * 40}ms cubic-bezier(.2,.9,.3,1.2)`,
-                filter: "blur(1.5px) saturate(0.7)",
-                padding: 4,
-                background: "#fff",
-                boxShadow: "0 8px 20px rgba(0,0,0,0.3)",
-                border: "none",
-                cursor: "pointer",
-                overflow: "hidden",
-              }}
-            >
-              <div style={{ position: "relative", width: "100%", height: "100%" }}>
-                <Image
-                  src={p.thumbnailUrl}
-                  alt=""
-                  fill
-                  sizes="100px"
-                  style={{ objectFit: "cover" }}
-                />
-              </div>
-            </button>
-          );
-        })}
-
       <button
         onClick={handleClose}
         aria-label="Close"
@@ -176,12 +164,17 @@ export default function HallLightbox({
       <div
         style={{
           position: "absolute",
-          inset: 0,
+          top: 72,
+          bottom: 100,
+          left: 0,
+          right: 0,
           display: "grid",
           gridTemplateColumns: "minmax(0, 1fr) 360px",
+          gridTemplateRows: "minmax(0, 1fr)",
           opacity: shown ? 1 : 0,
           transition: "opacity 400ms 100ms",
-          padding: 40,
+          padding: 32,
+          minHeight: 0,
         }}
       >
         {/* photo column */}
@@ -197,38 +190,81 @@ export default function HallLightbox({
             minWidth: 0,
           }}
         >
-          <NavArrow dir="prev" disabled={index === 0} onClick={() => go(-1)} />
+          <NavArrow dir="prev" disabled={false} onClick={() => go(-1)} />
 
           <div
-            key={photo.id}
             style={{
-              padding: 16,
-              background: "#fff",
-              boxShadow:
-                "0 30px 80px rgba(0,0,0,0.5), 0 10px 24px rgba(0,0,0,0.3)",
-              maxWidth: "100%",
-              maxHeight: "100%",
-              display: "flex",
+              position: "relative",
+              width: "calc(100vw - 564px)",
+              height: "calc(100vh - 276px)",
             }}
           >
-            <img
-              src={photo.url}
-              alt={photo.title ?? ""}
+            <div
+              key={`in-${displayIndex}`}
               style={{
-                display: "block",
-                maxWidth: "calc(100vw - 580px)",
-                maxHeight: "calc(100vh - 160px)",
-                width: "auto",
-                height: "auto",
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+                padding: 16,
+                background: "#fff",
+                boxShadow:
+                  "0 30px 80px rgba(0,0,0,0.5), 0 10px 24px rgba(0,0,0,0.3)",
+                display: "flex",
+                opacity: incomingOpacity,
+                transition:
+                  outgoingIndex !== null
+                    ? `opacity ${FADE_MS}ms ease`
+                    : undefined,
               }}
-            />
+            >
+              <img
+                src={photo.url}
+                alt={photo.title ?? ""}
+                style={{
+                  display: "block",
+                  maxWidth: "calc(100vw - 596px)",
+                  maxHeight: "calc(100vh - 308px)",
+                  width: "auto",
+                  height: "auto",
+                }}
+              />
+            </div>
+            {outgoingPhoto && (
+              <div
+                key={`out-${outgoingIndex}`}
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  top: "50%",
+                  left: "50%",
+                  transform: "translate(-50%, -50%)",
+                  padding: 16,
+                  background: "#fff",
+                  boxShadow:
+                    "0 30px 80px rgba(0,0,0,0.5), 0 10px 24px rgba(0,0,0,0.3)",
+                  display: "flex",
+                  opacity: crossfading ? 0 : 1,
+                  transition: `opacity ${FADE_MS}ms ease`,
+                  pointerEvents: "none",
+                }}
+              >
+                <img
+                  src={outgoingPhoto.url}
+                  alt=""
+                  style={{
+                    display: "block",
+                    maxWidth: "calc(100vw - 596px)",
+                    maxHeight: "calc(100vh - 308px)",
+                    width: "auto",
+                    height: "auto",
+                  }}
+                />
+              </div>
+            )}
           </div>
 
-          <NavArrow
-            dir="next"
-            disabled={index === photos.length - 1}
-            onClick={() => go(1)}
-          />
+          <NavArrow dir="next" disabled={false} onClick={() => go(1)} />
         </div>
 
         {/* drawer */}
@@ -293,7 +329,7 @@ export default function HallLightbox({
             </div>
           )}
 
-          {(photo.location || (photo.latitude != null && photo.longitude != null)) && (
+          {(locationLink.label || (photo.latitude != null && photo.longitude != null)) && (
             <div>
               <div
                 style={{
@@ -304,35 +340,34 @@ export default function HallLightbox({
                   marginBottom: 10,
                 }}
               >
-                Where{photo.location ? ` · ${photo.location}` : ""}
+                Where
+                {locationLink.label && (
+                  <>
+                    {" · "}
+                    {locationHref ? (
+                      <a
+                        href={locationHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          color: "var(--ex-accent)",
+                          textDecoration: "underline",
+                          textUnderlineOffset: 2,
+                        }}
+                      >
+                        {locationLink.label}
+                      </a>
+                    ) : (
+                      locationLink.label
+                    )}
+                  </>
+                )}
               </div>
               {photo.latitude != null && photo.longitude != null ? (
-                <EmbedMap lat={photo.latitude} lng={photo.longitude} label={photo.location ?? ""} />
+                <EmbedMap lat={photo.latitude} lng={photo.longitude} label={locationLink.label} />
               ) : (
-                <StylizedMap name={photo.location ?? ""} />
+                <StylizedMap name={locationLink.label} />
               )}
-              <a
-                href={
-                  photo.latitude != null && photo.longitude != null
-                    ? `https://www.google.com/maps/search/?api=1&query=${photo.latitude},${photo.longitude}`
-                    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(photo.location ?? "")}`
-                }
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  marginTop: 10,
-                  ...fontRole("labels"),
-                  fontSize: 9,
-                  letterSpacing: 1.5,
-                  color: "var(--ex-ink-soft)",
-                  textDecoration: "none",
-                }}
-              >
-                Open in Google Maps ↗
-              </a>
             </div>
           )}
 
@@ -581,6 +616,16 @@ function StylizedMap({ name }: { name: string }) {
       </div>
     </div>
   );
+}
+
+function parseMarkdownLink(raw: string | null | undefined): {
+  label: string;
+  href: string | null;
+} {
+  const text = (raw ?? "").trim();
+  const match = text.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+  if (match) return { label: match[1].trim(), href: match[2].trim() };
+  return { label: text, href: null };
 }
 
 function formatDate(iso: string) {

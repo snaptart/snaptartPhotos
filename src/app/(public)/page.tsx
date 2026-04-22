@@ -46,7 +46,7 @@ export default async function HomePage() {
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
         />
-        <div className="fixed inset-0 z-40 bg-white">
+        <div className="relative flex-1 bg-white">
           <FieldMap
             regions={data.regions}
             yearBounds={data.yearBounds}

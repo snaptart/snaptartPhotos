@@ -1,6 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+// Module-level path cache so subsequent FieldMap mounts (navigating between
+// / and /map/[slug]) don't flash an empty map while re-fetching the land
+// TopoJSON. All FieldMap instances share the same Mollweide projection
+// parameters, so these paths are identical across instances.
+let cachedWorldPath: string | null = null;
+let cachedGraticulePath: string | null = null;
+let cachedSpherePath: string | null = null;
+let worldFetchPromise: Promise<string | null> | null = null;
 import { useRouter } from "next/navigation";
 import { geoPath, geoGraticule } from "d3-geo";
 import { geoMollweide } from "d3-geo-projection";
@@ -87,19 +99,44 @@ export default function FieldMap({
   mapStyle = "modern",
   siteTitle = "Snaptart",
   tagline = "Field Map · Expedition Log",
+  mode = "interactive",
+  highlightSlug,
+  showBrand = false,
+  showFilters = false,
+  showYearScrubber = false,
 }: FieldMapProps) {
+  const isBackground = mode === "background";
+  const chromeBrand = !isBackground && showBrand;
+  const chromeFilters = !isBackground && showFilters;
+  const chromeScrubber = !isBackground && showYearScrubber;
   const router = useRouter();
   const [filter, setFilter] = useState<string>("all");
   const [years, setYears] = useState<[number, number]>(yearBounds);
   const [hoverRegion, setHoverRegion] = useState<string | null>(null);
   const [view, setView] = useState({ x: 0, y: 0, s: 1 });
   const [cursor, setCursor] = useState({ x: 0, y: 0, lat: 0, lng: 0 });
-  const [worldPath, setWorldPath] = useState<string | null>(null);
-  const [graticulePath, setGraticulePath] = useState<string | null>(null);
-  const [spherePath, setSpherePath] = useState<string | null>(null);
+  const [worldPath, setWorldPath] = useState<string | null>(cachedWorldPath);
+  const [graticulePath, setGraticulePath] = useState<string | null>(cachedGraticulePath);
+  const [spherePath, setSpherePath] = useState<string | null>(cachedSpherePath);
 
   const vpRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null);
+  const hoverCloseRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const openHover = useCallback((id: string) => {
+    if (hoverCloseRef.current) {
+      clearTimeout(hoverCloseRef.current);
+      hoverCloseRef.current = null;
+    }
+    setHoverRegion(id);
+  }, []);
+  const scheduleCloseHover = useCallback(() => {
+    if (hoverCloseRef.current) clearTimeout(hoverCloseRef.current);
+    hoverCloseRef.current = setTimeout(() => {
+      setHoverRegion(null);
+      hoverCloseRef.current = null;
+    }, 180);
+  }, []);
   const projection = useMemo(() => {
     return geoMollweide()
       .scale((MAP_W / (2 * Math.PI)) * 1.05)
@@ -109,24 +146,41 @@ export default function FieldMap({
 
   const palette = paletteFor(mapStyle);
 
-  // Build graticule + sphere + world paths
+  // Build graticule + sphere + world paths. Graticule and sphere are
+  // synchronous; world land is fetched once and cached at module level.
   useEffect(() => {
     const path = geoPath(projection);
-    setGraticulePath(path(geoGraticule().step([20, 15])()) ?? null);
-    setSpherePath(path({ type: "Sphere" }) ?? null);
+    if (!cachedGraticulePath) {
+      cachedGraticulePath = path(geoGraticule().step([20, 15])()) ?? null;
+    }
+    if (!cachedSpherePath) {
+      cachedSpherePath = path({ type: "Sphere" }) ?? null;
+    }
+    setGraticulePath(cachedGraticulePath);
+    setSpherePath(cachedSpherePath);
+
+    if (cachedWorldPath) {
+      setWorldPath(cachedWorldPath);
+      return;
+    }
 
     let cancelled = false;
-    fetch("/data/land-110m.json")
-      .then((r) => r.json() as Promise<Topology>)
-      .then((topo) => {
-        if (cancelled) return;
-        const land = feature(
-          topo,
-          topo.objects.land as GeometryCollection | GeometryObject
-        ) as unknown as FeatureCollection<Polygon | MultiPolygon>;
-        setWorldPath(path(land) ?? null);
-      })
-      .catch(() => {});
+    if (!worldFetchPromise) {
+      worldFetchPromise = fetch("/data/land-110m.json")
+        .then((r) => r.json() as Promise<Topology>)
+        .then((topo) => {
+          const land = feature(
+            topo,
+            topo.objects.land as GeometryCollection | GeometryObject
+          ) as unknown as FeatureCollection<Polygon | MultiPolygon>;
+          cachedWorldPath = path(land) ?? null;
+          return cachedWorldPath;
+        })
+        .catch(() => null);
+    }
+    worldFetchPromise.then((p) => {
+      if (!cancelled) setWorldPath(p);
+    });
     return () => {
       cancelled = true;
     };
@@ -149,8 +203,9 @@ export default function FieldMap({
     } catch {}
   }, [filter, years]);
 
-  // Fit to viewport
-  useEffect(() => {
+  // Fit to viewport — useLayoutEffect so the correct view is set before the
+  // first paint, preventing a flash of the unfitted map at view={0,0,1}.
+  useIsomorphicLayoutEffect(() => {
     const fit = () => {
       const vp = vpRef.current;
       if (!vp) return;
@@ -208,11 +263,12 @@ export default function FieldMap({
       }
     }
     setCursor({ x: e.clientX - r.left, y: e.clientY - r.top, lat, lng });
-    if (!dragRef.current) return;
+    const drag = dragRef.current;
+    if (!drag) return;
     setView((v) => ({
       ...v,
-      x: dragRef.current!.vx + (e.clientX - dragRef.current!.x),
-      y: dragRef.current!.vy + (e.clientY - dragRef.current!.y),
+      x: drag.vx + (e.clientX - drag.x),
+      y: drag.vy + (e.clientY - drag.y),
     }));
   };
 
@@ -224,7 +280,11 @@ export default function FieldMap({
   const projectedRegions = useMemo(() => {
     return regions.map((r) => {
       const p = projection([r.longitude, r.latitude]) ?? [0, 0];
-      return { ...r, px: p[0], py: p[1] };
+      // Round to integer pixels so the server- and client-serialized style
+      // strings match (the browser rounds inline-style pixel values when
+      // read back during hydration; full-float positions cause a React
+      // hydration mismatch).
+      return { ...r, px: Math.round(p[0]), py: Math.round(p[1]) };
     });
   }, [regions, projection]);
 
@@ -259,17 +319,18 @@ export default function FieldMap({
   return (
     <div
       ref={vpRef}
-      onMouseDown={onDown}
-      onMouseMove={onMove}
-      onMouseUp={onUp}
-      onMouseLeave={onUp}
+      onMouseDown={isBackground ? undefined : onDown}
+      onMouseMove={isBackground ? undefined : onMove}
+      onMouseUp={isBackground ? undefined : onUp}
+      onMouseLeave={isBackground ? undefined : onUp}
       style={{
         position: "absolute",
         inset: 0,
         overflow: "hidden",
-        cursor: dragRef.current ? "grabbing" : "grab",
+        cursor: isBackground ? "default" : dragRef.current ? "grabbing" : "grab",
         background: palette.bg,
         userSelect: "none",
+        pointerEvents: isBackground ? "none" : undefined,
       }}
     >
       {mapStyle === "blueprint" && (
@@ -340,16 +401,28 @@ export default function FieldMap({
           if (r.visibleCount === 0) return null;
           const size = Math.max(22, Math.min(72, 18 + Math.sqrt(r.visibleCount) * 5));
           const isHover = hoverRegion === r.id;
+          const isHighlight = isBackground && highlightSlug === r.slug;
           const labelLeft = r.px > MAP_W - 160;
           const coords = `${Math.abs(r.latitude).toFixed(2)}°${r.latitude >= 0 ? "N" : "S"} ${Math.abs(r.longitude).toFixed(2)}°${r.longitude >= 0 ? "E" : "W"}`;
+
+          const handlePinClick = (e: React.MouseEvent) => {
+            if (isBackground) return;
+            try {
+              sessionStorage.setItem(
+                `fieldmap-origin-${r.slug}`,
+                JSON.stringify({ x: e.clientX, y: e.clientY })
+              );
+            } catch {}
+            router.push(`/map/${r.slug}`);
+          };
 
           return (
             <div
               key={r.id}
               data-region={r.id}
-              onClick={() => router.push(`/map/${r.slug}`)}
-              onMouseEnter={() => setHoverRegion(r.id)}
-              onMouseLeave={() => setHoverRegion(null)}
+              onClick={handlePinClick}
+              onMouseEnter={() => !isBackground && openHover(r.id)}
+              onMouseLeave={() => !isBackground && scheduleCloseHover()}
               style={{
                 position: "absolute",
                 left: r.px,
@@ -361,15 +434,22 @@ export default function FieldMap({
             >
               <div
                 style={{
+                  position: "relative",
+                  transform: `scale(${1 / view.s})`,
+                  transformOrigin: "center center",
+                }}
+              >
+              <div
+                style={{
                   position: "absolute",
                   left: "50%",
                   top: "50%",
-                  width: size + 18,
-                  height: size + 18,
+                  width: size + (isHighlight ? 32 : 18),
+                  height: size + (isHighlight ? 32 : 18),
                   borderRadius: "50%",
                   transform: "translate(-50%, -50%)",
-                  border: `1px solid ${r.accentColor}`,
-                  opacity: isHover ? 0.6 : 0.2,
+                  border: `${isHighlight ? 2 : 1}px solid ${r.accentColor}`,
+                  opacity: isHighlight ? 0.9 : isHover ? 0.6 : 0.2,
                   transition: "opacity 0.2s",
                 }}
               />
@@ -419,9 +499,11 @@ export default function FieldMap({
               </div>
               {isHover && (
                 <div
+                  onMouseEnter={() => openHover(r.id)}
+                  onMouseLeave={scheduleCloseHover}
                   style={{
                     position: "absolute",
-                    top: -180,
+                    bottom: "calc(100% + 10px)",
                     left: labelLeft ? "auto" : "50%",
                     right: labelLeft ? "50%" : "auto",
                     transform: labelLeft ? "translateX(0)" : "translateX(-50%)",
@@ -434,7 +516,6 @@ export default function FieldMap({
                     padding: 12,
                     boxShadow:
                       "0 16px 40px rgba(13,17,22,0.14), 0 2px 8px rgba(13,17,22,0.06)",
-                    pointerEvents: "none",
                   }}
                 >
                   {r.previewThumbs.length > 0 && (
@@ -501,12 +582,14 @@ export default function FieldMap({
                   )}
                 </div>
               )}
+              </div>
             </div>
           );
         })}
       </div>
 
-      {/* TOP LEFT: brand */}
+      {chromeBrand && (
+      /* TOP LEFT: brand */
       <div style={{ position: "absolute", top: 22, left: 24, zIndex: 10, color: palette.ink }}>
         <div
           style={{
@@ -533,8 +616,10 @@ export default function FieldMap({
           {tagline}
         </div>
       </div>
+      )}
 
-      {/* BOTTOM LEFT: cursor readout */}
+      {!isBackground && (
+      /* BOTTOM LEFT: cursor readout */
       <div
         style={{
           position: "absolute",
@@ -556,8 +641,10 @@ export default function FieldMap({
         </div>
         <div>ZOOM ×{view.s.toFixed(2)}</div>
       </div>
+      )}
 
-      {/* TOP CENTER: filter chips */}
+      {chromeFilters && (
+      /* TOP CENTER: filter chips */
       <div
         style={{
           position: "absolute",
@@ -607,17 +694,21 @@ export default function FieldMap({
           );
         })}
       </div>
+      )}
 
-      <YearScrubber
-        years={years}
-        setYears={setYears}
-        bounds={yearBounds}
-        regions={visibleRegions}
-        palette={palette}
-        mapStyle={mapStyle}
-      />
+      {chromeScrubber && (
+        <YearScrubber
+          years={years}
+          setYears={setYears}
+          bounds={yearBounds}
+          regions={visibleRegions}
+          palette={palette}
+          mapStyle={mapStyle}
+        />
+      )}
 
-      {/* BOTTOM RIGHT: zoom controls */}
+      {!isBackground && (
+      /* BOTTOM RIGHT: zoom controls */
       <div
         style={{
           position: "absolute",
@@ -659,6 +750,7 @@ export default function FieldMap({
           </button>
         ))}
       </div>
+      )}
     </div>
   );
 }

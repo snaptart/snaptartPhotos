@@ -46,7 +46,6 @@ export async function POST(req: Request) {
       position: body.position ?? 0,
       isPasswordProtected: body.isPasswordProtected ?? false,
       passwordHash,
-      typography: body.typography ?? null,
     }).returning();
     return NextResponse.json(item);
   } catch {

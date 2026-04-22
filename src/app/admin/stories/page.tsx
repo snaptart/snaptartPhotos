@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import ImagePicker from "@/components/admin/ImagePicker";
 import { DndContext, closestCenter } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -11,7 +12,6 @@ import { Plus, X } from "lucide-react";
 import { SortableItem } from "@/components/admin/SortableItem";
 import { useSortableList } from "@/lib/hooks/useSortableList";
 import { useMessage } from "@/lib/hooks/useMessage";
-import { CURATED_FONTS } from "@/lib/theme/fonts";
 import {
   Button,
   Card,
@@ -19,16 +19,9 @@ import {
   Input,
   Pill,
   SectionLabel,
-  Select,
   Textarea,
   Topbar,
 } from "@/components/admin/ui";
-
-interface StoryTypography {
-  fontHeadings?: string;
-  fontBody?: string;
-  bodyFontSize?: "small" | "medium" | "large";
-}
 
 interface StoryMeta {
   dek?: string;
@@ -49,19 +42,15 @@ interface Story {
   position: number;
   metaTitle: string | null;
   metaDescription: string | null;
-  typography: StoryTypography | null;
   storyMeta: StoryMeta | null;
 }
-
-const SERIF_FONTS = CURATED_FONTS.filter((f) => f.category === "serif");
-const SANS_FONTS = CURATED_FONTS.filter((f) => f.category === "sans-serif");
-const DISPLAY_FONTS = CURATED_FONTS.filter((f) => f.category === "display");
 
 export default function StoriesPage() {
   const [stories, setStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewForm, setShowNewForm] = useState(false);
   const [editSettings, setEditSettings] = useState<string | null>(null);
+  const [frontispieceUrl, setFrontispieceUrl] = useState("");
   const { message, showSuccess, showError, alertClass } = useMessage();
   const router = useRouter();
 
@@ -82,6 +71,11 @@ export default function StoriesPage() {
   useEffect(() => {
     fetchStories();
   }, [fetchStories]);
+
+  useEffect(() => {
+    const current = stories.find((s) => s.id === editSettings);
+    setFrontispieceUrl(current?.storyMeta?.frontispieceUrl ?? "");
+  }, [editSettings, stories]);
 
   async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -109,22 +103,12 @@ export default function StoriesPage() {
     const isPasswordProtected = form.get("isPasswordProtected") === "on";
     const password = form.get("password") as string;
 
-    const typography: StoryTypography = {};
-    const fontHeadings = form.get("fontHeadings") as string;
-    const fontBody = form.get("fontBody") as string;
-    const bodyFontSize = form.get("bodyFontSize") as string;
-    if (fontHeadings) typography.fontHeadings = fontHeadings;
-    if (fontBody) typography.fontBody = fontBody;
-    if (bodyFontSize)
-      typography.bodyFontSize = bodyFontSize as StoryTypography["bodyFontSize"];
-
     const storyMeta: StoryMeta = {};
     const dek = (form.get("dek") as string) || "";
     const kind = (form.get("kind") as string) || "";
     const year = (form.get("year") as string) || "";
     const readTime = (form.get("readTime") as string) || "";
     const wordCount = (form.get("wordCount") as string) || "";
-    const frontispieceUrl = (form.get("frontispieceUrl") as string) || "";
     if (dek) storyMeta.dek = dek;
     if (kind) storyMeta.kind = kind;
     if (year) storyMeta.year = year;
@@ -142,7 +126,6 @@ export default function StoriesPage() {
       metaTitle: form.get("metaTitle") || null,
       metaDescription: form.get("metaDescription") || null,
       isPasswordProtected,
-      typography: Object.keys(typography).length > 0 ? typography : null,
       storyMeta: Object.keys(storyMeta).length > 0 ? storyMeta : null,
     };
 
@@ -192,16 +175,24 @@ export default function StoriesPage() {
         title="Stories"
         subtitle={`${stories.length} total · drag to reorder`}
         actions={
-          <Button
-            kind="primary"
-            onClick={() => {
-              setShowNewForm(true);
-              setEditSettings(null);
-            }}
-            icon={<Plus className="h-3.5 w-3.5" />}
-          >
-            New story
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              kind="ghost"
+              onClick={() => router.push("/admin/stories/index/edit")}
+            >
+              Edit contents page
+            </Button>
+            <Button
+              kind="primary"
+              onClick={() => {
+                setShowNewForm(true);
+                setEditSettings(null);
+              }}
+              icon={<Plus className="h-3.5 w-3.5" />}
+            >
+              New story
+            </Button>
+          </div>
         }
       />
 
@@ -337,13 +328,10 @@ export default function StoriesPage() {
                       />
                     </Field>
                   </div>
-                  <Field label="Frontispiece image URL" htmlFor="es-frontispiece" hint="Shown on the contents preview and above the body">
-                    <Input
-                      id="es-frontispiece"
-                      name="frontispieceUrl"
-                      type="url"
-                      defaultValue={editingStory.storyMeta?.frontispieceUrl ?? ""}
-                      placeholder="https://…"
+                  <Field label="Frontispiece image" hint="Shown on the contents preview and above the body">
+                    <ImagePicker
+                      value={frontispieceUrl}
+                      onChange={setFrontispieceUrl}
                     />
                   </Field>
                 </div>
@@ -372,37 +360,6 @@ export default function StoriesPage() {
                         : "Set a password"
                     }
                   />
-                </div>
-              </details>
-
-              <details className="rounded-md border border-admin-border p-3">
-                <summary className="cursor-pointer text-[13px] font-medium text-admin-ink-soft">
-                  Typography
-                </summary>
-                <div className="mt-3 space-y-4">
-                  <FontSelect
-                    label="Heading font"
-                    name="fontHeadings"
-                    defaultValue={editingStory.typography?.fontHeadings ?? ""}
-                  />
-                  <FontSelect
-                    label="Body font"
-                    name="fontBody"
-                    defaultValue={editingStory.typography?.fontBody ?? ""}
-                  />
-                  <Field label="Body font size" htmlFor="es-body-size">
-                    <Select
-                      id="es-body-size"
-                      name="bodyFontSize"
-                      defaultValue={
-                        editingStory.typography?.bodyFontSize ?? "medium"
-                      }
-                    >
-                      <option value="small">Small</option>
-                      <option value="medium">Medium</option>
-                      <option value="large">Large</option>
-                    </Select>
-                  </Field>
                 </div>
               </details>
 
@@ -526,45 +483,6 @@ export default function StoriesPage() {
         )}
       </div>
     </div>
-  );
-}
-
-function FontSelect({
-  label,
-  name,
-  defaultValue,
-}: {
-  label: string;
-  name: string;
-  defaultValue: string;
-}) {
-  return (
-    <Field label={label}>
-      <Select name={name} defaultValue={defaultValue}>
-        <option value="">Use theme default</option>
-        <optgroup label="Serif">
-          {SERIF_FONTS.map((f) => (
-            <option key={f.name} value={f.name}>
-              {f.name}
-            </option>
-          ))}
-        </optgroup>
-        <optgroup label="Sans-Serif">
-          {SANS_FONTS.map((f) => (
-            <option key={f.name} value={f.name}>
-              {f.name}
-            </option>
-          ))}
-        </optgroup>
-        <optgroup label="Display">
-          {DISPLAY_FONTS.map((f) => (
-            <option key={f.name} value={f.name}>
-              {f.name}
-            </option>
-          ))}
-        </optgroup>
-      </Select>
-    </Field>
   );
 }
 

@@ -28,4 +28,18 @@ export type FieldMapProps = {
   mapStyle?: MapStyle;
   siteTitle?: string;
   tagline?: string;
+  /**
+   * "interactive" (default) — full map with pin clicks, filter chips, scrubber, controls.
+   * "background" — inert faded/blurred map used behind a region overlay. No controls,
+   * no interactivity, no filter chips/scrubber/zoom/cursor readout.
+   */
+  mode?: "interactive" | "background";
+  /** Slug of the pin that should appear highlighted/accented in background mode. */
+  highlightSlug?: string;
+  /** Show the top-left brand block. Default false. */
+  showBrand?: boolean;
+  /** Show the centered tag filter chips. Default false. */
+  showFilters?: boolean;
+  /** Show the bottom dual-handle year scrubber. Default false. */
+  showYearScrubber?: boolean;
 };

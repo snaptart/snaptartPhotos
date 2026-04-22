@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { fontRole } from "@/lib/theme/role-style";
 import HallLightbox from "./HallLightbox";
 
@@ -37,6 +38,7 @@ export default function RoomView({
   backHref = "/",
   backLabel = "Back to map",
   returnLabel = "Return to map",
+  onBack,
 }: {
   galleryTitle: string;
   gallerySlug: string;
@@ -48,34 +50,131 @@ export default function RoomView({
   backHref?: string;
   backLabel?: string;
   returnLabel?: string;
+  onBack?: () => void;
 }) {
+  const router = useRouter();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [entered, setEntered] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [clientSeed, setClientSeed] = useState<string | null>(null);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
 
-  const walls = useMemo(() => {
-    const w: RoomPhoto[][] = [];
-    let cur: RoomPhoto[] = [];
-    photos.forEach((p, i) => {
-      cur.push(p);
-      const target = i % 6 < 3 ? 3 : 4;
-      if (cur.length === target) {
-        w.push(cur);
-        cur = [];
+  const accent = accentColor && /^#[0-9a-fA-F]{6}$/.test(accentColor) ? accentColor : "var(--ex-ink)";
+
+  useEffect(() => {
+    // Reshuffle positions on each page load, then fade in so the jump is invisible.
+    setClientSeed(Math.random().toString(36).slice(2));
+    const t = setTimeout(() => setEntered(true), 40);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Vertical wheel → horizontal scroll; keyboard arrows
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") el.scrollBy({ left: 400, behavior: "smooth" });
+      if (e.key === "ArrowLeft") el.scrollBy({ left: -400, behavior: "smooth" });
+      if (e.key === "Home") el.scrollTo({ left: 0, behavior: "smooth" });
+      if (e.key === "End") el.scrollTo({ left: el.scrollWidth, behavior: "smooth" });
+      if (e.key === "Escape" && lightboxIndex === null) {
+        if (onBack) onBack();
+        else router.push(backHref);
       }
-    });
-    if (cur.length) w.push(cur);
-    return w;
-  }, [photos]);
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    window.addEventListener("keydown", onKey);
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [backHref, router, lightboxIndex, onBack]);
+
+  // Scroll progress tracker
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const max = el.scrollWidth - el.clientWidth;
+      setProgress(max > 0 ? el.scrollLeft / max : 0);
+    };
+    el.addEventListener("scroll", onScroll);
+    onScroll();
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const firstChar = tagline ? tagline.charAt(0) : "";
+  const restChars = tagline ? tagline.slice(1) : "";
 
   return (
     <>
       <HallTokens />
 
-      <div style={{ position: "relative", background: "var(--ex-paper)", minHeight: "calc(100dvh - var(--hall-nav-offset, 80px))" }}>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: "var(--ex-paper)",
+          opacity: entered ? 1 : 0,
+          transform: entered ? "scale(1)" : "scale(1.04)",
+          transition: "opacity 480ms ease-out, transform 480ms ease-out",
+          overflow: "hidden",
+        }}
+      >
+        {/* ceiling band */}
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 80,
+            background:
+              "linear-gradient(to bottom, color-mix(in oklab, var(--ex-ink) 8%, transparent), transparent)",
+            pointerEvents: "none",
+            zIndex: 2,
+          }}
+        />
+        {/* floor band */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 110,
+            background:
+              "linear-gradient(to bottom, transparent, color-mix(in oklab, var(--ex-ink) 5%, transparent) 40%, color-mix(in oklab, var(--ex-ink) 12%, transparent))",
+            pointerEvents: "none",
+            zIndex: 1,
+          }}
+        />
+        {/* baseboard line */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: 108,
+            left: 0,
+            right: 0,
+            height: 1,
+            background: "var(--ex-ink-faint)",
+            pointerEvents: "none",
+            zIndex: 2,
+          }}
+        />
+
         {/* top bar */}
         <div
           style={{
-            position: "sticky",
+            position: "absolute",
             top: 0,
+            left: 0,
+            right: 0,
             zIndex: 10,
             background: "color-mix(in oklab, var(--ex-paper) 88%, transparent)",
             backdropFilter: "blur(8px)",
@@ -86,30 +185,61 @@ export default function RoomView({
             justifyContent: "space-between",
           }}
         >
-          <Link
-            href={backHref}
-            style={{
-              ...fontRole("labels"),
-              fontSize: 10,
-              color: "var(--ex-ink-soft)",
-              letterSpacing: 2,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              textDecoration: "none",
-            }}
-          >
-            <svg width="18" height="10" aria-hidden>
-              <path
-                d="M 1 5 L 16 5 M 6 1 L 1 5 L 6 9"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                fill="none"
-                strokeLinecap="round"
-              />
-            </svg>
-            {backLabel}
-          </Link>
+          {onBack ? (
+            <button
+              type="button"
+              onClick={onBack}
+              style={{
+                ...fontRole("labels"),
+                fontSize: 10,
+                color: "var(--ex-ink-soft)",
+                letterSpacing: 2,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                background: "transparent",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+              }}
+            >
+              <svg width="18" height="10" aria-hidden>
+                <path
+                  d="M 1 5 L 16 5 M 6 1 L 1 5 L 6 9"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  fill="none"
+                  strokeLinecap="round"
+                />
+              </svg>
+              {backLabel}
+            </button>
+          ) : (
+            <Link
+              href={backHref}
+              style={{
+                ...fontRole("labels"),
+                fontSize: 10,
+                color: "var(--ex-ink-soft)",
+                letterSpacing: 2,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                textDecoration: "none",
+              }}
+            >
+              <svg width="18" height="10" aria-hidden>
+                <path
+                  d="M 1 5 L 16 5 M 6 1 L 1 5 L 6 9"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  fill="none"
+                  strokeLinecap="round"
+                />
+              </svg>
+              {backLabel}
+            </Link>
+          )}
 
           <div style={{ textAlign: "center" }}>
             {numberingLabel && roomIndex !== undefined && (
@@ -148,112 +278,167 @@ export default function RoomView({
           </div>
         </div>
 
-        {/* wall-text */}
-        {tagline && (
-          <div style={{ maxWidth: 720, margin: "60px auto 40px", padding: "0 32px", textAlign: "center" }}>
+        {/* horizontal scroller — the long wall */}
+        <div
+          ref={scrollerRef}
+          style={{
+            position: "absolute",
+            top: 72,
+            bottom: 0,
+            left: 0,
+            right: 0,
+            overflowX: "auto",
+            overflowY: "hidden",
+            display: "flex",
+            alignItems: "stretch",
+            scrollBehavior: "auto",
+          }}
+        >
+          {/* wall-text placard with drop cap */}
+          {tagline && (
             <div
               style={{
-                ...fontRole("labels"),
-                fontSize: 9,
-                color: "var(--ex-ink-soft)",
-                letterSpacing: 3,
-                marginBottom: 12,
-              }}
-            >
-              — Wall text —
-            </div>
-            <div
-              style={{
-                ...fontRole("headings"),
-                fontSize: 20,
-                color: "var(--ex-ink)",
-                lineHeight: 1.5,
-              }}
-            >
-              {tagline}
-            </div>
-            <div style={{ width: 40, height: 1, background: "var(--ex-ink-soft)", margin: "20px auto" }} />
-          </div>
-        )}
-
-        {/* walls */}
-        <div style={{ maxWidth: 1240, margin: "0 auto", padding: "0 32px 80px" }}>
-          {walls.map((wall, wi) => (
-            <div
-              key={wi}
-              style={{
+                flex: "0 0 auto",
+                width: 520,
+                padding: "80px 48px 0",
                 display: "flex",
-                alignItems: "flex-end",
+                flexDirection: "column",
                 justifyContent: "center",
-                gap: 40,
-                marginBottom: 80,
-                minHeight: 360,
-                paddingBottom: 20,
-                borderBottom: "1px solid var(--ex-ink-faint)",
-                flexWrap: "wrap",
               }}
             >
-              {wall.map((p, pi) => {
-                const baseHeight = [300, 340, 280, 360, 310][pi % 5];
-                const offsetY = [0, 20, 40, 10, 30][(wi + pi) % 5];
-                const aspect = p.width && p.height ? p.width / p.height : 1.33;
-                const width = Math.min(baseHeight * aspect, 380);
-                const globalIndex = photos.indexOf(p);
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => setLightboxIndex(globalIndex)}
+              <div
+                style={{
+                  ...fontRole("labels"),
+                  fontSize: 9,
+                  color: "var(--ex-ink-soft)",
+                  letterSpacing: 3,
+                  marginBottom: 14,
+                }}
+              >
+                — Wall text —
+              </div>
+              <div
+                style={{
+                  ...fontRole("headings"),
+                  fontSize: 20,
+                  color: "var(--ex-ink)",
+                  lineHeight: 1.55,
+                }}
+              >
+                <span
+                  style={{
+                    ...fontRole("headings"),
+                    float: "left",
+                    fontSize: 68,
+                    lineHeight: 0.9,
+                    paddingRight: 10,
+                    paddingTop: 4,
+                    color: accent,
+                    fontStyle: "normal",
+                    fontWeight: 500,
+                  }}
+                >
+                  {firstChar}
+                </span>
+                <span style={{ fontStyle: "italic" }}>{restChars}</span>
+              </div>
+              <div style={{ width: 40, height: 1, background: "var(--ex-ink-soft)", margin: "26px 0 0" }} />
+              <div
+                style={{
+                  ...fontRole("labels"),
+                  fontSize: 9,
+                  color: "var(--ex-ink-soft)",
+                  letterSpacing: 2,
+                  marginTop: 20,
+                }}
+              >
+                {photos.length} works · scroll to walk the wall →
+              </div>
+            </div>
+          )}
+
+          {/* photos hung at varying heights */}
+          <div
+            style={{
+              flex: "0 0 auto",
+              display: "flex",
+              alignItems: "center",
+              gap: 0,
+              padding: "0 80px 0 24px",
+            }}
+          >
+            {photos.map((p, i) => {
+              const rnd = pseudoRandom(clientSeed ? `${clientSeed}-${i}` : p.id);
+              const imgHeight = Math.round(220 + rnd(0) * 160);
+              const offsetY = Math.round(-280 + rnd(1) * 560);
+              const rotation = -12 + rnd(2) * 24;
+              const marginLeft = i === 0 ? 0 : Math.round(20 + rnd(3) * 140);
+              const zIndex = Math.floor(rnd(4) * 20);
+              const aspect = p.width && p.height ? p.width / p.height : 1.33;
+              const imgWidth = Math.min(imgHeight * aspect, 380);
+              const frameSidePad = 12;
+              const frameTopPad = 12;
+              const frameBottomPad = 72;
+              const parsedLoc = parseMarkdownLink(p.location);
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setLightboxIndex(i)}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    padding: 0,
+                    display: "flex",
+                    cursor: "pointer",
+                    transform: `translateY(${offsetY}px) rotate(${rotation}deg)`,
+                    alignItems: "flex-start",
+                    flex: "0 0 auto",
+                    transformOrigin: "center center",
+                    transition: "transform 320ms ease-out, z-index 0s",
+                    marginLeft,
+                    zIndex,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.zIndex = "50";
+                    e.currentTarget.style.transform = `translateY(${offsetY - 8}px) rotate(${rotation * 0.4}deg) scale(1.04)`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.zIndex = String(zIndex);
+                    e.currentTarget.style.transform = `translateY(${offsetY}px) rotate(${rotation}deg)`;
+                  }}
+                >
+                  <div
                     style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 10,
-                      transform: `translateY(${offsetY}px)`,
-                      cursor: "pointer",
-                      background: "transparent",
-                      border: "none",
-                      padding: 0,
+                      width: imgWidth + frameSidePad * 2,
+                      paddingTop: frameTopPad,
+                      paddingLeft: frameSidePad,
+                      paddingRight: frameSidePad,
+                      paddingBottom: frameBottomPad,
+                      background: "#fff",
+                      boxShadow:
+                        "0 14px 30px rgba(30,25,20,0.14), 0 2px 4px rgba(30,25,20,0.08)",
+                      position: "relative",
                     }}
                   >
+                    <div style={{ position: "relative", width: imgWidth, height: imgHeight }}>
+                      <Image
+                        src={p.thumbnailUrl}
+                        alt={p.title ?? ""}
+                        fill
+                        sizes="(max-width: 768px) 60vw, 400px"
+                        style={{ objectFit: "cover" }}
+                      />
+                    </div>
                     <div
                       style={{
-                        width,
-                        height: baseHeight,
-                        padding: 10,
-                        background: "#fff",
-                        boxShadow:
-                          "0 14px 30px rgba(30,25,20,0.10), 0 2px 4px rgba(30,25,20,0.05)",
-                        transition: "transform 320ms ease-out, box-shadow 320ms",
-                        position: "relative",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = "translateY(-4px)";
-                        e.currentTarget.style.boxShadow =
-                          "0 22px 42px rgba(30,25,20,0.14), 0 3px 8px rgba(30,25,20,0.08)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = "";
-                        e.currentTarget.style.boxShadow =
-                          "0 14px 30px rgba(30,25,20,0.10), 0 2px 4px rgba(30,25,20,0.05)";
+                        position: "absolute",
+                        left: frameSidePad,
+                        right: frameSidePad,
+                        top: frameTopPad + imgHeight + 14,
+                        textAlign: "left",
                       }}
                     >
-                      <div style={{ position: "relative", width: "100%", height: "100%" }}>
-                        <Image
-                          src={p.thumbnailUrl}
-                          alt={p.title ?? ""}
-                          fill
-                          sizes="(max-width: 768px) 50vw, 400px"
-                          style={{ objectFit: "cover" }}
-                        />
-                      </div>
-                    </div>
-                    <div style={{ width, textAlign: "left", paddingLeft: 2 }}>
-                      <div
-                        style={{
-                          ...fontRole("headings"),
-                                    fontSize: 13,
-                          color: "var(--ex-ink)",
-                        }}
-                      >
+                      <div style={{ ...fontRole("headings"), fontSize: 13, color: "var(--ex-ink)" }}>
                         {p.title ?? "Untitled"}
                       </div>
                       {(p.location || p.createdAt) && (
@@ -263,48 +448,140 @@ export default function RoomView({
                             fontSize: 8,
                             color: "var(--ex-ink-soft)",
                             letterSpacing: 1,
-                            marginTop: 2,
+                            marginTop: 4,
                           }}
                         >
-                          {[p.location, formatYear(p.createdAt)].filter(Boolean).join(" · ")}
+                          {parsedLoc && (
+                            <a
+                              href={parsedLoc.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              style={{
+                                color: "inherit",
+                                textDecoration: "underline",
+                                textDecorationColor: "var(--ex-ink-faint)",
+                                textUnderlineOffset: 2,
+                              }}
+                            >
+                              {parsedLoc.label}
+                            </a>
+                          )}
+                          {!parsedLoc && p.location && <span>{p.location}</span>}
+                          {(parsedLoc || p.location) && formatYear(p.createdAt) && <span> · </span>}
+                          {formatYear(p.createdAt) && <span>{formatYear(p.createdAt)}</span>}
                         </div>
                       )}
                     </div>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </div>
+                  </div>
+                </button>
+              );
+            })}
 
-        <div
-          style={{
-            textAlign: "center",
-            padding: "0 32px 80px",
-            ...fontRole("headings"),
-            fontSize: 14,
-            color: "var(--ex-ink-soft)",
-          }}
-        >
-          — end of room —
-          <div style={{ marginTop: 10 }}>
-            <Link
-              href={backHref}
+            {/* end placard */}
+            <div
               style={{
-                display: "inline-block",
-                background: "transparent",
-                border: "1px solid var(--ex-ink)",
-                padding: "10px 24px",
-                ...fontRole("labels"),
-                fontSize: 10,
-                letterSpacing: 2,
-                color: "var(--ex-ink)",
-                textDecoration: "none",
+                flex: "0 0 auto",
+                width: 320,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-start",
+                justifyContent: "center",
+                padding: "0 20px",
               }}
             >
-              {returnLabel}
-            </Link>
+              <div
+                style={{
+                  ...fontRole("headings"),
+                  fontStyle: "italic",
+                  fontSize: 16,
+                  color: "var(--ex-ink-soft)",
+                  marginBottom: 14,
+                }}
+              >
+                — end of wall —
+              </div>
+              {onBack ? (
+                <button
+                  type="button"
+                  onClick={onBack}
+                  style={{
+                    display: "inline-block",
+                    background: "transparent",
+                    border: "1px solid var(--ex-ink)",
+                    padding: "10px 24px",
+                    ...fontRole("labels"),
+                    fontSize: 10,
+                    letterSpacing: 2,
+                    color: "var(--ex-ink)",
+                    cursor: "pointer",
+                  }}
+                >
+                  {returnLabel}
+                </button>
+              ) : (
+                <Link
+                  href={backHref}
+                  style={{
+                    display: "inline-block",
+                    background: "transparent",
+                    border: "1px solid var(--ex-ink)",
+                    padding: "10px 24px",
+                    ...fontRole("labels"),
+                    fontSize: 10,
+                    letterSpacing: 2,
+                    color: "var(--ex-ink)",
+                    textDecoration: "none",
+                  }}
+                >
+                  {returnLabel}
+                </Link>
+              )}
+            </div>
           </div>
+        </div>
+
+        {/* scroll progress indicator */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: 46,
+            left: 32,
+            right: 32,
+            height: 2,
+            background: "var(--ex-ink-faint)",
+            zIndex: 3,
+            pointerEvents: "none",
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              top: -3,
+              left: `${progress * 100}%`,
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: accent,
+              transform: "translateX(-50%)",
+              transition: "left 80ms linear",
+            }}
+          />
+        </div>
+        <div
+          style={{
+            position: "absolute",
+            bottom: 18,
+            left: 32,
+            ...fontRole("labels"),
+            fontSize: 9,
+            color: "var(--ex-ink-soft)",
+            letterSpacing: 2,
+            zIndex: 3,
+            pointerEvents: "none",
+          }}
+        >
+          scroll / ← → / shift+wheel · esc to exit
         </div>
       </div>
 
@@ -328,6 +605,32 @@ function formatYear(iso: string) {
   } catch {
     return "";
   }
+}
+
+function parseMarkdownLink(s: string | null): { label: string; url: string } | null {
+  if (!s) return null;
+  const m = s.match(/^\s*\[([^\]]+)\]\(([^)]+)\)\s*$/);
+  if (!m) return null;
+  return { label: m[1], url: m[2] };
+}
+
+// Deterministic 0..1 sequence keyed by a photo id, used so layout stays
+// stable across renders while still looking scattered.
+function pseudoRandom(seed: string) {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  let state = h >>> 0;
+  return (salt: number) => {
+    state ^= salt + 0x9e3779b9 + (state << 6) + (state >>> 2);
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 function HallTokens() {

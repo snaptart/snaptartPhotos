@@ -1,10 +1,13 @@
 import { db } from "@/lib/db";
-import { galleries, photos } from "@/lib/db/schema";
+import { galleries, photos, siteSettings } from "@/lib/db/schema";
 import { and, asc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import RoomView, { type RoomPhoto } from "@/components/public/hall/RoomView";
+import type { RoomPhoto } from "@/components/public/hall/RoomView";
 import siteConfig from "@/lib/site.config";
+import { getFieldMapData } from "@/lib/fieldmap/query";
+import RegionPageClient from "./RegionPageClient";
+import type { MapStyle } from "@/components/public/fieldmap/types";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -38,6 +41,9 @@ export default async function FieldMapRegionPage({ params }: Props) {
 
   if (!gallery) notFound();
 
+  const [settingsRow] = await db.select().from(siteSettings).limit(1);
+  const fieldMapData = await getFieldMapData();
+
   const rows = await db
     .select()
     .from(photos)
@@ -59,18 +65,28 @@ export default async function FieldMapRegionPage({ params }: Props) {
     createdAt: p.createdAt.toISOString(),
   }));
 
+  const rawStyle = settingsRow?.fieldMapStyle;
+  const mapStyle: MapStyle =
+    rawStyle === "mono" || rawStyle === "blueprint" ? rawStyle : "modern";
+
   return (
-    <div className="hall-ex fixed inset-0 z-40 overflow-auto bg-white">
-      <RoomView
+    <>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      />
+      <RegionPageClient
+        fieldMapData={fieldMapData}
+        mapStyle={mapStyle}
+        siteTitle={settingsRow?.siteTitle ?? siteConfig.siteName}
+        slug={gallery.slug}
         galleryTitle={gallery.title}
-        gallerySlug={gallery.slug}
         tagline={gallery.tagline ?? gallery.description ?? ""}
         accentColor={gallery.accentColor ?? null}
+        latitude={gallery.latitude}
+        longitude={gallery.longitude}
         photos={roomPhotos}
-        backHref="/"
-        backLabel="Back to map"
-        returnLabel="Return to map"
       />
-    </div>
+    </>
   );
 }

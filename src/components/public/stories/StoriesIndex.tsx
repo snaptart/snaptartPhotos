@@ -16,112 +16,151 @@ export type IndexStory = {
   isProtected: boolean;
 };
 
-export default function StoriesIndex({ stories }: { stories: IndexStory[] }) {
+export const STORIES_INDEX_DEFAULTS = {
+  volumeLabel: "Vol. I",
+  title: "Stories",
+  dek: "Short pieces. Fiction, flash, and essay.",
+} as const;
+
+type StoriesIndexProps = {
+  stories: IndexStory[];
+  volumeLabel?: string;
+  title?: string;
+  dek?: string;
+};
+
+export default function StoriesIndex({
+  stories,
+  volumeLabel = STORIES_INDEX_DEFAULTS.volumeLabel,
+  title = STORIES_INDEX_DEFAULTS.title,
+  dek = STORIES_INDEX_DEFAULTS.dek,
+}: StoriesIndexProps) {
+  return (
+    <div className="stories-ex">
+      <StoryTokens />
+      <StoriesIndexInner
+        stories={stories}
+        volumeLabel={volumeLabel}
+        title={title}
+        dek={dek}
+      />
+    </div>
+  );
+}
+
+function StoriesIndexInner({
+  stories,
+  volumeLabel,
+  title,
+  dek,
+}: {
+  stories: IndexStory[];
+  volumeLabel: string;
+  title: string;
+  dek: string;
+}) {
   const [hoverSlug, setHoverSlug] = useState<string | null>(null);
   const hovered = hoverSlug ? stories.find((s) => s.slug === hoverSlug) : null;
   const preview = hovered ?? stories[0] ?? null;
 
   return (
-    <div className="stories-ex">
-      <StoryTokens />
-      <div
-        className="grid"
-        style={{
-          gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-          minHeight: "calc(100dvh - var(--hall-nav-offset, 80px))",
-          background: "var(--st-paper)",
-          color: "var(--st-ink)",
-        }}
-      >
-        {/* LEFT — contents */}
-        <div style={{ padding: "80px 64px 120px", maxWidth: 720, margin: "0 auto", width: "100%" }}>
+    <div
+      className="grid"
+      style={{
+        gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+        minHeight: "calc(100dvh - var(--hall-nav-offset, 80px))",
+        background: "var(--st-paper)",
+        color: "var(--st-ink)",
+      }}
+    >
+      {/* LEFT — contents */}
+      <div style={{ padding: "80px 64px 120px", maxWidth: 720, margin: "0 auto", width: "100%" }}>
+        <div
+          style={{
+            ...fontRole("labels"),
+            fontSize: 10,
+            letterSpacing: 3,
+            color: "var(--st-ink-soft)",
+          }}
+        >
+          {volumeLabel}
+        </div>
+        <div
+          style={{
+            ...fontRole("headings"),
+            fontSize: 84,
+            lineHeight: 0.95,
+            marginTop: 18,
+            letterSpacing: -1.5,
+          }}
+        >
+          {title}
+        </div>
+        <div
+          style={{
+            ...fontRole("body"),
+            fontSize: 18,
+            color: "var(--st-ink-soft)",
+            marginTop: 20,
+            maxWidth: 480,
+            lineHeight: 1.45,
+          }}
+        >
+          {dek}
+        </div>
+        <div style={{ height: 1, width: 56, background: "var(--st-accent)", marginTop: 28 }} />
+
+        <div style={{ marginTop: 60 }}>
           <div
             style={{
               ...fontRole("labels"),
               fontSize: 10,
               letterSpacing: 3,
               color: "var(--st-ink-soft)",
+              marginBottom: 20,
             }}
           >
-            Vol. I
+            Contents
           </div>
-          <div
-            style={{
-              ...fontRole("headings"),
-              fontSize: 84,
-              lineHeight: 0.95,
-              marginTop: 18,
-              letterSpacing: -1.5,
-            }}
-          >
-            Stories
-          </div>
-          <div
-            style={{
-              ...fontRole("body"),
-              fontSize: 18,
-              color: "var(--st-ink-soft)",
-              marginTop: 20,
-              maxWidth: 480,
-              lineHeight: 1.45,
-            }}
-          >
-            Short pieces. Fiction, flash, and essay.
-          </div>
-          <div style={{ height: 1, width: 56, background: "var(--st-accent)", marginTop: 28 }} />
-
-          <div style={{ marginTop: 60 }}>
-            <div
+          {stories.length === 0 ? (
+            <p
               style={{
-                ...fontRole("labels"),
-                fontSize: 10,
-                letterSpacing: 3,
+                ...fontRole("headings"),
                 color: "var(--st-ink-soft)",
-                marginBottom: 20,
               }}
             >
-              Contents
-            </div>
-            {stories.length === 0 ? (
-              <p
-                style={{
-                  ...fontRole("headings"),
-                  color: "var(--st-ink-soft)",
-                }}
-              >
-                No stories yet.
-              </p>
-            ) : (
-              stories.map((s, i) => (
-                <TOCEntry
-                  key={s.slug}
-                  story={s}
-                  num={i + 1}
-                  onHover={() => setHoverSlug(s.slug)}
-                  onLeave={() => setHoverSlug(null)}
-                  active={hoverSlug === s.slug}
-                />
-              ))
-            )}
-          </div>
+              No stories yet.
+            </p>
+          ) : (
+            stories.map((s, i) => (
+              <TOCEntry
+                key={s.slug}
+                story={s}
+                num={i + 1}
+                onHover={() => setHoverSlug(s.slug)}
+                onLeave={() => setHoverSlug(null)}
+                active={hoverSlug === s.slug}
+              />
+            ))
+          )}
         </div>
+      </div>
 
-        {/* RIGHT — hovered frontispiece */}
-        <div
-          style={{
-            position: "sticky",
-            top: 0,
-            height: "calc(100dvh - var(--hall-nav-offset, 80px))",
-            overflow: "hidden",
-            background: "var(--st-paper-room)",
-            borderLeft: "1px solid var(--st-ink-faint)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <IndexPreview story={preview} active={!!hovered} />
-        </div>
+      {/* RIGHT — hovered frontispiece */}
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          height: "calc(100dvh - var(--hall-nav-offset, 80px))",
+          overflow: "hidden",
+          background: "var(--st-paper-room)",
+          borderLeft: "1px solid var(--st-ink-faint)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <IndexPreview story={preview} active={!!hovered} />
       </div>
     </div>
   );
@@ -342,7 +381,7 @@ function Dot() {
   );
 }
 
-function StoryTokens() {
+export function StoryTokens() {
   return (
     <style>{`
       .stories-ex {

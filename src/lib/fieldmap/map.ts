@@ -104,3 +104,25 @@ export function buildSpherePath(
 ): string | null {
   return geoPath(projection)({ type: "Sphere" }) ?? null;
 }
+
+/**
+ * Projects a lat/lng to screen coordinates assuming the map is fit to the
+ * given viewport using the same math as FieldMap.tsx (width - 60, height -
+ * 160, with a -20px vertical offset). Returns null if the projection fails
+ * or the viewport is empty.
+ */
+export function projectLatLngToScreen(
+  latitude: number,
+  longitude: number,
+  viewportWidth: number,
+  viewportHeight: number
+): { x: number; y: number } | null {
+  if (viewportWidth <= 0 || viewportHeight <= 0) return null;
+  const projection = createMollweideProjection();
+  const p = projection([longitude, latitude]);
+  if (!p) return null;
+  const s = Math.min((viewportWidth - 60) / MAP_W, (viewportHeight - 160) / MAP_H);
+  const offsetX = (viewportWidth - MAP_W * s) / 2;
+  const offsetY = (viewportHeight - MAP_H * s) / 2 - 20;
+  return { x: offsetX + p[0] * s, y: offsetY + p[1] * s };
+}

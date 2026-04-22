@@ -2,7 +2,13 @@ import { db } from "@/lib/db";
 import { pages } from "@/lib/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import type { Metadata } from "next";
-import StoriesIndex, { type IndexStory } from "@/components/public/stories/StoriesIndex";
+import type { Data } from "@puckeditor/core";
+import StoriesIndex, {
+  STORIES_INDEX_DEFAULTS,
+  type IndexStory,
+} from "@/components/public/stories/StoriesIndex";
+import PuckRenderer from "@/components/public/PuckRenderer";
+import { STORIES_INDEX_SLUG } from "@/lib/stories/constants";
 
 export const metadata: Metadata = {
   title: "Stories",
@@ -16,6 +22,15 @@ type StoryMeta = {
   wordCount?: number;
   frontispieceUrl?: string;
 };
+
+function isPuckData(content: unknown): content is Data {
+  return (
+    typeof content === "object" &&
+    content !== null &&
+    "root" in content &&
+    "content" in content
+  );
+}
 
 export default async function StoriesIndexPage() {
   const rows = await db
@@ -48,5 +63,21 @@ export default async function StoriesIndexPage() {
     };
   });
 
-  return <StoriesIndex stories={stories} />;
+  const [indexDoc] = await db
+    .select({ content: pages.content })
+    .from(pages)
+    .where(eq(pages.slug, STORIES_INDEX_SLUG));
+
+  if (indexDoc && isPuckData(indexDoc.content)) {
+    return <PuckRenderer data={indexDoc.content} storiesIndex={stories} />;
+  }
+
+  return (
+    <StoriesIndex
+      stories={stories}
+      volumeLabel={STORIES_INDEX_DEFAULTS.volumeLabel}
+      title={STORIES_INDEX_DEFAULTS.title}
+      dek={STORIES_INDEX_DEFAULTS.dek}
+    />
+  );
 }

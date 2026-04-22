@@ -204,6 +204,10 @@ export default function NavigationSettingsPage() {
   }
 
   function handleTargetTypeChange(targetType: string) {
+    if (targetType === "stories") {
+      setForm({ label: "Stories", url: "/stories", targetType, targetId: null });
+      return;
+    }
     setForm({ label: "", url: "", targetType, targetId: null });
   }
 
@@ -367,6 +371,7 @@ export default function NavigationSettingsPage() {
                     <option value="gallery">
                       {siteConfig.labels.gallery}
                     </option>
+                    <option value="stories">Stories</option>
                     <option value="external">External link</option>
                   </Select>
                 </Field>
