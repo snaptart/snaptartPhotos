@@ -31,6 +31,8 @@ interface Gallery {
   description: string | null;
   tagline: string | null;
   accentColor: string | null;
+  latitude: number | null;
+  longitude: number | null;
   previewPhotoIds: string[] | null;
   coverImageUrl: string | null;
   parentId: string | null;
@@ -113,6 +115,8 @@ export default function GalleriesPage() {
         description: form.get("description") || null,
         tagline: form.get("tagline") || null,
         accentColor: accentColor || null,
+        latitude: parseNullableFloat(form.get("latitude")),
+        longitude: parseNullableFloat(form.get("longitude")),
         isPublished: form.get("isPublished") === "on",
         position: galleries.length,
       }),
@@ -138,6 +142,8 @@ export default function GalleriesPage() {
         description: form.get("description") || null,
         tagline: form.get("tagline") || null,
         accentColor: accentColor || null,
+        latitude: parseNullableFloat(form.get("latitude")),
+        longitude: parseNullableFloat(form.get("longitude")),
         previewPhotoIds: previewIds.length > 0 ? previewIds : null,
         isPublished: form.get("isPublished") === "on",
       }),
@@ -254,7 +260,7 @@ export default function GalleriesPage() {
                   rows={2}
                 />
               </Field>
-              <Field label="Tagline" htmlFor="g-tagline" hint="Shown as wall text inside the Hall room view">
+              <Field label="Tagline" htmlFor="g-tagline" hint="Shown as the flavor line on Field Map pins and region view">
                 <Textarea
                   id="g-tagline"
                   name="tagline"
@@ -299,6 +305,30 @@ export default function GalleriesPage() {
                       Clear
                     </button>
                   )}
+                </div>
+              </Field>
+              <Field label="Field Map position" htmlFor="g-latitude" hint="Decimal degrees. Pins the gallery to the world map.">
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    id="g-latitude"
+                    name="latitude"
+                    type="number"
+                    step="any"
+                    min={-90}
+                    max={90}
+                    defaultValue={editingGallery?.latitude ?? ""}
+                    placeholder="Latitude (e.g. 48.8566)"
+                  />
+                  <Input
+                    id="g-longitude"
+                    name="longitude"
+                    type="number"
+                    step="any"
+                    min={-180}
+                    max={180}
+                    defaultValue={editingGallery?.longitude ?? ""}
+                    placeholder="Longitude (e.g. 2.3522)"
+                  />
                 </div>
               </Field>
               {editingId && (
@@ -589,4 +619,12 @@ function PreviewPicker({
       )}
     </div>
   );
+}
+
+function parseNullableFloat(v: FormDataEntryValue | null): number | null {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (s === "") return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
 }

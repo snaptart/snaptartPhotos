@@ -32,14 +32,22 @@ export default function RoomView({
   tagline,
   accentColor,
   roomIndex,
+  numberingLabel,
   photos,
+  backHref = "/",
+  backLabel = "Back to map",
+  returnLabel = "Return to map",
 }: {
   galleryTitle: string;
   gallerySlug: string;
   tagline: string;
   accentColor: string | null;
-  roomIndex: number;
+  roomIndex?: number;
+  numberingLabel?: string;
   photos: RoomPhoto[];
+  backHref?: string;
+  backLabel?: string;
+  returnLabel?: string;
 }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
@@ -79,7 +87,7 @@ export default function RoomView({
           }}
         >
           <Link
-            href="/hall"
+            href={backHref}
             style={{
               ...fontRole("labels"),
               fontSize: 10,
@@ -100,20 +108,22 @@ export default function RoomView({
                 strokeLinecap="round"
               />
             </svg>
-            Back to plan
+            {backLabel}
           </Link>
 
           <div style={{ textAlign: "center" }}>
-            <div
-              style={{
-                ...fontRole("labels"),
-                fontSize: 9,
-                color: "var(--ex-ink-soft)",
-                letterSpacing: 2,
-              }}
-            >
-              Room · {String(roomIndex + 1).padStart(2, "0")}
-            </div>
+            {numberingLabel && roomIndex !== undefined && (
+              <div
+                style={{
+                  ...fontRole("labels"),
+                  fontSize: 9,
+                  color: "var(--ex-ink-soft)",
+                  letterSpacing: 2,
+                }}
+              >
+                {numberingLabel} · {String(roomIndex + 1).padStart(2, "0")}
+              </div>
+            )}
             <div
               style={{
                 ...fontRole("headings"),
@@ -279,7 +289,7 @@ export default function RoomView({
           — end of room —
           <div style={{ marginTop: 10 }}>
             <Link
-              href="/hall"
+              href={backHref}
               style={{
                 display: "inline-block",
                 background: "transparent",
@@ -292,7 +302,7 @@ export default function RoomView({
                 textDecoration: "none",
               }}
             >
-              Return to floor plan
+              {returnLabel}
             </Link>
           </div>
         </div>

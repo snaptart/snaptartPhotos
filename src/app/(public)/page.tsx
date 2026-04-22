@@ -12,6 +12,8 @@ import type { Data } from "@puckeditor/core";
 import type { EmbedPhoto, GlobalLightboxSettings } from "@/lib/puck/config";
 import siteConfig from "@/lib/site.config";
 import { fontRole } from "@/lib/theme/role-style";
+import FieldMap from "@/components/public/fieldmap/FieldMap";
+import { getFieldMapData } from "@/lib/fieldmap/query";
 
 const tiptapExtensions = [
   StarterKit,
@@ -32,6 +34,26 @@ function isPuckData(content: unknown): content is Data {
 
 export default async function HomePage() {
   const [settingsRow] = await db.select().from(siteSettings).limit(1);
+
+  if (settingsRow?.homepageType === "field_map") {
+    const data = await getFieldMapData();
+    return (
+      <>
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+        />
+        <div className="fixed inset-0 z-40 bg-white">
+          <FieldMap
+            regions={data.regions}
+            yearBounds={data.yearBounds}
+            filters={data.filters}
+            siteTitle={settingsRow?.siteTitle ?? siteConfig.siteName}
+          />
+        </div>
+      </>
+    );
+  }
 
   if (!settingsRow?.homepageId) {
     return (

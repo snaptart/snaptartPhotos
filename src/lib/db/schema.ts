@@ -97,6 +97,8 @@ export const galleries = pgTable("galleries", {
   description: text("description"),
   tagline: text("tagline"),
   accentColor: text("accent_color"),
+  latitude: real("latitude"),
+  longitude: real("longitude"),
   floorX: real("floor_x"),
   floorY: real("floor_y"),
   floorW: real("floor_w"),
