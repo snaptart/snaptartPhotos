@@ -37,6 +37,9 @@ export default async function HomePage() {
 
   if (settingsRow?.homepageType === "field_map") {
     const data = await getFieldMapData();
+    const rawStyle = settingsRow?.fieldMapStyle;
+    const mapStyle: "modern" | "mono" | "blueprint" =
+      rawStyle === "mono" || rawStyle === "blueprint" ? rawStyle : "modern";
     return (
       <>
         <link
@@ -48,6 +51,7 @@ export default async function HomePage() {
             regions={data.regions}
             yearBounds={data.yearBounds}
             filters={data.filters}
+            mapStyle={mapStyle}
             siteTitle={settingsRow?.siteTitle ?? siteConfig.siteName}
           />
         </div>

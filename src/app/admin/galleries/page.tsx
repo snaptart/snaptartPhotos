@@ -8,7 +8,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { ArrowLeft, ArrowRight, LayoutGrid, Plus, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, MapPin, Plus, X } from "lucide-react";
 import { SortableItem } from "@/components/admin/SortableItem";
 import { useSortableList } from "@/lib/hooks/useSortableList";
 import { useMessage } from "@/lib/hooks/useMessage";
@@ -195,7 +195,7 @@ export default function GalleriesPage() {
               href="/admin/galleries/layout"
               className="inline-flex items-center gap-1.5 text-[12px] font-mono uppercase tracking-[1.5px] text-admin-ink-soft hover:text-admin-ink"
             >
-              <LayoutGrid className="h-3.5 w-3.5" /> Floor plan
+              <MapPin className="h-3.5 w-3.5" /> Field Map
             </Link>
             <Button
               kind="primary"

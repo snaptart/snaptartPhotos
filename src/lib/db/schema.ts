@@ -30,6 +30,7 @@ export const siteSettings = pgTable("site_settings", {
   contactEmail: text("contact_email"),
   homepageId: uuid("homepage_id"),
   homepageType: text("homepage_type").notNull().default("page"), // "page" | "field_map"
+  fieldMapStyle: text("field_map_style").notNull().default("modern"), // "modern" | "mono" | "blueprint"
   // Global lightbox defaults
   lightboxMetadataFields: text("lightbox_metadata_fields").array().default(["title", "description"]),
   lightboxCornerRadius: integer("lightbox_corner_radius").default(0),

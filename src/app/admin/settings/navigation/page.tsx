@@ -51,8 +51,11 @@ interface FooterDraft {
   footerText: string;
 }
 
+type FieldMapStyle = "modern" | "mono" | "blueprint";
+
 interface HomepageDraft {
   homepageType: "page" | "field_map";
+  fieldMapStyle: FieldMapStyle;
 }
 
 const emptyForm: FormState = {
@@ -62,11 +65,18 @@ const emptyForm: FormState = {
   targetId: null,
 };
 
+function isFieldMapStyle(v: unknown): v is FieldMapStyle {
+  return v === "modern" || v === "mono" || v === "blueprint";
+}
+
 export default function NavigationSettingsPage() {
   const [loaded, setLoaded] = useState(false);
 
   // Homepage behaviour
-  const [homepage, setHomepage] = useState<HomepageDraft>({ homepageType: "page" });
+  const [homepage, setHomepage] = useState<HomepageDraft>({
+    homepageType: "page",
+    fieldMapStyle: "modern",
+  });
   const [savingHomepage, setSavingHomepage] = useState(false);
   const {
     message: hpMsg,
@@ -127,6 +137,7 @@ export default function NavigationSettingsPage() {
       });
       setHomepage({
         homepageType: settings.homepageType === "field_map" ? "field_map" : "page",
+        fieldMapStyle: isFieldMapStyle(settings.fieldMapStyle) ? settings.fieldMapStyle : "modern",
       });
     }
     setItems(items);
@@ -147,7 +158,10 @@ export default function NavigationSettingsPage() {
     const res = await fetch("/api/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ homepageType: homepage.homepageType }),
+      body: JSON.stringify({
+        homepageType: homepage.homepageType,
+        fieldMapStyle: homepage.fieldMapStyle,
+      }),
     });
     if (res.ok) hpOK("Homepage saved.");
     else hpBad("Failed to save homepage.");
@@ -275,15 +289,34 @@ export default function NavigationSettingsPage() {
               id="homepageType"
               value={homepage.homepageType}
               onChange={(e) =>
-                setHomepage({
+                setHomepage((h) => ({
+                  ...h,
                   homepageType: e.target.value === "field_map" ? "field_map" : "page",
-                })
+                }))
               }
             >
               <option value="page">A page (default — uses your selected homepage)</option>
               <option value="field_map">The Field Map</option>
             </Select>
           </Field>
+          {homepage.homepageType === "field_map" && (
+            <Field label="Map style" htmlFor="fieldMapStyle" inline hint="Colors and mood of the world map.">
+              <Select
+                id="fieldMapStyle"
+                value={homepage.fieldMapStyle}
+                onChange={(e) =>
+                  setHomepage((h) => ({
+                    ...h,
+                    fieldMapStyle: isFieldMapStyle(e.target.value) ? e.target.value : "modern",
+                  }))
+                }
+              >
+                <option value="modern">Modern — white, soft beige land, pale blue ocean</option>
+                <option value="mono">Mono — greyscale, quiet</option>
+                <option value="blueprint">Blueprint — dark navy, cobalt accents</option>
+              </Select>
+            </Field>
+          )}
         </SettingGroup>
         <div className="flex justify-end mb-4">
           <Button type="submit" kind="primary" disabled={savingHomepage}>
