@@ -19,6 +19,7 @@ type RegionPageClientProps = {
   latitude: number | null;
   longitude: number | null;
   photos: RoomPhoto[];
+  captionFields?: readonly string[];
 };
 
 const ANIM_MS = 900;
@@ -59,6 +60,7 @@ export default function RegionPageClient({
   latitude,
   longitude,
   photos,
+  captionFields,
 }: RegionPageClientProps) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -188,6 +190,7 @@ export default function RegionPageClient({
           tagline={tagline}
           accentColor={accentColor}
           photos={photos}
+          captionFields={captionFields}
           backHref="/"
           backLabel="Back to map"
           returnLabel="Return to map"

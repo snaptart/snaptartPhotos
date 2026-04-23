@@ -14,6 +14,10 @@ import { useSortableList } from "@/lib/hooks/useSortableList";
 import { useMessage } from "@/lib/hooks/useMessage";
 import siteConfig from "@/lib/site.config";
 import {
+  DEFAULT_ROOM_CAPTION_FIELDS,
+  ROOM_CAPTION_FIELD_OPTIONS,
+} from "@/components/public/hall/RoomView";
+import {
   Button,
   Card,
   Field,
@@ -34,6 +38,7 @@ interface Gallery {
   latitude: number | null;
   longitude: number | null;
   previewPhotoIds: string[] | null;
+  roomCaptionFields: string[] | null;
   coverImageUrl: string | null;
   parentId: string | null;
   position: number;
@@ -61,6 +66,7 @@ export default function GalleriesPage() {
   const [pickerPhotos, setPickerPhotos] = useState<PickerPhoto[]>([]);
   const [previewIds, setPreviewIds] = useState<string[]>([]);
   const [accentColor, setAccentColor] = useState<string>("");
+  const [captionFields, setCaptionFields] = useState<string[]>([...DEFAULT_ROOM_CAPTION_FIELDS]);
   const { message, showSuccess, showError, alertClass } = useMessage();
 
   const { sensors, handleDragEnd } = useSortableList({
@@ -73,7 +79,7 @@ export default function GalleriesPage() {
   const fetchGalleries = useCallback(async () => {
     const res = await fetch("/api/galleries");
     const data = await res.json();
-    setGalleries(data);
+    setGalleries(Array.isArray(data) ? data : []);
     setLoading(false);
   }, []);
 
@@ -86,12 +92,14 @@ export default function GalleriesPage() {
       setPickerPhotos([]);
       setPreviewIds([]);
       setAccentColor("");
+      setCaptionFields([...DEFAULT_ROOM_CAPTION_FIELDS]);
       return;
     }
     const gallery = galleries.find((g) => g.id === editingId);
     if (!gallery) return;
     setPreviewIds(gallery.previewPhotoIds ?? []);
     setAccentColor(gallery.accentColor ?? "");
+    setCaptionFields(gallery.roomCaptionFields ?? [...DEFAULT_ROOM_CAPTION_FIELDS]);
     let cancelled = false;
     (async () => {
       const res = await fetch(`/api/photos?galleryId=${editingId}`);
@@ -117,6 +125,7 @@ export default function GalleriesPage() {
         accentColor: accentColor || null,
         latitude: parseNullableFloat(form.get("latitude")),
         longitude: parseNullableFloat(form.get("longitude")),
+        roomCaptionFields: captionFields,
         isPublished: form.get("isPublished") === "on",
         position: galleries.length,
       }),
@@ -145,6 +154,7 @@ export default function GalleriesPage() {
         latitude: parseNullableFloat(form.get("latitude")),
         longitude: parseNullableFloat(form.get("longitude")),
         previewPhotoIds: previewIds.length > 0 ? previewIds : null,
+        roomCaptionFields: captionFields,
         isPublished: form.get("isPublished") === "on",
       }),
     });
@@ -329,6 +339,30 @@ export default function GalleriesPage() {
                     defaultValue={editingGallery?.longitude ?? ""}
                     placeholder="Longitude (e.g. 2.3522)"
                   />
+                </div>
+              </Field>
+              <Field label="Room caption fields" htmlFor="g-caption-fields" hint="What appears below each framed photo in the room view.">
+                <div id="g-caption-fields" className="flex flex-col gap-1.5">
+                  {ROOM_CAPTION_FIELD_OPTIONS.map((opt) => (
+                    <label
+                      key={opt.key}
+                      className="flex items-center gap-2 text-[13px] text-admin-ink cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={captionFields.includes(opt.key)}
+                        onChange={(e) => {
+                          setCaptionFields((prev) =>
+                            e.target.checked
+                              ? [...prev, opt.key]
+                              : prev.filter((k) => k !== opt.key),
+                          );
+                        }}
+                        className="accent-admin-accent"
+                      />
+                      {opt.label}
+                    </label>
+                  ))}
                 </div>
               </Field>
               {editingId && (

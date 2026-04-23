@@ -3,7 +3,7 @@ import { galleries, photos, siteSettings } from "@/lib/db/schema";
 import { and, asc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import type { RoomPhoto } from "@/components/public/hall/RoomView";
+import { DEFAULT_ROOM_CAPTION_FIELDS, type RoomPhoto } from "@/components/public/hall/RoomView";
 import siteConfig from "@/lib/site.config";
 import { getFieldMapData } from "@/lib/fieldmap/query";
 import RegionPageClient from "./RegionPageClient";
@@ -87,6 +87,7 @@ export default async function FieldMapRegionPage({ params }: Props) {
         latitude={gallery.latitude}
         longitude={gallery.longitude}
         photos={roomPhotos}
+        captionFields={gallery.roomCaptionFields ?? DEFAULT_ROOM_CAPTION_FIELDS}
       />
     </>
   );

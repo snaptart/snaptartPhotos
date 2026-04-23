@@ -105,6 +105,7 @@ export const galleries = pgTable("galleries", {
   floorW: real("floor_w"),
   floorH: real("floor_h"),
   previewPhotoIds: text("preview_photo_ids").array(),
+  roomCaptionFields: text("room_caption_fields").array(),
   coverImageUrl: text("cover_image_url"),
   parentId: uuid("parent_id"),
   position: integer("position").notNull().default(0),

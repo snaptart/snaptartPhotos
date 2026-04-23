@@ -7,6 +7,18 @@ import { useRouter } from "next/navigation";
 import { fontRole } from "@/lib/theme/role-style";
 import HallLightbox from "./HallLightbox";
 
+export const ROOM_CAPTION_FIELD_OPTIONS = [
+  { key: "title", label: "Title" },
+  { key: "description", label: "Description" },
+  { key: "location", label: "Location" },
+  { key: "year", label: "Year" },
+  { key: "camera", label: "Camera settings" },
+] as const;
+
+export type RoomCaptionField = (typeof ROOM_CAPTION_FIELD_OPTIONS)[number]["key"];
+
+export const DEFAULT_ROOM_CAPTION_FIELDS: RoomCaptionField[] = ["title", "location", "year"];
+
 export type RoomPhoto = {
   id: string;
   url: string;
@@ -36,6 +48,7 @@ export default function RoomView({
   roomIndex,
   numberingLabel,
   photos,
+  captionFields = DEFAULT_ROOM_CAPTION_FIELDS,
   backHref = "/",
   backLabel = "Back to map",
   returnLabel = "Return to map",
@@ -48,6 +61,7 @@ export default function RoomView({
   roomIndex?: number;
   numberingLabel?: string;
   photos: RoomPhoto[];
+  captionFields?: readonly string[];
   backHref?: string;
   backLabel?: string;
   returnLabel?: string;
@@ -505,40 +519,77 @@ export default function RoomView({
                         textAlign: "left",
                       }}
                     >
-                      <div style={{ ...fontRole("headings"), fontSize: 13, color: "var(--ex-ink)" }}>
-                        {p.title ?? "Untitled"}
-                      </div>
-                      {(p.location || p.takenAt || p.createdAt) && (
-                        <div
-                          style={{
-                            ...fontRole("labels"),
-                            fontSize: 8,
-                            color: "var(--ex-ink-soft)",
-                            letterSpacing: 1,
-                            marginTop: 4,
-                          }}
-                        >
-                          {parsedLoc && (
-                            <a
-                              href={parsedLoc.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              style={{
-                                color: "inherit",
-                                textDecoration: "underline",
-                                textDecorationColor: "var(--ex-ink-faint)",
-                                textUnderlineOffset: 2,
-                              }}
-                            >
-                              {parsedLoc.label}
-                            </a>
-                          )}
-                          {!parsedLoc && p.location && <span>{p.location}</span>}
-                          {(parsedLoc || p.location) && formatYear(p.takenAt ?? p.createdAt) && <span> · </span>}
-                          {formatYear(p.takenAt ?? p.createdAt) && <span>{formatYear(p.takenAt ?? p.createdAt)}</span>}
+                      {captionFields.includes("title") && (
+                        <div style={{ ...fontRole("headings"), fontSize: 13, color: "var(--ex-ink)" }}>
+                          {p.title ?? "Untitled"}
                         </div>
                       )}
+                      {captionFields.includes("description") && p.description && (
+                        <div
+                          style={{
+                            ...fontRole("body"),
+                            fontSize: 11,
+                            color: "var(--ex-ink-soft)",
+                            marginTop: captionFields.includes("title") ? 4 : 0,
+                            lineHeight: 1.4,
+                          }}
+                        >
+                          {p.description}
+                        </div>
+                      )}
+                      {(() => {
+                        const parts: React.ReactNode[] = [];
+                        if (captionFields.includes("location")) {
+                          if (parsedLoc) {
+                            parts.push(
+                              <a
+                                key="location"
+                                href={parsedLoc.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                style={{
+                                  color: "inherit",
+                                  textDecoration: "underline",
+                                  textDecorationColor: "var(--ex-ink-faint)",
+                                  textUnderlineOffset: 2,
+                                }}
+                              >
+                                {parsedLoc.label}
+                              </a>,
+                            );
+                          } else if (p.location) {
+                            parts.push(<span key="location">{p.location}</span>);
+                          }
+                        }
+                        if (captionFields.includes("year")) {
+                          const year = formatYear(p.takenAt ?? p.createdAt);
+                          if (year) parts.push(<span key="year">{year}</span>);
+                        }
+                        if (captionFields.includes("camera")) {
+                          const cam = formatCamera(p.cameraSettings);
+                          if (cam) parts.push(<span key="camera">{cam}</span>);
+                        }
+                        if (parts.length === 0) return null;
+                        return (
+                          <div
+                            style={{
+                              ...fontRole("labels"),
+                              fontSize: 8,
+                              color: "var(--ex-ink-soft)",
+                              letterSpacing: 1,
+                              marginTop: 4,
+                            }}
+                          >
+                            {parts.map((node, idx) => (
+                              <span key={idx}>
+                                {idx > 0 && <span> · </span>}
+                                {node}
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 </button>
@@ -678,6 +729,17 @@ function formatYear(iso: string) {
   } catch {
     return "";
   }
+}
+
+function formatCamera(cs: RoomPhoto["cameraSettings"]): string {
+  if (!cs) return "";
+  const parts: string[] = [];
+  if (cs.camera) parts.push(cs.camera);
+  if (cs.lens) parts.push(cs.lens);
+  if (cs.iso != null && cs.iso !== "") parts.push(`ISO ${cs.iso}`);
+  if (cs.aperture) parts.push(cs.aperture);
+  if (cs.shutter) parts.push(cs.shutter);
+  return parts.join(" · ");
 }
 
 function parseMarkdownLink(s: string | null): { label: string; url: string } | null {
