@@ -134,6 +134,7 @@ export const photos = pgTable("photos", {
   focalX: real("focal_x").notNull().default(50),
   focalY: real("focal_y").notNull().default(50),
   position: integer("position").notNull().default(0),
+  takenAt: timestamp("taken_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

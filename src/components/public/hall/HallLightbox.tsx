@@ -1,8 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { Maximize2, PanelRightClose, PanelRightOpen, X } from "lucide-react";
 import { fontRole } from "@/lib/theme/role-style";
 import type { RoomPhoto } from "./RoomView";
+
+type LightboxMode = "normal" | "focused" | "immersive";
+const MODE_STORAGE_KEY = "snaptart-lightbox-mode";
 
 export default function HallLightbox({
   galleryTitle,
@@ -30,6 +35,42 @@ export default function HallLightbox({
   const photo = photos[displayIndex];
   const outgoingPhoto = outgoingIndex !== null ? photos[outgoingIndex] : null;
   const incomingOpacity = outgoingIndex === null || crossfading ? 1 : 0;
+
+  const [mode, setMode] = useState<LightboxMode>(() => {
+    if (typeof window === "undefined") return "normal";
+    try {
+      const saved = sessionStorage.getItem(MODE_STORAGE_KEY);
+      if (saved === "focused") return "focused";
+    } catch {}
+    return "normal";
+  });
+  const drawerVisible = mode === "normal";
+  const chromeVisible = mode !== "immersive";
+  const frameVisible = mode !== "immersive";
+
+  // Remember the last non-immersive mode so exiting fullscreen restores
+  // the user's drawer preference (normal vs focused) instead of defaulting.
+  const lastNonImmersiveModeRef = useRef<LightboxMode>(
+    mode === "immersive" ? "normal" : mode,
+  );
+
+  // Persist drawer preference only (not immersive, which is transient)
+  useEffect(() => {
+    if (mode === "immersive") return;
+    lastNonImmersiveModeRef.current = mode;
+    try {
+      sessionStorage.setItem(MODE_STORAGE_KEY, mode);
+    } catch {}
+  }, [mode]);
+
+  const toggleDrawer = useCallback(() => {
+    setMode((m) => (m === "normal" ? "focused" : "normal"));
+  }, []);
+  const toggleImmersive = useCallback(() => {
+    setMode((m) =>
+      m === "immersive" ? lastNonImmersiveModeRef.current : "immersive",
+    );
+  }, []);
 
   const go = useCallback(
     (delta: number) => {
@@ -79,19 +120,31 @@ export default function HallLightbox({
     setTimeout(onClose, 300);
   }, [onClose]);
 
+  const stepBack = useCallback(() => {
+    setMode((m) => {
+      if (m === "immersive") return lastNonImmersiveModeRef.current;
+      if (m === "focused") return "normal";
+      // Already at "normal" — escape closes the lightbox
+      handleClose();
+      return m;
+    });
+  }, [handleClose]);
+
   useEffect(() => {
     requestAnimationFrame(() => setShown(true));
   }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handleClose();
-      if (e.key === "ArrowRight") go(1);
-      if (e.key === "ArrowLeft") go(-1);
+      if (e.key === "Escape") stepBack();
+      else if (e.key === "ArrowRight") go(1);
+      else if (e.key === "ArrowLeft") go(-1);
+      else if (e.key === "i" || e.key === "I") toggleDrawer();
+      else if (e.key === "f" || e.key === "F") toggleImmersive();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [go, handleClose]);
+  }, [go, stepBack, toggleDrawer, toggleImmersive]);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -124,7 +177,7 @@ export default function HallLightbox({
         .join(" · ")
     : "";
 
-  return (
+  const content = (
     <div
       className="hall-ex"
       style={{
@@ -136,44 +189,72 @@ export default function HallLightbox({
         transition: "background 320ms ease-out, backdrop-filter 320ms",
       }}
     >
-      <button
-        onClick={handleClose}
-        aria-label="Close"
-        style={{
-          position: "absolute",
-          top: 24,
-          right: 24,
-          zIndex: 5,
-          width: 40,
-          height: 40,
-          borderRadius: "50%",
-          border: "1px solid rgba(255,255,255,0.35)",
-          background: "rgba(255,255,255,0.08)",
-          cursor: "pointer",
-          color: "#fff",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 18,
-          fontFamily: "serif",
-        }}
-      >
-        ×
-      </button>
+      {!chromeVisible && (
+        <button
+          onClick={stepBack}
+          aria-label="Exit fullscreen (Esc)"
+          title="Exit fullscreen (Esc)"
+          style={{
+            position: "absolute",
+            top: 16,
+            right: 16,
+            zIndex: 5,
+            width: 28,
+            height: 28,
+            borderRadius: "50%",
+            border: "1px solid rgba(255,255,255,0.2)",
+            background: "rgba(255,255,255,0.05)",
+            color: "rgba(255,255,255,0.6)",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <X size={14} />
+        </button>
+      )}
+      {chromeVisible && (
+        <div
+          style={{
+            position: "absolute",
+            top: 24,
+            right: 24,
+            zIndex: 5,
+            display: "flex",
+            gap: 8,
+          }}
+        >
+          <ChromeButton
+            onClick={toggleDrawer}
+            label={drawerVisible ? "Hide info panel (I)" : "Show info panel (I)"}
+          >
+            {drawerVisible ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+          </ChromeButton>
+          <ChromeButton onClick={toggleImmersive} label="Fullscreen (F)">
+            <Maximize2 size={16} />
+          </ChromeButton>
+          <ChromeButton onClick={handleClose} label="Close (Esc)">
+            <X size={16} />
+          </ChromeButton>
+        </div>
+      )}
 
       <div
         style={{
           position: "absolute",
-          top: 72,
-          bottom: 100,
+          top: mode === "immersive" ? 0 : 72,
+          bottom: mode === "immersive" ? 0 : 100,
           left: 0,
           right: 0,
           display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) 360px",
+          gridTemplateColumns: drawerVisible
+            ? "minmax(0, 1fr) 360px"
+            : "minmax(0, 1fr)",
           gridTemplateRows: "minmax(0, 1fr)",
           opacity: shown ? 1 : 0,
           transition: "opacity 400ms 100ms",
-          padding: 32,
+          padding: mode === "immersive" ? 0 : 32,
           minHeight: 0,
         }}
       >
@@ -183,7 +264,7 @@ export default function HallLightbox({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            padding: "20px 70px",
+            padding: mode === "immersive" ? 0 : "20px 70px",
             position: "relative",
             transform: shown ? "scale(1)" : "scale(0.94)",
             transition: "transform 400ms cubic-bezier(.2,.9,.3,1.1)",
@@ -195,8 +276,13 @@ export default function HallLightbox({
           <div
             style={{
               position: "relative",
-              width: "calc(100vw - 564px)",
-              height: "calc(100vh - 276px)",
+              width:
+                mode === "normal"
+                  ? "calc(100vw - 564px)"
+                  : mode === "focused"
+                    ? "calc(100vw - 204px)"
+                    : "100vw",
+              height: mode === "immersive" ? "100vh" : "calc(100vh - 276px)",
             }}
           >
             <div
@@ -206,10 +292,11 @@ export default function HallLightbox({
                 top: "50%",
                 left: "50%",
                 transform: "translate(-50%, -50%)",
-                padding: 16,
-                background: "#fff",
-                boxShadow:
-                  "0 30px 80px rgba(0,0,0,0.5), 0 10px 24px rgba(0,0,0,0.3)",
+                padding: frameVisible ? 16 : 0,
+                background: frameVisible ? "#fff" : "transparent",
+                boxShadow: frameVisible
+                  ? "0 30px 80px rgba(0,0,0,0.5), 0 10px 24px rgba(0,0,0,0.3)"
+                  : "none",
                 display: "flex",
                 opacity: incomingOpacity,
                 transition:
@@ -223,8 +310,13 @@ export default function HallLightbox({
                 alt={photo.title ?? ""}
                 style={{
                   display: "block",
-                  maxWidth: "calc(100vw - 596px)",
-                  maxHeight: "calc(100vh - 308px)",
+                  maxWidth:
+                    mode === "normal"
+                      ? "calc(100vw - 596px)"
+                      : mode === "focused"
+                        ? "calc(100vw - 236px)"
+                        : "100vw",
+                  maxHeight: mode === "immersive" ? "100vh" : "calc(100vh - 308px)",
                   width: "auto",
                   height: "auto",
                 }}
@@ -239,10 +331,11 @@ export default function HallLightbox({
                   top: "50%",
                   left: "50%",
                   transform: "translate(-50%, -50%)",
-                  padding: 16,
-                  background: "#fff",
-                  boxShadow:
-                    "0 30px 80px rgba(0,0,0,0.5), 0 10px 24px rgba(0,0,0,0.3)",
+                  padding: frameVisible ? 16 : 0,
+                  background: frameVisible ? "#fff" : "transparent",
+                  boxShadow: frameVisible
+                    ? "0 30px 80px rgba(0,0,0,0.5), 0 10px 24px rgba(0,0,0,0.3)"
+                    : "none",
                   display: "flex",
                   opacity: crossfading ? 0 : 1,
                   transition: `opacity ${FADE_MS}ms ease`,
@@ -254,8 +347,14 @@ export default function HallLightbox({
                   alt=""
                   style={{
                     display: "block",
-                    maxWidth: "calc(100vw - 596px)",
-                    maxHeight: "calc(100vh - 308px)",
+                    maxWidth:
+                      mode === "normal"
+                        ? "calc(100vw - 596px)"
+                        : mode === "focused"
+                          ? "calc(100vw - 236px)"
+                          : "100vw",
+                    maxHeight:
+                      mode === "immersive" ? "100vh" : "calc(100vh - 308px)",
                     width: "auto",
                     height: "auto",
                   }}
@@ -268,6 +367,7 @@ export default function HallLightbox({
         </div>
 
         {/* drawer */}
+        {drawerVisible && (
         <div
           key={`drawer-${photo.id}`}
           style={{
@@ -403,7 +503,7 @@ export default function HallLightbox({
             </div>
           )}
 
-          {photo.createdAt && (
+          {(photo.takenAt || photo.createdAt) && (
             <div>
               <div
                 style={{
@@ -423,13 +523,15 @@ export default function HallLightbox({
                   color: "var(--ex-ink)",
                 }}
               >
-                {formatDate(photo.createdAt)}
+                {formatDate(photo.takenAt ?? photo.createdAt, photo.takenAt != null)}
               </div>
             </div>
           )}
         </div>
+        )}
       </div>
 
+      {chromeVisible && (
       <div
         style={{
           position: "absolute",
@@ -453,9 +555,51 @@ export default function HallLightbox({
           {String(photos.length).padStart(2, "0")}
         </span>
         <span style={{ opacity: 0.5 }}>·</span>
-        <span>Esc  Close</span>
+        <span>I  Info</span>
+        <span style={{ opacity: 0.5 }}>·</span>
+        <span>F  Fullscreen</span>
+        <span style={{ opacity: 0.5 }}>·</span>
+        <span>Esc  Back</span>
       </div>
+      )}
     </div>
+  );
+
+  if (mode === "immersive" && typeof document !== "undefined") {
+    return createPortal(content, document.body);
+  }
+  return content;
+}
+
+function ChromeButton({
+  onClick,
+  label,
+  children,
+}: {
+  onClick: () => void;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      style={{
+        width: 36,
+        height: 36,
+        borderRadius: "50%",
+        border: "1px solid rgba(255,255,255,0.35)",
+        background: "rgba(255,255,255,0.08)",
+        cursor: "pointer",
+        color: "#fff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -628,13 +772,16 @@ function parseMarkdownLink(raw: string | null | undefined): {
   return { label: text, href: null };
 }
 
-function formatDate(iso: string) {
+function formatDate(iso: string, isTakenAt = false) {
   try {
     const d = new Date(iso);
+    // takenAt is stored as UTC-of-wall-clock (filename has no TZ), so format in UTC
+    // to avoid timezone drift. createdAt is a real instant, format in local time.
     return d.toLocaleDateString(undefined, {
       year: "numeric",
       month: "long",
       day: "numeric",
+      ...(isTakenAt ? { timeZone: "UTC" } : {}),
     });
   } catch {
     return iso;

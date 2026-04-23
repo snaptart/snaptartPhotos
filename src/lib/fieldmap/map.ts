@@ -1,6 +1,6 @@
 import { geoPath, geoGraticule } from "d3-geo";
 import { geoMollweide } from "d3-geo-projection";
-import { feature } from "topojson-client";
+import { feature, mesh } from "topojson-client";
 import type { Topology, GeometryCollection, GeometryObject } from "topojson-specification";
 import type { FeatureCollection, MultiPolygon, Polygon } from "geojson";
 
@@ -88,6 +88,42 @@ export async function loadLandPath(
       topo.objects.land as GeometryCollection | GeometryObject
     ) as unknown as FeatureCollection<Polygon | MultiPolygon>;
     return path(land) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function loadCountriesBordersPath(
+  projection: ReturnType<typeof createMollweideProjection>
+): Promise<string | null> {
+  const path = geoPath(projection);
+  try {
+    const res = await fetch("/data/countries-110m.json");
+    const topo = (await res.json()) as Topology;
+    const borders = mesh(
+      topo,
+      topo.objects.countries as GeometryCollection | GeometryObject,
+      (a, b) => a !== b,
+    );
+    return path(borders) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function loadStatesBordersPath(
+  projection: ReturnType<typeof createMollweideProjection>
+): Promise<string | null> {
+  const path = geoPath(projection);
+  try {
+    const res = await fetch("/data/states-10m.json");
+    const topo = (await res.json()) as Topology;
+    const borders = mesh(
+      topo,
+      topo.objects.states as GeometryCollection | GeometryObject,
+      (a, b) => a !== b,
+    );
+    return path(borders) ?? null;
   } catch {
     return null;
   }

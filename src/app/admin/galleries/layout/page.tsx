@@ -12,6 +12,8 @@ import {
   createMollweideProjection,
   paletteFor,
   loadLandPath,
+  loadCountriesBordersPath,
+  loadStatesBordersPath,
   buildGraticulePath,
   buildSpherePath,
 } from "@/lib/fieldmap/map";
@@ -38,6 +40,8 @@ export default function FieldMapPlacementEditor() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState({ x: 0, y: 0, s: 1 });
   const [worldPath, setWorldPath] = useState<string | null>(null);
+  const [countriesPath, setCountriesPath] = useState<string | null>(null);
+  const [statesPath, setStatesPath] = useState<string | null>(null);
   const [graticulePath, setGraticulePath] = useState<string | null>(null);
   const [spherePath, setSpherePath] = useState<string | null>(null);
 
@@ -70,6 +74,8 @@ export default function FieldMapPlacementEditor() {
     setGraticulePath(buildGraticulePath(projection));
     setSpherePath(buildSpherePath(projection));
     loadLandPath(projection).then(setWorldPath);
+    loadCountriesBordersPath(projection).then(setCountriesPath);
+    loadStatesBordersPath(projection).then(setStatesPath);
   }, [projection]);
 
   useEffect(() => {
@@ -350,6 +356,28 @@ export default function FieldMapPlacementEditor() {
                     strokeWidth="0.8"
                     strokeLinejoin="round"
                     strokeOpacity="0.7"
+                  />
+                )}
+                {countriesPath && (
+                  <path
+                    d={countriesPath}
+                    fill="none"
+                    stroke={palette.landStroke}
+                    strokeWidth="0.5"
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                    strokeOpacity="0.4"
+                  />
+                )}
+                {statesPath && (
+                  <path
+                    d={statesPath}
+                    fill="none"
+                    stroke={palette.landStroke}
+                    strokeWidth="0.4"
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                    strokeOpacity="0.28"
                   />
                 )}
               </svg>

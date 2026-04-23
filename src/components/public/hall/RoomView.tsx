@@ -25,6 +25,7 @@ export type RoomPhoto = {
   } | null;
   width: number;
   height: number;
+  takenAt: string | null;
   createdAt: string;
 };
 
@@ -291,6 +292,7 @@ export default function RoomView({
             overflowY: "hidden",
             display: "flex",
             alignItems: "stretch",
+            justifyContent: "safe center",
             scrollBehavior: "auto",
           }}
         >
@@ -370,7 +372,7 @@ export default function RoomView({
             {photos.map((p, i) => {
               const rnd = pseudoRandom(clientSeed ? `${clientSeed}-${i}` : p.id);
               const imgHeight = Math.round(220 + rnd(0) * 160);
-              const offsetY = Math.round(-280 + rnd(1) * 560);
+              const offsetY = Math.round(-220 + rnd(1) * 440);
               const rotation = -12 + rnd(2) * 24;
               const marginLeft = i === 0 ? 0 : Math.round(20 + rnd(3) * 140);
               const zIndex = Math.floor(rnd(4) * 20);
@@ -441,7 +443,7 @@ export default function RoomView({
                       <div style={{ ...fontRole("headings"), fontSize: 13, color: "var(--ex-ink)" }}>
                         {p.title ?? "Untitled"}
                       </div>
-                      {(p.location || p.createdAt) && (
+                      {(p.location || p.takenAt || p.createdAt) && (
                         <div
                           style={{
                             ...fontRole("labels"),
@@ -468,8 +470,8 @@ export default function RoomView({
                             </a>
                           )}
                           {!parsedLoc && p.location && <span>{p.location}</span>}
-                          {(parsedLoc || p.location) && formatYear(p.createdAt) && <span> · </span>}
-                          {formatYear(p.createdAt) && <span>{formatYear(p.createdAt)}</span>}
+                          {(parsedLoc || p.location) && formatYear(p.takenAt ?? p.createdAt) && <span> · </span>}
+                          {formatYear(p.takenAt ?? p.createdAt) && <span>{formatYear(p.takenAt ?? p.createdAt)}</span>}
                         </div>
                       )}
                     </div>
@@ -601,7 +603,9 @@ export default function RoomView({
 
 function formatYear(iso: string) {
   try {
-    return new Date(iso).getFullYear().toString();
+    const d = new Date(iso);
+    // takenAt is stored as UTC-of-wall-clock; createdAt is a true instant. UTC year works for both.
+    return d.getUTCFullYear().toString();
   } catch {
     return "";
   }

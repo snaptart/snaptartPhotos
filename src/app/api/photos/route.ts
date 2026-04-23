@@ -55,6 +55,9 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
+    if (Object.prototype.hasOwnProperty.call(body, "takenAt")) {
+      body.takenAt = body.takenAt ? new Date(body.takenAt) : null;
+    }
     const [item] = await db.insert(photos).values(body).returning();
     return NextResponse.json(item);
   } catch {
@@ -107,6 +110,9 @@ export async function PUT(req: Request) {
     // Single update
     if (!body.id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
     const { id, ...data } = body;
+    if (Object.prototype.hasOwnProperty.call(data, "takenAt")) {
+      data.takenAt = data.takenAt ? new Date(data.takenAt) : null;
+    }
     data.updatedAt = new Date();
 
     const [updated] = await db.update(photos).set(data).where(eq(photos.id, id)).returning();

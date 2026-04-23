@@ -37,6 +37,7 @@ import FocalPointPicker from "@/components/admin/FocalPointPicker";
 import { PhotoBulkEditDrawer } from "@/components/admin/PhotoBulkEditDrawer";
 import { useMessage } from "@/lib/hooks/useMessage";
 import siteConfig from "@/lib/site.config";
+import { parseFilenameForTakenAt } from "@/lib/photo-metadata";
 import { cn } from "@/lib/utils";
 import {
   Button,
@@ -65,6 +66,7 @@ interface Photo {
   focalX: number;
   focalY: number;
   position: number;
+  takenAt: string | null;
   createdAt: string;
 }
 
@@ -204,6 +206,7 @@ export default function PhotosPage() {
       }
       const { blobUrl, url, thumbnailUrl } = await uploadRes.json();
 
+      const takenAt = parseFilenameForTakenAt(file.name);
       const photoRes = await fetch("/api/photos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -215,6 +218,7 @@ export default function PhotosPage() {
           width: dimensions.width,
           height: dimensions.height,
           filename: file.name,
+          takenAt: takenAt?.toISOString() ?? null,
           position: photos.length + uploaded,
         }),
       });
@@ -246,6 +250,7 @@ export default function PhotosPage() {
       body: JSON.stringify({
         id: editingId,
         filename: form.get("filename") || null,
+        takenAt: parseTakenAtInput(form.get("takenAt")),
         title: form.get("title") || null,
         description: form.get("description") || null,
         location: form.get("location") || null,
@@ -765,6 +770,24 @@ function parseTagsInput(v: FormDataEntryValue | null): string[] {
     .filter((t) => t.length > 0);
 }
 
+// takenAt is stored as UTC-of-wall-clock (the filename has no timezone), so we
+// treat the datetime-local input as UTC to round-trip the original clock time.
+function parseTakenAtInput(v: FormDataEntryValue | null): string | null {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (s === "") return null;
+  const dt = new Date(s + "Z");
+  return Number.isNaN(dt.getTime()) ? null : dt.toISOString();
+}
+
+function formatTakenAtForInput(iso: string | null): string {
+  if (!iso) return "";
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}T${pad(dt.getUTCHours())}:${pad(dt.getUTCMinutes())}`;
+}
+
 function FilterChip({
   active,
   onClick,
@@ -1037,6 +1060,18 @@ function EditPhotoModal({
                 id="p-filename"
                 name="filename"
                 defaultValue={photo.filename ?? ""}
+              />
+            </Field>
+            <Field
+              label="Date taken"
+              htmlFor="p-taken-at"
+              hint="Extracted from filename when possible (pattern: [YYYYMMDD]_HHMMSS_...)"
+            >
+              <Input
+                id="p-taken-at"
+                name="takenAt"
+                type="datetime-local"
+                defaultValue={formatTakenAtForInput(photo.takenAt)}
               />
             </Field>
             <Field label="Title" htmlFor="p-title">

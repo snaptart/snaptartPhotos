@@ -10,13 +10,17 @@ const useIsomorphicLayoutEffect =
 // TopoJSON. All FieldMap instances share the same Mollweide projection
 // parameters, so these paths are identical across instances.
 let cachedWorldPath: string | null = null;
+let cachedCountriesPath: string | null = null;
+let cachedStatesPath: string | null = null;
 let cachedGraticulePath: string | null = null;
 let cachedSpherePath: string | null = null;
 let worldFetchPromise: Promise<string | null> | null = null;
+let countriesFetchPromise: Promise<string | null> | null = null;
+let statesFetchPromise: Promise<string | null> | null = null;
 import { useRouter } from "next/navigation";
 import { geoPath, geoGraticule } from "d3-geo";
 import { geoMollweide } from "d3-geo-projection";
-import { feature } from "topojson-client";
+import { feature, mesh } from "topojson-client";
 import type {
   Topology,
   GeometryCollection,
@@ -116,6 +120,8 @@ export default function FieldMap({
   const [view, setView] = useState({ x: 0, y: 0, s: 1 });
   const [cursor, setCursor] = useState({ x: 0, y: 0, lat: 0, lng: 0 });
   const [worldPath, setWorldPath] = useState<string | null>(cachedWorldPath);
+  const [countriesPath, setCountriesPath] = useState<string | null>(cachedCountriesPath);
+  const [statesPath, setStatesPath] = useState<string | null>(cachedStatesPath);
   const [graticulePath, setGraticulePath] = useState<string | null>(cachedGraticulePath);
   const [spherePath, setSpherePath] = useState<string | null>(cachedSpherePath);
 
@@ -159,28 +165,73 @@ export default function FieldMap({
     setGraticulePath(cachedGraticulePath);
     setSpherePath(cachedSpherePath);
 
+    let cancelled = false;
+
     if (cachedWorldPath) {
       setWorldPath(cachedWorldPath);
-      return;
+    } else {
+      if (!worldFetchPromise) {
+        worldFetchPromise = fetch("/data/land-110m.json")
+          .then((r) => r.json() as Promise<Topology>)
+          .then((topo) => {
+            const land = feature(
+              topo,
+              topo.objects.land as GeometryCollection | GeometryObject
+            ) as unknown as FeatureCollection<Polygon | MultiPolygon>;
+            cachedWorldPath = path(land) ?? null;
+            return cachedWorldPath;
+          })
+          .catch(() => null);
+      }
+      worldFetchPromise.then((p) => {
+        if (!cancelled) setWorldPath(p);
+      });
     }
 
-    let cancelled = false;
-    if (!worldFetchPromise) {
-      worldFetchPromise = fetch("/data/land-110m.json")
-        .then((r) => r.json() as Promise<Topology>)
-        .then((topo) => {
-          const land = feature(
-            topo,
-            topo.objects.land as GeometryCollection | GeometryObject
-          ) as unknown as FeatureCollection<Polygon | MultiPolygon>;
-          cachedWorldPath = path(land) ?? null;
-          return cachedWorldPath;
-        })
-        .catch(() => null);
+    if (cachedCountriesPath) {
+      setCountriesPath(cachedCountriesPath);
+    } else {
+      if (!countriesFetchPromise) {
+        countriesFetchPromise = fetch("/data/countries-110m.json")
+          .then((r) => r.json() as Promise<Topology>)
+          .then((topo) => {
+            const borders = mesh(
+              topo,
+              topo.objects.countries as GeometryCollection | GeometryObject,
+              (a, b) => a !== b,
+            );
+            cachedCountriesPath = path(borders) ?? null;
+            return cachedCountriesPath;
+          })
+          .catch(() => null);
+      }
+      countriesFetchPromise.then((p) => {
+        if (!cancelled) setCountriesPath(p);
+      });
     }
-    worldFetchPromise.then((p) => {
-      if (!cancelled) setWorldPath(p);
-    });
+
+    if (cachedStatesPath) {
+      setStatesPath(cachedStatesPath);
+    } else {
+      if (!statesFetchPromise) {
+        statesFetchPromise = fetch("/data/states-10m.json")
+          .then((r) => r.json() as Promise<Topology>)
+          .then((topo) => {
+            const borders = mesh(
+              topo,
+              topo.objects.states as GeometryCollection | GeometryObject,
+              (a, b) => a !== b,
+            );
+            cachedStatesPath = path(borders) ?? null;
+            return cachedStatesPath;
+          })
+          .catch(() => null);
+      }
+      statesFetchPromise.then((p) => {
+        if (!cancelled) setStatesPath(p);
+      });
+    }
+
     return () => {
       cancelled = true;
     };
@@ -393,6 +444,30 @@ export default function FieldMap({
               strokeWidth="0.8"
               strokeLinejoin="round"
               strokeOpacity="0.7"
+            />
+          )}
+
+          {countriesPath && (
+            <path
+              d={countriesPath}
+              fill="none"
+              stroke={palette.landStroke}
+              strokeWidth="0.5"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              strokeOpacity="0.4"
+            />
+          )}
+
+          {statesPath && (
+            <path
+              d={statesPath}
+              fill="none"
+              stroke={palette.landStroke}
+              strokeWidth="0.4"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              strokeOpacity="0.28"
             />
           )}
         </svg>

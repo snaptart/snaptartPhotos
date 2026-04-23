@@ -62,6 +62,7 @@ export default async function FieldMapRegionPage({ params }: Props) {
     cameraSettings: p.cameraSettings as RoomPhoto["cameraSettings"],
     width: p.width,
     height: p.height,
+    takenAt: p.takenAt ? p.takenAt.toISOString() : null,
     createdAt: p.createdAt.toISOString(),
   }));
 

@@ -4,7 +4,20 @@ import { galleries, photos } from "@/lib/db/schema";
 import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import type { FieldMapFilter, FieldMapRegion } from "@/components/public/fieldmap/types";
 
-const DEFAULT_ACCENT = "#5b6470";
+// Muted, gallery-appropriate palette used when a gallery has no accent_color.
+// Picked deterministically by position so pins look distinct without admin input.
+const FALLBACK_PALETTE = [
+  "#b8824a", // warm ocher
+  "#6d8b9c", // steel blue
+  "#8a9b6e", // olive
+  "#a9603f", // rust
+  "#7a6c8f", // muted violet
+  "#c9a96a", // mustard
+  "#5e7f8b", // teal slate
+  "#8b5a5a", // terracotta
+  "#6b8a5a", // moss
+  "#a87c4c", // warm brown
+];
 
 export const DEFAULT_FIELD_MAP_FILTERS: FieldMapFilter[] = [
   { id: "all", label: "All" },
@@ -52,6 +65,7 @@ export async function getFieldMapData(): Promise<FieldMapData> {
       thumbnailUrl: photos.thumbnailUrl,
       url: photos.url,
       tags: photos.tags,
+      takenAt: photos.takenAt,
       createdAt: photos.createdAt,
       position: photos.position,
     })
@@ -69,7 +83,7 @@ export async function getFieldMapData(): Promise<FieldMapData> {
   let globalMin = Number.POSITIVE_INFINITY;
   let globalMax = Number.NEGATIVE_INFINITY;
 
-  const regions: FieldMapRegion[] = galleryRows.map((g) => {
+  const regions: FieldMapRegion[] = galleryRows.map((g, gi) => {
     const ps = byGallery.get(g.id) ?? [];
     const tagCounts: Record<string, number> = {};
     const photosByYearTag: Array<{ year: number; tag: string | null }> = [];
@@ -77,7 +91,8 @@ export async function getFieldMapData(): Promise<FieldMapData> {
     let maxYear = Number.NEGATIVE_INFINITY;
 
     for (const p of ps) {
-      const year = p.createdAt.getFullYear();
+      // `takenAt` is stored as UTC-of-wall-clock (filename has no TZ), so read with UTC getters.
+      const year = p.takenAt ? p.takenAt.getUTCFullYear() : p.createdAt.getFullYear();
       const primaryTag = p.tags && p.tags.length > 0 ? p.tags[0].toLowerCase() : null;
       if (primaryTag) tagCounts[primaryTag] = (tagCounts[primaryTag] ?? 0) + 1;
       photosByYearTag.push({ year, tag: primaryTag });
@@ -101,7 +116,7 @@ export async function getFieldMapData(): Promise<FieldMapData> {
       name: g.title,
       latitude: g.latitude ?? 0,
       longitude: g.longitude ?? 0,
-      accentColor: g.accentColor ?? DEFAULT_ACCENT,
+      accentColor: g.accentColor ?? FALLBACK_PALETTE[gi % FALLBACK_PALETTE.length],
       flavor: g.tagline,
       totalCount: ps.length,
       tagCounts,
