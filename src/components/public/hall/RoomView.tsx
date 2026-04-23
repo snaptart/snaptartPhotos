@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fontRole } from "@/lib/theme/role-style";
 import HallLightbox from "./HallLightbox";
@@ -57,13 +57,38 @@ export default function RoomView({
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [entered, setEntered] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [viewportW, setViewportW] = useState(1200);
+  const [viewportH, setViewportH] = useState(800);
+  const [scrollerH, setScrollerH] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
   const [clientSeed, setClientSeed] = useState<string | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
+
+  // Track viewport dims so photo frames can be clamped to never exceed the
+  // available space (critical on phone screens and short landscape modes).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const update = () => {
+      setViewportW(window.innerWidth);
+      setViewportH(window.innerHeight);
+    };
+    update();
+    const mql = window.matchMedia("(max-width: 900px)");
+    setIsMobile(mql.matches);
+    const onMqlChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    window.addEventListener("resize", update);
+    mql.addEventListener("change", onMqlChange);
+    return () => {
+      window.removeEventListener("resize", update);
+      mql.removeEventListener("change", onMqlChange);
+    };
+  }, []);
 
   const accent = accentColor && /^#[0-9a-fA-F]{6}$/.test(accentColor) ? accentColor : "var(--ex-ink)";
 
   useEffect(() => {
-    // Reshuffle positions on each page load, then fade in so the jump is invisible.
+    // Reshuffle scattered positions on each page load, then fade in so the
+    // jump is invisible. Only used on desktop where photos are scattered.
     setClientSeed(Math.random().toString(36).slice(2));
     const t = setTimeout(() => setEntered(true), 40);
     return () => clearTimeout(t);
@@ -109,6 +134,21 @@ export default function RoomView({
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Measure the scroller's actual inner height so the mobile image clamp
+  // can size frames to what's truly available (the scroller lives inside a
+  // flex-1 area between the site navbar and footer, so viewportH overstates
+  // the space by the navbar+footer chrome).
+  useLayoutEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const update = () => setScrollerH(el.clientHeight);
+    update();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const firstChar = tagline ? tagline.charAt(0) : "";
   const restChars = tagline ? tagline.slice(1) : "";
 
@@ -127,47 +167,38 @@ export default function RoomView({
           overflow: "hidden",
         }}
       >
-        {/* ceiling band */}
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 80,
-            background:
-              "linear-gradient(to bottom, color-mix(in oklab, var(--ex-ink) 8%, transparent), transparent)",
-            pointerEvents: "none",
-            zIndex: 2,
-          }}
-        />
-        {/* floor band */}
-        <div
-          style={{
-            position: "absolute",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: 110,
-            background:
-              "linear-gradient(to bottom, transparent, color-mix(in oklab, var(--ex-ink) 5%, transparent) 40%, color-mix(in oklab, var(--ex-ink) 12%, transparent))",
-            pointerEvents: "none",
-            zIndex: 1,
-          }}
-        />
-        {/* baseboard line */}
-        <div
-          style={{
-            position: "absolute",
-            bottom: 108,
-            left: 0,
-            right: 0,
-            height: 1,
-            background: "var(--ex-ink-faint)",
-            pointerEvents: "none",
-            zIndex: 2,
-          }}
-        />
+        {!isMobile && (
+          <>
+            {/* ceiling band */}
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 80,
+                background:
+                  "linear-gradient(to bottom, color-mix(in oklab, var(--ex-ink) 8%, transparent), transparent)",
+                pointerEvents: "none",
+                zIndex: 2,
+              }}
+            />
+            {/* floor band */}
+            <div
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: 110,
+                background:
+                  "linear-gradient(to bottom, transparent, color-mix(in oklab, var(--ex-ink) 5%, transparent) 40%, color-mix(in oklab, var(--ex-ink) 12%, transparent))",
+                pointerEvents: "none",
+                zIndex: 1,
+              }}
+            />
+          </>
+        )}
 
         {/* top bar */}
         <div
@@ -284,7 +315,12 @@ export default function RoomView({
           ref={scrollerRef}
           style={{
             position: "absolute",
-            top: 72,
+            // Mobile uses a little extra top offset so the image frame +
+            // its shadow don't crowd into the RoomView title bar.
+            top: isMobile ? 96 : 72,
+            // Mobile has no bottom chrome so the wall runs all the way to
+            // the viewport edge. Desktop keeps the original scattered
+            // behavior that lets frames drift into the floor band area.
             bottom: 0,
             left: 0,
             right: 0,
@@ -359,29 +395,50 @@ export default function RoomView({
             </div>
           )}
 
-          {/* photos hung at varying heights */}
+          {/* photos — scattered on desktop, tidy row on mobile */}
           <div
             style={{
               flex: "0 0 auto",
               display: "flex",
-              alignItems: "center",
+              alignItems: isMobile ? "flex-start" : "center",
               gap: 0,
               padding: "0 80px 0 24px",
             }}
           >
             {photos.map((p, i) => {
               const rnd = pseudoRandom(clientSeed ? `${clientSeed}-${i}` : p.id);
-              const imgHeight = Math.round(220 + rnd(0) * 160);
-              const offsetY = Math.round(-220 + rnd(1) * 440);
-              const rotation = -12 + rnd(2) * 24;
-              const marginLeft = i === 0 ? 0 : Math.round(20 + rnd(3) * 140);
-              const zIndex = Math.floor(rnd(4) * 20);
-              const aspect = p.width && p.height ? p.width / p.height : 1.33;
-              const imgWidth = Math.min(imgHeight * aspect, 380);
               const frameSidePad = 12;
               const frameTopPad = 12;
               const frameBottomPad = 72;
+              const aspect = p.width && p.height ? p.width / p.height : 1.33;
+              // Mobile: uniform heights, no scatter, frames fit fully within
+              // the scroller (no top/bottom clipping including shadow).
+              // Desktop: original scattered look with variable heights +
+              // rotations + vertical offsets.
+              // Clamp against the scroller's actual height (not viewport) so
+              // frames never extend past the flex-1 container's bottom edge,
+              // which is where the site footer begins.
+              const MOBILE_BOTTOM_CLEARANCE = 50; // shadow (~30) + buffer
+              const mobileMaxImgHeight = Math.max(
+                120,
+                (scrollerH || viewportH - 200) - frameTopPad - frameBottomPad - MOBILE_BOTTOM_CLEARANCE,
+              );
+              const imgHeight = isMobile
+                ? Math.min(380, mobileMaxImgHeight)
+                : Math.round(220 + rnd(0) * 160);
+              // Width cap keeps a single frame within the viewport so it
+              // can't overflow horizontally on phones.
+              const maxImgWidth = Math.max(160, viewportW - 24 - frameSidePad * 2);
+              const imgWidth = Math.min(imgHeight * aspect, 380, maxImgWidth);
               const parsedLoc = parseMarkdownLink(p.location);
+
+              const offsetY = isMobile ? 0 : Math.round(-120 + rnd(1) * 240);
+              const rotation = isMobile ? 0 : -12 + rnd(2) * 24;
+              const marginLeft = isMobile
+                ? i === 0 ? 0 : 32
+                : i === 0 ? 0 : Math.round(20 + rnd(3) * 140);
+              const zIndex = isMobile ? undefined : Math.floor(rnd(4) * 20);
+
               return (
                 <button
                   key={p.id}
@@ -401,12 +458,20 @@ export default function RoomView({
                     zIndex,
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.zIndex = "50";
-                    e.currentTarget.style.transform = `translateY(${offsetY - 8}px) rotate(${rotation * 0.4}deg) scale(1.04)`;
+                    if (isMobile) {
+                      e.currentTarget.style.transform = "translateY(-8px) rotate(0deg) scale(1.03)";
+                    } else {
+                      e.currentTarget.style.zIndex = "50";
+                      e.currentTarget.style.transform = `translateY(${offsetY - 8}px) rotate(${rotation * 0.4}deg) scale(1.04)`;
+                    }
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.zIndex = String(zIndex);
-                    e.currentTarget.style.transform = `translateY(${offsetY}px) rotate(${rotation}deg)`;
+                    if (isMobile) {
+                      e.currentTarget.style.transform = "translateY(0) rotate(0deg)";
+                    } else {
+                      e.currentTarget.style.zIndex = String(zIndex ?? 0);
+                      e.currentTarget.style.transform = `translateY(${offsetY}px) rotate(${rotation}deg)`;
+                    }
                   }}
                 >
                   <div
@@ -543,48 +608,52 @@ export default function RoomView({
           </div>
         </div>
 
-        {/* scroll progress indicator */}
-        <div
-          style={{
-            position: "absolute",
-            bottom: 46,
-            left: 32,
-            right: 32,
-            height: 2,
-            background: "var(--ex-ink-faint)",
-            zIndex: 3,
-            pointerEvents: "none",
-          }}
-        >
-          <div
-            style={{
-              position: "absolute",
-              top: -3,
-              left: `${progress * 100}%`,
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: accent,
-              transform: "translateX(-50%)",
-              transition: "left 80ms linear",
-            }}
-          />
-        </div>
-        <div
-          style={{
-            position: "absolute",
-            bottom: 18,
-            left: 32,
-            ...fontRole("labels"),
-            fontSize: 9,
-            color: "var(--ex-ink-soft)",
-            letterSpacing: 2,
-            zIndex: 3,
-            pointerEvents: "none",
-          }}
-        >
-          scroll / ← → / shift+wheel · esc to exit
-        </div>
+        {!isMobile && (
+          <>
+            {/* scroll progress indicator */}
+            <div
+              style={{
+                position: "absolute",
+                bottom: 46,
+                left: 32,
+                right: 32,
+                height: 2,
+                background: "var(--ex-ink-faint)",
+                zIndex: 3,
+                pointerEvents: "none",
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  top: -3,
+                  left: `${progress * 100}%`,
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: accent,
+                  transform: "translateX(-50%)",
+                  transition: "left 80ms linear",
+                }}
+              />
+            </div>
+            <div
+              style={{
+                position: "absolute",
+                bottom: 18,
+                left: 32,
+                ...fontRole("labels"),
+                fontSize: 9,
+                color: "var(--ex-ink-soft)",
+                letterSpacing: 2,
+                zIndex: 3,
+                pointerEvents: "none",
+              }}
+            >
+              scroll / ← → / shift+wheel · esc to exit
+            </div>
+          </>
+        )}
       </div>
 
       {lightboxIndex !== null && (
@@ -618,8 +687,8 @@ function parseMarkdownLink(s: string | null): { label: string; url: string } | n
   return { label: m[1], url: m[2] };
 }
 
-// Deterministic 0..1 sequence keyed by a photo id, used so layout stays
-// stable across renders while still looking scattered.
+// Deterministic 0..1 sequence keyed by a photo id, used so the scattered
+// desktop layout stays stable across renders while still looking random.
 function pseudoRandom(seed: string) {
   let h = 2166136261;
   for (let i = 0; i < seed.length; i++) {

@@ -2,28 +2,52 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Maximize2, PanelRightClose, PanelRightOpen, X } from "lucide-react";
+import { Info, Maximize2, PanelRightClose, PanelRightOpen, X } from "lucide-react";
 import { fontRole } from "@/lib/theme/role-style";
 import type { RoomPhoto } from "./RoomView";
 
-type LightboxMode = "normal" | "focused" | "immersive";
-const MODE_STORAGE_KEY = "snaptart-lightbox-mode";
-
-export default function HallLightbox({
-  galleryTitle,
-  accentColor,
-  photos,
-  index,
-  onClose,
-  onIndexChange,
-}: {
+type HallLightboxProps = {
   galleryTitle: string;
   accentColor?: string | null;
   photos: RoomPhoto[];
   index: number;
   onClose: () => void;
   onIndexChange: (i: number) => void;
-}) {
+};
+
+// Dispatcher — picks the desktop or mobile implementation based on viewport.
+// The two variants differ enough (3-mode vs immersive-only, crossfade vs
+// drag-to-slide, side drawer vs bottom sheet) that keeping them as separate
+// components is cleaner than interleaving conditionals.
+export default function HallLightbox(props: HallLightboxProps) {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mql = window.matchMedia("(max-width: 900px)");
+    setIsMobile(mql.matches);
+    const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+  return isMobile ? <HallLightboxMobile {...props} /> : <HallLightboxDesktop {...props} />;
+}
+
+// ====================================================================
+// Desktop — 3 modes (normal/focused/immersive), side drawer, crossfade,
+// nav arrows, keyboard hints footer. Original behavior pre-simplification.
+// ====================================================================
+
+type LightboxMode = "normal" | "focused" | "immersive";
+const MODE_STORAGE_KEY = "snaptart-lightbox-mode";
+
+function HallLightboxDesktop({
+  galleryTitle,
+  accentColor,
+  photos,
+  index,
+  onClose,
+  onIndexChange,
+}: HallLightboxProps) {
   const [shown, setShown] = useState(false);
   const dirRef = useRef(0);
 
@@ -32,6 +56,13 @@ export default function HallLightbox({
   const [outgoingIndex, setOutgoingIndex] = useState<number | null>(null);
   const [crossfading, setCrossfading] = useState(false);
   const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [immersiveNavsVisible, setImmersiveNavsVisible] = useState(false);
+  const navHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [immersiveDragOffset, setImmersiveDragOffset] = useState(0);
+  const [immersiveAnimating, setImmersiveAnimating] = useState(false);
+  const [viewportW, setViewportW] = useState(1200);
+  const dragStartRef = useRef<{ x: number; y: number; t: number; offset: number } | null>(null);
+  const commitRef = useRef<{ direction: number } | null>(null);
   const photo = photos[displayIndex];
   const outgoingPhoto = outgoingIndex !== null ? photos[outgoingIndex] : null;
   const incomingOpacity = outgoingIndex === null || crossfading ? 1 : 0;
@@ -48,13 +79,10 @@ export default function HallLightbox({
   const chromeVisible = mode !== "immersive";
   const frameVisible = mode !== "immersive";
 
-  // Remember the last non-immersive mode so exiting fullscreen restores
-  // the user's drawer preference (normal vs focused) instead of defaulting.
   const lastNonImmersiveModeRef = useRef<LightboxMode>(
     mode === "immersive" ? "normal" : mode,
   );
 
-  // Persist drawer preference only (not immersive, which is transient)
   useEffect(() => {
     if (mode === "immersive") return;
     lastNonImmersiveModeRef.current = mode;
@@ -75,16 +103,32 @@ export default function HallLightbox({
   const go = useCallback(
     (delta: number) => {
       if (photos.length === 0) return;
+      if (mode === "immersive") {
+        if (photos.length <= 1 || immersiveAnimating) return;
+        commitRef.current = { direction: delta };
+        setImmersiveAnimating(true);
+        setImmersiveDragOffset(-delta * viewportW);
+        return;
+      }
       const next = (displayIndex + delta + photos.length) % photos.length;
       dirRef.current = delta;
       onIndexChange(next);
     },
-    [displayIndex, photos.length, onIndexChange],
+    [mode, immersiveAnimating, viewportW, displayIndex, photos.length, onIndexChange],
   );
 
-  // Sync parent-driven index change into a crossfade
   useLayoutEffect(() => {
     if (index === displayIndex) return;
+    if (mode === "immersive") {
+      if (navTimerRef.current) {
+        clearTimeout(navTimerRef.current);
+        navTimerRef.current = null;
+      }
+      setDisplayIndex(index);
+      setOutgoingIndex(null);
+      setCrossfading(false);
+      return;
+    }
     if (navTimerRef.current) clearTimeout(navTimerRef.current);
     setOutgoingIndex(displayIndex);
     setDisplayIndex(index);
@@ -96,9 +140,8 @@ export default function HallLightbox({
       setOutgoingIndex(null);
       setCrossfading(false);
     }, FADE_MS + 60);
-  }, [index, displayIndex]);
+  }, [index, displayIndex, mode]);
 
-  // Preload adjacent images so the next crossfade has no network hitch
   useEffect(() => {
     if (photos.length <= 1) return;
     const nextIdx = (displayIndex + 1) % photos.length;
@@ -112,8 +155,125 @@ export default function HallLightbox({
   useEffect(() => {
     return () => {
       if (navTimerRef.current) clearTimeout(navTimerRef.current);
+      if (navHideTimerRef.current) clearTimeout(navHideTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (mode !== "immersive") {
+      setImmersiveNavsVisible(false);
+      if (navHideTimerRef.current) {
+        clearTimeout(navHideTimerRef.current);
+        navHideTimerRef.current = null;
+      }
+      setImmersiveDragOffset(0);
+      setImmersiveAnimating(false);
+      commitRef.current = null;
+      dragStartRef.current = null;
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const update = () => setViewportW(window.innerWidth);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  const onImmersivePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (mode !== "immersive") return;
+      if ((e.target as HTMLElement).closest("button, a")) return;
+      commitRef.current = null;
+      dragStartRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        t: Date.now(),
+        offset: immersiveDragOffset,
+      };
+      setImmersiveAnimating(false);
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    [mode, immersiveDragOffset],
+  );
+
+  const onImmersivePointerMove = useCallback((e: React.PointerEvent) => {
+    const start = dragStartRef.current;
+    if (!start) return;
+    const dx = e.clientX - start.x;
+    setImmersiveDragOffset(start.offset + dx);
+  }, []);
+
+  const onImmersivePointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      const start = dragStartRef.current;
+      dragStartRef.current = null;
+      if ((e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) {
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      }
+      if (!start) return;
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+      const dt = Date.now() - start.t;
+      const TAP_MAX_MOVE = 8;
+      const TAP_MAX_MS = 250;
+      const threshold = Math.max(60, viewportW * 0.15);
+
+      if (absX < TAP_MAX_MOVE && absY < TAP_MAX_MOVE && dt < TAP_MAX_MS) {
+        setImmersiveAnimating(false);
+        setImmersiveDragOffset(0);
+        return;
+      }
+
+      if (absX > threshold && absX > absY && photos.length > 1) {
+        const direction = dx < 0 ? 1 : -1;
+        commitRef.current = { direction };
+        setImmersiveAnimating(true);
+        setImmersiveDragOffset(-direction * viewportW);
+      } else {
+        setImmersiveAnimating(true);
+        setImmersiveDragOffset(0);
+      }
+    },
+    [viewportW, photos.length],
+  );
+
+  const onImmersiveSlideEnd = useCallback(() => {
+    const commit = commitRef.current;
+    commitRef.current = null;
+    if (commit) {
+      const newIndex = (displayIndex + commit.direction + photos.length) % photos.length;
+      setDisplayIndex(newIndex);
+      setImmersiveAnimating(false);
+      setImmersiveDragOffset(0);
+      onIndexChange(newIndex);
+    } else {
+      setImmersiveAnimating(false);
+    }
+  }, [displayIndex, photos.length, onIndexChange]);
+
+  const handleNavMouseEnter = useCallback(() => {
+    if (mode !== "immersive") return;
+    if (navHideTimerRef.current) {
+      clearTimeout(navHideTimerRef.current);
+      navHideTimerRef.current = null;
+    }
+    setImmersiveNavsVisible(true);
+  }, [mode]);
+
+  const handleNavMouseLeave = useCallback(() => {
+    if (mode !== "immersive") return;
+    if (navHideTimerRef.current) clearTimeout(navHideTimerRef.current);
+    navHideTimerRef.current = setTimeout(() => {
+      setImmersiveNavsVisible(false);
+      navHideTimerRef.current = null;
+    }, 2000);
+  }, [mode]);
+
+  const navsVisible = mode !== "immersive" || immersiveNavsVisible;
 
   const handleClose = useCallback(() => {
     setShown(false);
@@ -124,7 +284,6 @@ export default function HallLightbox({
     setMode((m) => {
       if (m === "immersive") return lastNonImmersiveModeRef.current;
       if (m === "focused") return "normal";
-      // Already at "normal" — escape closes the lightbox
       handleClose();
       return m;
     });
@@ -271,61 +430,89 @@ export default function HallLightbox({
             minWidth: 0,
           }}
         >
-          <NavArrow dir="prev" disabled={false} onClick={() => go(-1)} />
+          <NavArrow
+            dir="prev"
+            disabled={false}
+            onClick={() => go(-1)}
+            visible={navsVisible}
+            onMouseEnter={handleNavMouseEnter}
+            onMouseLeave={handleNavMouseLeave}
+          />
 
-          <div
-            style={{
-              position: "relative",
-              width:
-                mode === "normal"
-                  ? "calc(100vw - 564px)"
-                  : mode === "focused"
-                    ? "calc(100vw - 204px)"
-                    : "100vw",
-              height: mode === "immersive" ? "100vh" : "calc(100vh - 276px)",
-            }}
-          >
+          {mode === "immersive" ? (
             <div
-              key={`in-${displayIndex}`}
+              onPointerDown={onImmersivePointerDown}
+              onPointerMove={onImmersivePointerMove}
+              onPointerUp={onImmersivePointerUp}
+              onPointerCancel={onImmersivePointerUp}
               style={{
                 position: "absolute",
-                top: "50%",
-                left: "50%",
-                transform: "translate(-50%, -50%)",
-                padding: frameVisible ? 16 : 0,
-                background: frameVisible ? "#fff" : "transparent",
-                boxShadow: frameVisible
-                  ? "0 30px 80px rgba(0,0,0,0.5), 0 10px 24px rgba(0,0,0,0.3)"
-                  : "none",
-                display: "flex",
-                opacity: incomingOpacity,
-                transition:
-                  outgoingIndex !== null
-                    ? `opacity ${FADE_MS}ms ease`
-                    : undefined,
+                inset: 0,
+                overflow: "hidden",
+                touchAction: "none",
+                userSelect: "none",
               }}
             >
-              <img
-                src={photo.url}
-                alt={photo.title ?? ""}
-                style={{
-                  display: "block",
-                  maxWidth:
-                    mode === "normal"
-                      ? "calc(100vw - 596px)"
-                      : mode === "focused"
-                        ? "calc(100vw - 236px)"
-                        : "100vw",
-                  maxHeight: mode === "immersive" ? "100vh" : "calc(100vh - 308px)",
-                  width: "auto",
-                  height: "auto",
-                }}
-              />
+              {[-1, 0, 1]
+                .map((rel) => ({
+                  rel,
+                  i: (displayIndex + rel + photos.length) % photos.length,
+                }))
+                .filter(
+                  (s, idx, arr) => arr.findIndex((x) => x.i === s.i) === idx,
+                )
+                .map(({ rel, i }) => {
+                  const p = photos[i];
+                  return (
+                    <div
+                      key={`slot-${rel}`}
+                      onTransitionEnd={
+                        rel === 0 ? onImmersiveSlideEnd : undefined
+                      }
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        transform: `translateX(calc(${rel * 100}vw + ${immersiveDragOffset}px))`,
+                        transition: immersiveAnimating
+                          ? "transform 320ms cubic-bezier(.2,.9,.3,1)"
+                          : "none",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        willChange: "transform",
+                      }}
+                    >
+                      <img
+                        src={p.url}
+                        alt={p.title ?? ""}
+                        draggable={false}
+                        style={{
+                          display: "block",
+                          maxWidth: "100vw",
+                          maxHeight: "100vh",
+                          width: "auto",
+                          height: "auto",
+                          userSelect: "none",
+                          pointerEvents: "none",
+                        }}
+                      />
+                    </div>
+                  );
+                })}
             </div>
-            {outgoingPhoto && (
+          ) : (
+            <div
+              style={{
+                position: "relative",
+                width:
+                  mode === "normal"
+                    ? "calc(100vw - 564px)"
+                    : "calc(100vw - 204px)",
+                height: "calc(100vh - 276px)",
+              }}
+            >
               <div
-                key={`out-${outgoingIndex}`}
-                aria-hidden
+                key={`in-${displayIndex}`}
                 style={{
                   position: "absolute",
                   top: "50%",
@@ -337,230 +524,139 @@ export default function HallLightbox({
                     ? "0 30px 80px rgba(0,0,0,0.5), 0 10px 24px rgba(0,0,0,0.3)"
                     : "none",
                   display: "flex",
-                  opacity: crossfading ? 0 : 1,
-                  transition: `opacity ${FADE_MS}ms ease`,
-                  pointerEvents: "none",
+                  opacity: incomingOpacity,
+                  transition:
+                    outgoingIndex !== null
+                      ? `opacity ${FADE_MS}ms ease`
+                      : undefined,
                 }}
               >
                 <img
-                  src={outgoingPhoto.url}
-                  alt=""
+                  src={photo.url}
+                  alt={photo.title ?? ""}
                   style={{
                     display: "block",
                     maxWidth:
                       mode === "normal"
                         ? "calc(100vw - 596px)"
-                        : mode === "focused"
-                          ? "calc(100vw - 236px)"
-                          : "100vw",
-                    maxHeight:
-                      mode === "immersive" ? "100vh" : "calc(100vh - 308px)",
+                        : "calc(100vw - 236px)",
+                    maxHeight: "calc(100vh - 308px)",
                     width: "auto",
                     height: "auto",
                   }}
                 />
               </div>
-            )}
-          </div>
-
-          <NavArrow dir="next" disabled={false} onClick={() => go(1)} />
-        </div>
-
-        {/* drawer */}
-        {drawerVisible && (
-        <div
-          key={`drawer-${photo.id}`}
-          style={{
-            background: "var(--ex-paper)",
-            padding: 32,
-            overflowY: "auto",
-            transform: shown ? "translateX(0)" : "translateX(20px)",
-            transition: "transform 400ms cubic-bezier(.2,.9,.3,1)",
-            borderRadius: 2,
-            boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
-            display: "flex",
-            flexDirection: "column",
-            gap: 20,
-          }}
-        >
-          <div>
-            <div
-              style={{
-                ...fontRole("labels"),
-                fontSize: 9,
-                letterSpacing: 2,
-                color: "var(--ex-ink-soft)",
-              }}
-            >
-              {galleryTitle} · {String(index + 1).padStart(2, "0")} /{" "}
-              {String(photos.length).padStart(2, "0")}
-            </div>
-            <div
-              style={{
-                ...fontRole("headings"),
-                fontSize: 30,
-                color: "var(--ex-ink)",
-                marginTop: 8,
-                lineHeight: 1.05,
-              }}
-            >
-              {photo.title ?? "Untitled"}
-            </div>
-            <div
-              style={{
-                width: 32,
-                height: 1,
-                background: accentColor ?? "var(--ex-accent)",
-                marginTop: 16,
-              }}
-            />
-          </div>
-
-          {photo.description && (
-            <div
-              style={{
-                ...fontRole("body"),
-                fontSize: 15,
-                color: "var(--ex-ink-soft)",
-                lineHeight: 1.5,
-              }}
-            >
-              “{photo.description}”
-            </div>
-          )}
-
-          {(locationLink.label || (photo.latitude != null && photo.longitude != null)) && (
-            <div>
-              <div
-                style={{
-                  ...fontRole("labels"),
-                  fontSize: 9,
-                  letterSpacing: 2,
-                  color: "var(--ex-ink-soft)",
-                  marginBottom: 10,
-                }}
-              >
-                Where
-                {locationLink.label && (
-                  <>
-                    {" · "}
-                    {locationHref ? (
-                      <a
-                        href={locationHref}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          color: "var(--ex-accent)",
-                          textDecoration: "underline",
-                          textUnderlineOffset: 2,
-                        }}
-                      >
-                        {locationLink.label}
-                      </a>
-                    ) : (
-                      locationLink.label
-                    )}
-                  </>
-                )}
-              </div>
-              {photo.latitude != null && photo.longitude != null ? (
-                <EmbedMap lat={photo.latitude} lng={photo.longitude} label={locationLink.label} />
-              ) : (
-                <StylizedMap name={locationLink.label} />
+              {outgoingPhoto && (
+                <div
+                  key={`out-${outgoingIndex}`}
+                  aria-hidden
+                  style={{
+                    position: "absolute",
+                    top: "50%",
+                    left: "50%",
+                    transform: "translate(-50%, -50%)",
+                    padding: frameVisible ? 16 : 0,
+                    background: frameVisible ? "#fff" : "transparent",
+                    boxShadow: frameVisible
+                      ? "0 30px 80px rgba(0,0,0,0.5), 0 10px 24px rgba(0,0,0,0.3)"
+                      : "none",
+                    display: "flex",
+                    opacity: crossfading ? 0 : 1,
+                    transition: `opacity ${FADE_MS}ms ease`,
+                    pointerEvents: "none",
+                  }}
+                >
+                  <img
+                    src={outgoingPhoto.url}
+                    alt=""
+                    style={{
+                      display: "block",
+                      maxWidth:
+                        mode === "normal"
+                          ? "calc(100vw - 596px)"
+                          : "calc(100vw - 236px)",
+                      maxHeight: "calc(100vh - 308px)",
+                      width: "auto",
+                      height: "auto",
+                    }}
+                  />
+                </div>
               )}
             </div>
           )}
 
-          {cameraLine && (
-            <div>
-              <div
-                style={{
-                  ...fontRole("labels"),
-                  fontSize: 9,
-                  letterSpacing: 2,
-                  color: "var(--ex-ink-soft)",
-                  marginBottom: 10,
-                }}
-              >
-                Camera
-              </div>
-              <div
-                style={{
-                  ...fontRole("labels"),
-                  fontSize: 11,
-                  color: "var(--ex-ink)",
-                  lineHeight: 1.8,
-                }}
-              >
-                {cameraLine}
-                {settingsLine && (
-                  <>
-                    <br />
-                    <span style={{ color: "var(--ex-ink-soft)" }}>{settingsLine}</span>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-
-          {(photo.takenAt || photo.createdAt) && (
-            <div>
-              <div
-                style={{
-                  ...fontRole("labels"),
-                  fontSize: 9,
-                  letterSpacing: 2,
-                  color: "var(--ex-ink-soft)",
-                  marginBottom: 6,
-                }}
-              >
-                When
-              </div>
-              <div
-                style={{
-                  ...fontRole("labels"),
-                  fontSize: 11,
-                  color: "var(--ex-ink)",
-                }}
-              >
-                {formatDate(photo.takenAt ?? photo.createdAt, photo.takenAt != null)}
-              </div>
-            </div>
-          )}
+          <NavArrow
+            dir="next"
+            disabled={false}
+            onClick={() => go(1)}
+            visible={navsVisible}
+            onMouseEnter={handleNavMouseEnter}
+            onMouseLeave={handleNavMouseLeave}
+          />
         </div>
+
+        {/* drawer */}
+        {drawerVisible && (
+          <div
+            key={`drawer-${photo.id}`}
+            style={{
+              background: "var(--ex-paper)",
+              padding: 32,
+              overflowY: "auto",
+              transform: shown ? "translateX(0)" : "translateX(20px)",
+              transition: "transform 400ms cubic-bezier(.2,.9,.3,1)",
+              borderRadius: 2,
+              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 20,
+            }}
+          >
+            <DrawerContent
+              galleryTitle={galleryTitle}
+              accentColor={accentColor ?? null}
+              photo={photo}
+              index={displayIndex}
+              total={photos.length}
+              locationLink={locationLink}
+              locationHref={locationHref}
+              cameraLine={cameraLine}
+              settingsLine={settingsLine}
+            />
+          </div>
         )}
       </div>
 
       {chromeVisible && (
-      <div
-        style={{
-          position: "absolute",
-          bottom: 20,
-          left: "50%",
-          transform: "translateX(-50%)",
-          ...fontRole("labels"),
-          fontSize: 9,
-          letterSpacing: 2,
-          color: "rgba(255,255,255,0.5)",
-          display: "flex",
-          gap: 20,
-          alignItems: "center",
-          pointerEvents: "none",
-        }}
-      >
-        <span>← / →  Navigate</span>
-        <span style={{ opacity: 0.5 }}>·</span>
-        <span>
-          {String(index + 1).padStart(2, "0")} /{" "}
-          {String(photos.length).padStart(2, "0")}
-        </span>
-        <span style={{ opacity: 0.5 }}>·</span>
-        <span>I  Info</span>
-        <span style={{ opacity: 0.5 }}>·</span>
-        <span>F  Fullscreen</span>
-        <span style={{ opacity: 0.5 }}>·</span>
-        <span>Esc  Back</span>
-      </div>
+        <div
+          style={{
+            position: "absolute",
+            bottom: 20,
+            left: "50%",
+            transform: "translateX(-50%)",
+            ...fontRole("labels"),
+            fontSize: 9,
+            letterSpacing: 2,
+            color: "rgba(255,255,255,0.5)",
+            display: "flex",
+            gap: 20,
+            alignItems: "center",
+            pointerEvents: "none",
+          }}
+        >
+          <span>← / →  Navigate</span>
+          <span style={{ opacity: 0.5 }}>·</span>
+          <span>
+            {String(displayIndex + 1).padStart(2, "0")} /{" "}
+            {String(photos.length).padStart(2, "0")}
+          </span>
+          <span style={{ opacity: 0.5 }}>·</span>
+          <span>I  Info</span>
+          <span style={{ opacity: 0.5 }}>·</span>
+          <span>F  Fullscreen</span>
+          <span style={{ opacity: 0.5 }}>·</span>
+          <span>Esc  Back</span>
+        </div>
       )}
     </div>
   );
@@ -571,31 +667,534 @@ export default function HallLightbox({
   return content;
 }
 
+// ====================================================================
+// Mobile — immersive-only, bottom sheet drawer, drag-to-slide carousel.
+// ====================================================================
+
+const DRAWER_STORAGE_KEY = "snaptart-lightbox-drawer";
+
+function HallLightboxMobile({
+  galleryTitle,
+  accentColor,
+  photos,
+  index,
+  onClose,
+  onIndexChange,
+}: HallLightboxProps) {
+  const [shown, setShown] = useState(false);
+  const [showDrawer, setShowDrawer] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return sessionStorage.getItem(DRAWER_STORAGE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [dragOffset, setDragOffset] = useState(0);
+  const [animating, setAnimating] = useState(false);
+  const [viewportW, setViewportW] = useState(1200);
+  const dragStartRef = useRef<{ x: number; y: number; t: number; offset: number } | null>(null);
+  const commitRef = useRef<{ direction: number } | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const update = () => setViewportW(window.innerWidth);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(DRAWER_STORAGE_KEY, showDrawer ? "1" : "0");
+    } catch {}
+  }, [showDrawer]);
+
+  const toggleDrawer = useCallback(() => setShowDrawer((v) => !v), []);
+
+  const handleClose = useCallback(() => {
+    setShown(false);
+    setTimeout(onClose, 300);
+  }, [onClose]);
+
+  const go = useCallback(
+    (delta: number) => {
+      if (photos.length <= 1) return;
+      commitRef.current = { direction: delta };
+      setAnimating(true);
+      setDragOffset(-delta * viewportW);
+    },
+    [photos.length, viewportW],
+  );
+
+  useEffect(() => {
+    if (photos.length <= 1) return;
+    const nextIdx = (index + 1) % photos.length;
+    const prevIdx = (index - 1 + photos.length) % photos.length;
+    [nextIdx, prevIdx].forEach((i) => {
+      const img = new window.Image();
+      img.src = photos[i].url;
+    });
+  }, [index, photos]);
+
+  useEffect(() => {
+    requestAnimationFrame(() => setShown(true));
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") handleClose();
+      else if (e.key === "ArrowRight") go(1);
+      else if (e.key === "ArrowLeft") go(-1);
+      else if (e.key === "i" || e.key === "I") toggleDrawer();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [go, handleClose, toggleDrawer]);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if ((e.target as HTMLElement).closest("button, a")) return;
+      commitRef.current = null;
+      dragStartRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        t: Date.now(),
+        offset: dragOffset,
+      };
+      setAnimating(false);
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    [dragOffset],
+  );
+
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    const start = dragStartRef.current;
+    if (!start) return;
+    const dx = e.clientX - start.x;
+    setDragOffset(start.offset + dx);
+  }, []);
+
+  const onPointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      const start = dragStartRef.current;
+      dragStartRef.current = null;
+      if ((e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) {
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      }
+      if (!start) return;
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+      const dt = Date.now() - start.t;
+      const TAP_MAX_MOVE = 8;
+      const TAP_MAX_MS = 250;
+      const threshold = Math.max(50, viewportW * 0.2);
+
+      if (absX < TAP_MAX_MOVE && absY < TAP_MAX_MOVE && dt < TAP_MAX_MS) {
+        if (showDrawer) setShowDrawer(false);
+        setAnimating(false);
+        setDragOffset(0);
+        return;
+      }
+
+      if (absX > threshold && absX > absY && photos.length > 1) {
+        const direction = dx < 0 ? 1 : -1;
+        commitRef.current = { direction };
+        setAnimating(true);
+        setDragOffset(-direction * viewportW);
+      } else {
+        setAnimating(true);
+        setDragOffset(0);
+      }
+    },
+    [viewportW, showDrawer, photos.length],
+  );
+
+  const onSlideTransitionEnd = useCallback(() => {
+    const commit = commitRef.current;
+    commitRef.current = null;
+    if (commit) {
+      const newIndex = (index + commit.direction + photos.length) % photos.length;
+      setAnimating(false);
+      setDragOffset(0);
+      onIndexChange(newIndex);
+    } else {
+      setAnimating(false);
+    }
+  }, [index, photos.length, onIndexChange]);
+
+  const photo = photos[index];
+  const locationLink = parseMarkdownLink(photo.location);
+  const locationHref =
+    locationLink.href ??
+    (photo.latitude != null && photo.longitude != null
+      ? `https://www.google.com/maps/search/?api=1&query=${photo.latitude},${photo.longitude}`
+      : locationLink.label
+        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationLink.label)}`
+        : null);
+
+  const camera = photo.cameraSettings ?? null;
+  const cameraLine = camera
+    ? [camera.camera, camera.lens].filter(Boolean).join(" · ")
+    : "";
+  const settingsLine = camera
+    ? [
+        camera.iso ? `ISO ${camera.iso}` : null,
+        camera.aperture ? `ƒ/${String(camera.aperture).replace(/^f\//i, "")}` : null,
+        camera.shutter ?? null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
+
+  const slotIndices = [-1, 0, 1]
+    .map((rel) => ({ rel, i: (index + rel + photos.length) % photos.length }))
+    .filter((s, idx, arr) => arr.findIndex((x) => x.i === s.i) === idx);
+
+  const content = (
+    <div
+      className="hall-ex"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 100,
+        background: shown ? "#000" : "transparent",
+        backdropFilter: shown ? "blur(16px)" : "blur(0)",
+        transition: "background 320ms ease-out, backdrop-filter 320ms",
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          top: 20,
+          right: 20,
+          zIndex: 30,
+          display: "flex",
+          gap: 8,
+        }}
+      >
+        <ChromeButton
+          onClick={toggleDrawer}
+          label={showDrawer ? "Hide info panel (I)" : "Show info panel (I)"}
+          active={showDrawer}
+        >
+          <Info size={16} />
+        </ChromeButton>
+        <ChromeButton onClick={handleClose} label="Close (Esc)">
+          <X size={16} />
+        </ChromeButton>
+      </div>
+
+      <div
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        style={{
+          position: "absolute",
+          inset: 0,
+          overflow: "hidden",
+          opacity: shown ? 1 : 0,
+          transition: "opacity 400ms 100ms",
+          touchAction: "none",
+          userSelect: "none",
+        }}
+      >
+        {slotIndices.map(({ rel, i }) => {
+          const p = photos[i];
+          return (
+            <div
+              key={`slot-${rel}`}
+              onTransitionEnd={rel === 0 ? onSlideTransitionEnd : undefined}
+              style={{
+                position: "absolute",
+                inset: 0,
+                transform: `translateX(calc(${rel * 100}vw + ${dragOffset}px))`,
+                transition: animating
+                  ? "transform 300ms cubic-bezier(.2,.9,.3,1)"
+                  : "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                willChange: "transform",
+              }}
+            >
+              <img
+                src={p.url}
+                alt={p.title ?? ""}
+                draggable={false}
+                style={{
+                  maxWidth: "100vw",
+                  maxHeight: "100vh",
+                  width: "auto",
+                  height: "auto",
+                  display: "block",
+                  userSelect: "none",
+                  pointerEvents: "none",
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      <div
+        aria-hidden={!showDrawer}
+        style={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          maxHeight: "48vh",
+          zIndex: 20,
+          background: "var(--ex-paper)",
+          padding: "20px 20px 32px",
+          overflowY: "auto",
+          borderRadius: "16px 16px 0 0",
+          boxShadow:
+            "0 -10px 40px rgba(0,0,0,0.4), 0 20px 60px rgba(0,0,0,0.3)",
+          display: "flex",
+          flexDirection: "column",
+          gap: 20,
+          transform: showDrawer ? "translateY(0)" : "translateY(100%)",
+          transition: "transform 320ms cubic-bezier(.2,.9,.3,1)",
+          pointerEvents: showDrawer ? "auto" : "none",
+        }}
+      >
+        <DrawerContent
+          galleryTitle={galleryTitle}
+          accentColor={accentColor ?? null}
+          photo={photo}
+          index={index}
+          total={photos.length}
+          locationLink={locationLink}
+          locationHref={locationHref}
+          cameraLine={cameraLine}
+          settingsLine={settingsLine}
+        />
+      </div>
+    </div>
+  );
+
+  return typeof document !== "undefined"
+    ? createPortal(content, document.body)
+    : content;
+}
+
+// ====================================================================
+// Shared helpers
+// ====================================================================
+
+function DrawerContent({
+  galleryTitle,
+  accentColor,
+  photo,
+  index,
+  total,
+  locationLink,
+  locationHref,
+  cameraLine,
+  settingsLine,
+}: {
+  galleryTitle: string;
+  accentColor: string | null;
+  photo: RoomPhoto;
+  index: number;
+  total: number;
+  locationLink: { label: string; href: string | null };
+  locationHref: string | null;
+  cameraLine: string;
+  settingsLine: string;
+}) {
+  return (
+    <>
+      <div>
+        <div
+          style={{
+            ...fontRole("labels"),
+            fontSize: 9,
+            letterSpacing: 2,
+            color: "var(--ex-ink-soft)",
+          }}
+        >
+          {galleryTitle} · {String(index + 1).padStart(2, "0")} /{" "}
+          {String(total).padStart(2, "0")}
+        </div>
+        <div
+          style={{
+            ...fontRole("headings"),
+            fontSize: 28,
+            color: "var(--ex-ink)",
+            marginTop: 8,
+            lineHeight: 1.05,
+          }}
+        >
+          {photo.title ?? "Untitled"}
+        </div>
+        <div
+          style={{
+            width: 32,
+            height: 1,
+            background: accentColor ?? "var(--ex-accent)",
+            marginTop: 14,
+          }}
+        />
+      </div>
+
+      {photo.description && (
+        <div
+          style={{
+            ...fontRole("body"),
+            fontSize: 14,
+            color: "var(--ex-ink-soft)",
+            lineHeight: 1.5,
+          }}
+        >
+          &ldquo;{photo.description}&rdquo;
+        </div>
+      )}
+
+      {(locationLink.label || (photo.latitude != null && photo.longitude != null)) && (
+        <div>
+          <div
+            style={{
+              ...fontRole("labels"),
+              fontSize: 9,
+              letterSpacing: 2,
+              color: "var(--ex-ink-soft)",
+              marginBottom: 10,
+            }}
+          >
+            Where
+            {locationLink.label && (
+              <>
+                {" · "}
+                {locationHref ? (
+                  <a
+                    href={locationHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: "var(--ex-accent)",
+                      textDecoration: "underline",
+                      textUnderlineOffset: 2,
+                    }}
+                  >
+                    {locationLink.label}
+                  </a>
+                ) : (
+                  locationLink.label
+                )}
+              </>
+            )}
+          </div>
+          {photo.latitude != null && photo.longitude != null ? (
+            <EmbedMap lat={photo.latitude} lng={photo.longitude} label={locationLink.label} />
+          ) : (
+            <StylizedMap name={locationLink.label} />
+          )}
+        </div>
+      )}
+
+      {cameraLine && (
+        <div>
+          <div
+            style={{
+              ...fontRole("labels"),
+              fontSize: 9,
+              letterSpacing: 2,
+              color: "var(--ex-ink-soft)",
+              marginBottom: 10,
+            }}
+          >
+            Camera
+          </div>
+          <div
+            style={{
+              ...fontRole("labels"),
+              fontSize: 11,
+              color: "var(--ex-ink)",
+              lineHeight: 1.8,
+            }}
+          >
+            {cameraLine}
+            {settingsLine && (
+              <>
+                <br />
+                <span style={{ color: "var(--ex-ink-soft)" }}>{settingsLine}</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {(photo.takenAt || photo.createdAt) && (
+        <div>
+          <div
+            style={{
+              ...fontRole("labels"),
+              fontSize: 9,
+              letterSpacing: 2,
+              color: "var(--ex-ink-soft)",
+              marginBottom: 6,
+            }}
+          >
+            When
+          </div>
+          <div
+            style={{
+              ...fontRole("labels"),
+              fontSize: 11,
+              color: "var(--ex-ink)",
+            }}
+          >
+            {formatDate(photo.takenAt ?? photo.createdAt, photo.takenAt != null)}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function ChromeButton({
   onClick,
   label,
+  active,
   children,
 }: {
   onClick: () => void;
   label: string;
+  active?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <button
       onClick={onClick}
       aria-label={label}
+      aria-pressed={active}
       title={label}
       style={{
         width: 36,
         height: 36,
         borderRadius: "50%",
         border: "1px solid rgba(255,255,255,0.35)",
-        background: "rgba(255,255,255,0.08)",
+        background: active ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.08)",
         cursor: "pointer",
         color: "#fff",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        backdropFilter: "blur(6px)",
       }}
     >
       {children}
@@ -607,15 +1206,23 @@ function NavArrow({
   dir,
   disabled,
   onClick,
+  visible = true,
+  onMouseEnter,
+  onMouseLeave,
 }: {
   dir: "prev" | "next";
   disabled: boolean;
   onClick: () => void;
+  visible?: boolean;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }) {
   const isPrev = dir === "prev";
   return (
     <button
       onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       disabled={disabled}
       aria-label={isPrev ? "Previous photo" : "Next photo"}
       style={{
@@ -626,9 +1233,13 @@ function NavArrow({
         width: 56,
         height: 56,
         borderRadius: "50%",
-        border: "1px solid rgba(255,255,255,0.3)",
-        background: disabled ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.08)",
-        backdropFilter: "blur(8px)",
+        border: visible ? "1px solid rgba(255,255,255,0.3)" : "1px solid transparent",
+        background: disabled
+          ? "rgba(255,255,255,0.02)"
+          : visible
+            ? "rgba(255,255,255,0.08)"
+            : "transparent",
+        backdropFilter: visible ? "blur(8px)" : "none",
         color: disabled ? "rgba(255,255,255,0.2)" : "#fff",
         cursor: disabled ? "not-allowed" : "pointer",
         display: "flex",
@@ -636,7 +1247,8 @@ function NavArrow({
         justifyContent: "center",
         fontSize: 22,
         fontFamily: "serif",
-        transition: "background 200ms, border-color 200ms",
+        opacity: visible ? 1 : 0,
+        transition: "background 200ms, border-color 200ms, opacity 280ms ease",
         zIndex: 3,
       }}
     >
@@ -775,8 +1387,6 @@ function parseMarkdownLink(raw: string | null | undefined): {
 function formatDate(iso: string, isTakenAt = false) {
   try {
     const d = new Date(iso);
-    // takenAt is stored as UTC-of-wall-clock (filename has no TZ), so format in UTC
-    // to avoid timezone drift. createdAt is a real instant, format in local time.
     return d.toLocaleDateString(undefined, {
       year: "numeric",
       month: "long",

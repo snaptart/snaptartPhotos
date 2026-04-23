@@ -1,24 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-
-const useIsomorphicLayoutEffect =
-  typeof window !== "undefined" ? useLayoutEffect : useEffect;
-
-// Module-level path cache so subsequent FieldMap mounts (navigating between
-// / and /map/[slug]) don't flash an empty map while re-fetching the land
-// TopoJSON. All FieldMap instances share the same Mollweide projection
-// parameters, so these paths are identical across instances.
-let cachedWorldPath: string | null = null;
-let cachedCountriesPath: string | null = null;
-let cachedStatesPath: string | null = null;
-let cachedGraticulePath: string | null = null;
-let cachedSpherePath: string | null = null;
-let worldFetchPromise: Promise<string | null> | null = null;
-let countriesFetchPromise: Promise<string | null> | null = null;
-let statesFetchPromise: Promise<string | null> | null = null;
 import { useRouter } from "next/navigation";
-import { geoPath, geoGraticule } from "d3-geo";
+import { geoPath, geoGraticule, geoMercator } from "d3-geo";
 import { geoMollweide } from "d3-geo-projection";
 import { feature, mesh } from "topojson-client";
 import type {
@@ -33,8 +17,70 @@ import type {
   MapStyle,
 } from "./types";
 
-const MAP_W = 2000;
-const MAP_H = 1000;
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+type ProjectionKey = "mollweide" | "mercator";
+
+// Mollweide fills a 2:1 ellipse naturally; Mercator gets an asymmetric box
+// that trims most of Antarctica on mobile, giving the rest of the world more
+// of the phone's viewport.
+const MAP_DIMS: Record<ProjectionKey, { w: number; h: number }> = {
+  mollweide: { w: 2000, h: 1000 },
+  mercator: { w: 1200, h: 900 },
+};
+
+// Asymmetric clip: +82° north keeps arctic shots visible; -60° south cuts off
+// most of Antarctica (the Antarctic peninsula tip still shows) so the fit
+// centers on the inhabited world instead of reserving room for the ice cap.
+const MERCATOR_CLIP_NORTH = 82;
+const MERCATOR_CLIP_SOUTH = -60;
+const MERCATOR_CLIP: Polygon = {
+  type: "Polygon",
+  coordinates: [[
+    [-180, MERCATOR_CLIP_SOUTH],
+    [180, MERCATOR_CLIP_SOUTH],
+    [180, MERCATOR_CLIP_NORTH],
+    [-180, MERCATOR_CLIP_NORTH],
+    [-180, MERCATOR_CLIP_SOUTH],
+  ]],
+};
+
+// Module-level path cache so subsequent FieldMap mounts (navigating between
+// / and /map/[slug]) don't flash an empty map while re-fetching the land
+// TopoJSON. Cached per projection since the path strings differ.
+type CacheEntry = {
+  world: string | null;
+  countries: string | null;
+  states: string | null;
+  graticule: string | null;
+  sphere: string | null;
+};
+type FetchEntry = {
+  world: Promise<string | null> | null;
+  countries: Promise<string | null> | null;
+  states: Promise<string | null> | null;
+};
+const emptyCache = (): CacheEntry => ({
+  world: null,
+  countries: null,
+  states: null,
+  graticule: null,
+  sphere: null,
+});
+const emptyFetches = (): FetchEntry => ({
+  world: null,
+  countries: null,
+  states: null,
+});
+const pathCache: Record<ProjectionKey, CacheEntry> = {
+  mollweide: emptyCache(),
+  mercator: emptyCache(),
+};
+const fetchPromises: Record<ProjectionKey, FetchEntry> = {
+  mollweide: emptyFetches(),
+  mercator: emptyFetches(),
+};
 
 type Palette = {
   bg: string;
@@ -119,11 +165,14 @@ export default function FieldMap({
   const [hoverRegion, setHoverRegion] = useState<string | null>(null);
   const [view, setView] = useState({ x: 0, y: 0, s: 1 });
   const [cursor, setCursor] = useState({ x: 0, y: 0, lat: 0, lng: 0 });
-  const [worldPath, setWorldPath] = useState<string | null>(cachedWorldPath);
-  const [countriesPath, setCountriesPath] = useState<string | null>(cachedCountriesPath);
-  const [statesPath, setStatesPath] = useState<string | null>(cachedStatesPath);
-  const [graticulePath, setGraticulePath] = useState<string | null>(cachedGraticulePath);
-  const [spherePath, setSpherePath] = useState<string | null>(cachedSpherePath);
+  const [isMobile, setIsMobile] = useState(false);
+  const projectionKey: ProjectionKey = isMobile ? "mercator" : "mollweide";
+  const { w: MAP_W, h: MAP_H } = MAP_DIMS[projectionKey];
+  const [worldPath, setWorldPath] = useState<string | null>(pathCache[projectionKey].world);
+  const [countriesPath, setCountriesPath] = useState<string | null>(pathCache[projectionKey].countries);
+  const [statesPath, setStatesPath] = useState<string | null>(pathCache[projectionKey].states);
+  const [graticulePath, setGraticulePath] = useState<string | null>(pathCache[projectionKey].graticule);
+  const [spherePath, setSpherePath] = useState<string | null>(pathCache[projectionKey].sphere);
 
   const vpRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null);
@@ -144,55 +193,78 @@ export default function FieldMap({
     }, 180);
   }, []);
   const projection = useMemo(() => {
+    if (projectionKey === "mercator") {
+      return geoMercator()
+        .precision(0.3)
+        .fitExtent([[0, 0], [MAP_W, MAP_H]], MERCATOR_CLIP);
+    }
     return geoMollweide()
       .scale((MAP_W / (2 * Math.PI)) * 1.05)
       .translate([MAP_W / 2, MAP_H / 2])
       .precision(0.3);
+  }, [projectionKey, MAP_W, MAP_H]);
+
+  // Track viewport width to swap projection on mobile. useLayoutEffect so the
+  // mobile branch is picked before the first path-building effect runs.
+  useIsomorphicLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+    const mql = window.matchMedia("(max-width: 900px)");
+    setIsMobile(mql.matches);
+    const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
   }, []);
 
   const palette = paletteFor(mapStyle);
 
   // Build graticule + sphere + world paths. Graticule and sphere are
-  // synchronous; world land is fetched once and cached at module level.
+  // synchronous; world land is fetched once and cached at module level per
+  // projection (the path strings differ, so each projection gets its own
+  // cache entry).
   useEffect(() => {
     const path = geoPath(projection);
-    if (!cachedGraticulePath) {
-      cachedGraticulePath = path(geoGraticule().step([20, 15])()) ?? null;
+    const cache = pathCache[projectionKey];
+    const fetches = fetchPromises[projectionKey];
+
+    if (!cache.graticule) {
+      cache.graticule = path(geoGraticule().step([20, 15])()) ?? null;
     }
-    if (!cachedSpherePath) {
-      cachedSpherePath = path({ type: "Sphere" }) ?? null;
+    if (!cache.sphere) {
+      cache.sphere = path({ type: "Sphere" }) ?? null;
     }
-    setGraticulePath(cachedGraticulePath);
-    setSpherePath(cachedSpherePath);
+    setGraticulePath(cache.graticule);
+    setSpherePath(cache.sphere);
+    // Reset async paths to whatever this projection has cached (may be null
+    // on first visit to that projection) so we don't show the previous
+    // projection's land outline misaligned with the new pin positions.
+    setWorldPath(cache.world);
+    setCountriesPath(cache.countries);
+    setStatesPath(cache.states);
 
     let cancelled = false;
 
-    if (cachedWorldPath) {
-      setWorldPath(cachedWorldPath);
-    } else {
-      if (!worldFetchPromise) {
-        worldFetchPromise = fetch("/data/land-110m.json")
+    if (!cache.world) {
+      if (!fetches.world) {
+        fetches.world = fetch("/data/land-110m.json")
           .then((r) => r.json() as Promise<Topology>)
           .then((topo) => {
             const land = feature(
               topo,
               topo.objects.land as GeometryCollection | GeometryObject
             ) as unknown as FeatureCollection<Polygon | MultiPolygon>;
-            cachedWorldPath = path(land) ?? null;
-            return cachedWorldPath;
+            cache.world = path(land) ?? null;
+            return cache.world;
           })
           .catch(() => null);
       }
-      worldFetchPromise.then((p) => {
+      fetches.world.then((p) => {
         if (!cancelled) setWorldPath(p);
       });
     }
 
-    if (cachedCountriesPath) {
-      setCountriesPath(cachedCountriesPath);
-    } else {
-      if (!countriesFetchPromise) {
-        countriesFetchPromise = fetch("/data/countries-110m.json")
+    if (!cache.countries) {
+      if (!fetches.countries) {
+        fetches.countries = fetch("/data/countries-110m.json")
           .then((r) => r.json() as Promise<Topology>)
           .then((topo) => {
             const borders = mesh(
@@ -200,21 +272,19 @@ export default function FieldMap({
               topo.objects.countries as GeometryCollection | GeometryObject,
               (a, b) => a !== b,
             );
-            cachedCountriesPath = path(borders) ?? null;
-            return cachedCountriesPath;
+            cache.countries = path(borders) ?? null;
+            return cache.countries;
           })
           .catch(() => null);
       }
-      countriesFetchPromise.then((p) => {
+      fetches.countries.then((p) => {
         if (!cancelled) setCountriesPath(p);
       });
     }
 
-    if (cachedStatesPath) {
-      setStatesPath(cachedStatesPath);
-    } else {
-      if (!statesFetchPromise) {
-        statesFetchPromise = fetch("/data/states-10m.json")
+    if (!cache.states) {
+      if (!fetches.states) {
+        fetches.states = fetch("/data/states-10m.json")
           .then((r) => r.json() as Promise<Topology>)
           .then((topo) => {
             const borders = mesh(
@@ -222,12 +292,12 @@ export default function FieldMap({
               topo.objects.states as GeometryCollection | GeometryObject,
               (a, b) => a !== b,
             );
-            cachedStatesPath = path(borders) ?? null;
-            return cachedStatesPath;
+            cache.states = path(borders) ?? null;
+            return cache.states;
           })
           .catch(() => null);
       }
-      statesFetchPromise.then((p) => {
+      fetches.states.then((p) => {
         if (!cancelled) setStatesPath(p);
       });
     }
@@ -235,7 +305,7 @@ export default function FieldMap({
     return () => {
       cancelled = true;
     };
-  }, [projection]);
+  }, [projection, projectionKey]);
 
   // Restore persisted view state
   useEffect(() => {
@@ -261,13 +331,18 @@ export default function FieldMap({
       const vp = vpRef.current;
       if (!vp) return;
       const r = vp.getBoundingClientRect();
-      const s = Math.min((r.width - 60) / MAP_W, (r.height - 160) / MAP_H);
-      setView({ s, x: (r.width - MAP_W * s) / 2, y: (r.height - MAP_H * s) / 2 - 20 });
+      // On mobile the map runs edge-to-edge horizontally and sits a bit
+      // higher; on desktop we keep side gutters for the chrome.
+      const padX = isMobile ? 0 : 60;
+      const padY = isMobile ? 120 : 160;
+      const yOffset = isMobile ? -60 : -20;
+      const s = Math.min((r.width - padX) / MAP_W, (r.height - padY) / MAP_H);
+      setView({ s, x: (r.width - MAP_W * s) / 2, y: (r.height - MAP_H * s) / 2 + yOffset });
     };
     fit();
     window.addEventListener("resize", fit);
     return () => window.removeEventListener("resize", fit);
-  }, []);
+  }, [MAP_W, MAP_H, isMobile]);
 
   // Wheel pan + zoom
   useEffect(() => {
@@ -293,12 +368,15 @@ export default function FieldMap({
     return () => vp.removeEventListener("wheel", onWheel);
   }, []);
 
-  const onDown = (e: React.MouseEvent) => {
+  const onDown = (e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest("[data-region]")) return;
+    // Capture the pointer so we keep getting move/up events even if the
+    // finger slides off the viewport (touch dragging the map off-screen).
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     dragRef.current = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
   };
 
-  const onMove = (e: React.MouseEvent) => {
+  const onMove = (e: React.PointerEvent) => {
     const vp = vpRef.current;
     if (!vp) return;
     const r = vp.getBoundingClientRect();
@@ -323,7 +401,10 @@ export default function FieldMap({
     }));
   };
 
-  const onUp = () => {
+  const onUp = (e: React.PointerEvent) => {
+    if ((e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    }
     dragRef.current = null;
   };
 
@@ -370,10 +451,10 @@ export default function FieldMap({
   return (
     <div
       ref={vpRef}
-      onMouseDown={isBackground ? undefined : onDown}
-      onMouseMove={isBackground ? undefined : onMove}
-      onMouseUp={isBackground ? undefined : onUp}
-      onMouseLeave={isBackground ? undefined : onUp}
+      onPointerDown={isBackground ? undefined : onDown}
+      onPointerMove={isBackground ? undefined : onMove}
+      onPointerUp={isBackground ? undefined : onUp}
+      onPointerCancel={isBackground ? undefined : onUp}
       style={{
         position: "absolute",
         inset: 0,
@@ -382,6 +463,9 @@ export default function FieldMap({
         background: palette.bg,
         userSelect: "none",
         pointerEvents: isBackground ? "none" : undefined,
+        // Stop the browser from using touch gestures for page scroll/zoom so
+        // pointer events fire for drag on mobile.
+        touchAction: isBackground ? undefined : "none",
       }}
     >
       {mapStyle === "blueprint" && (
