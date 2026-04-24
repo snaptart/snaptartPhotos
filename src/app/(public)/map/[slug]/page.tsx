@@ -88,6 +88,9 @@ export default async function FieldMapRegionPage({ params }: Props) {
         longitude={gallery.longitude}
         photos={roomPhotos}
         captionFields={gallery.roomCaptionFields ?? DEFAULT_ROOM_CAPTION_FIELDS}
+        filmStamp={gallery.filmStamp}
+        handwritingFont={gallery.handwritingFont}
+        stampFont={gallery.stampFont}
       />
     </>
   );

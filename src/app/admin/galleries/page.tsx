@@ -24,9 +24,16 @@ import {
   Input,
   Pill,
   SectionLabel,
+  Select,
   Textarea,
   Topbar,
 } from "@/components/admin/ui";
+import {
+  HANDWRITING_FONT_OPTIONS,
+  STAMP_FONT_OPTIONS,
+  DEFAULT_HANDWRITING_FONT,
+  DEFAULT_STAMP_FONT,
+} from "@/components/public/slideFonts";
 
 interface Gallery {
   id: string;
@@ -39,6 +46,9 @@ interface Gallery {
   longitude: number | null;
   previewPhotoIds: string[] | null;
   roomCaptionFields: string[] | null;
+  filmStamp: string | null;
+  handwritingFont: string | null;
+  stampFont: string | null;
   coverImageUrl: string | null;
   parentId: string | null;
   position: number;
@@ -126,6 +136,9 @@ export default function GalleriesPage() {
         latitude: parseNullableFloat(form.get("latitude")),
         longitude: parseNullableFloat(form.get("longitude")),
         roomCaptionFields: captionFields,
+        filmStamp: (form.get("filmStamp") as string)?.trim() || null,
+        handwritingFont: (form.get("handwritingFont") as string) || null,
+        stampFont: (form.get("stampFont") as string) || null,
         isPublished: form.get("isPublished") === "on",
         position: galleries.length,
       }),
@@ -155,6 +168,9 @@ export default function GalleriesPage() {
         longitude: parseNullableFloat(form.get("longitude")),
         previewPhotoIds: previewIds.length > 0 ? previewIds : null,
         roomCaptionFields: captionFields,
+        filmStamp: (form.get("filmStamp") as string)?.trim() || null,
+        handwritingFont: (form.get("handwritingFont") as string) || null,
+        stampFont: (form.get("stampFont") as string) || null,
         isPublished: form.get("isPublished") === "on",
       }),
     });
@@ -365,6 +381,40 @@ export default function GalleriesPage() {
                   ))}
                 </div>
               </Field>
+              <SectionLabel>Slide frame</SectionLabel>
+              <Field label="Film stamp" htmlFor="g-film-stamp" hint="Printed on the slide mount (e.g. KODACHROME II). Leave blank to hide.">
+                <Input
+                  id="g-film-stamp"
+                  name="filmStamp"
+                  defaultValue={editingGallery?.filmStamp ?? ""}
+                  placeholder="KODACHROME II"
+                />
+              </Field>
+              <Field label="Handwriting font" htmlFor="g-handwriting-font" hint={`Caption font. Defaults to ${DEFAULT_HANDWRITING_FONT}.`}>
+                <Select
+                  id="g-handwriting-font"
+                  name="handwritingFont"
+                  defaultValue={editingGallery?.handwritingFont ?? ""}
+                >
+                  <option value="">Default ({DEFAULT_HANDWRITING_FONT})</option>
+                  {HANDWRITING_FONT_OPTIONS.map((f) => (
+                    <option key={f} value={f}>{f}</option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Stamp font" htmlFor="g-stamp-font" hint={`Film stamp, date, and frame number. Defaults to ${DEFAULT_STAMP_FONT}.`}>
+                <Select
+                  id="g-stamp-font"
+                  name="stampFont"
+                  defaultValue={editingGallery?.stampFont ?? ""}
+                >
+                  <option value="">Default ({DEFAULT_STAMP_FONT})</option>
+                  {STAMP_FONT_OPTIONS.map((f) => (
+                    <option key={f} value={f}>{f}</option>
+                  ))}
+                </Select>
+              </Field>
+
               {editingId && (
                 <PreviewPicker
                   photos={pickerPhotos}

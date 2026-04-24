@@ -20,6 +20,9 @@ type RegionPageClientProps = {
   longitude: number | null;
   photos: RoomPhoto[];
   captionFields?: readonly string[];
+  filmStamp?: string | null;
+  handwritingFont?: string | null;
+  stampFont?: string | null;
 };
 
 const ANIM_MS = 900;
@@ -61,6 +64,9 @@ export default function RegionPageClient({
   longitude,
   photos,
   captionFields,
+  filmStamp,
+  handwritingFont,
+  stampFont,
 }: RegionPageClientProps) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -191,6 +197,9 @@ export default function RegionPageClient({
           accentColor={accentColor}
           photos={photos}
           captionFields={captionFields}
+          filmStamp={filmStamp}
+          handwritingFont={handwritingFont}
+          stampFont={stampFont}
           backHref="/"
           backLabel="Back to map"
           returnLabel="Return to map"

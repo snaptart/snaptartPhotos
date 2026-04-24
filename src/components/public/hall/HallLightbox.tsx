@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Info, Maximize2, PanelRightClose, PanelRightOpen, X } from "lucide-react";
 import { fontRole } from "@/lib/theme/role-style";
 import type { RoomPhoto } from "./RoomView";
+import Slide, { deriveFrameNumber } from "../Slide";
 
 type HallLightboxProps = {
   galleryTitle: string;
@@ -13,6 +14,9 @@ type HallLightboxProps = {
   index: number;
   onClose: () => void;
   onIndexChange: (i: number) => void;
+  filmStamp?: string | null;
+  handwritingFont?: string | null;
+  stampFont?: string | null;
 };
 
 // Dispatcher — picks the desktop or mobile implementation based on viewport.
@@ -47,6 +51,9 @@ function HallLightboxDesktop({
   index,
   onClose,
   onIndexChange,
+  filmStamp,
+  handwritingFont,
+  stampFont,
 }: HallLightboxProps) {
   const [shown, setShown] = useState(false);
   const dirRef = useRef(0);
@@ -77,7 +84,6 @@ function HallLightboxDesktop({
   });
   const drawerVisible = mode === "normal";
   const chromeVisible = mode !== "immersive";
-  const frameVisible = mode !== "immersive";
 
   const lastNonImmersiveModeRef = useRef<LightboxMode>(
     mode === "immersive" ? "normal" : mode,
@@ -336,6 +342,9 @@ function HallLightboxDesktop({
         .join(" · ")
     : "";
 
+  const onLightBg = mode !== "immersive";
+  const backdropColor = onLightBg ? "#ffffff" : "#000";
+
   const content = (
     <div
       className="hall-ex"
@@ -343,8 +352,8 @@ function HallLightboxDesktop({
         position: "fixed",
         inset: 0,
         zIndex: 100,
-        background: shown ? "#000" : "transparent",
-        backdropFilter: shown ? "blur(16px)" : "blur(0)",
+        background: shown ? backdropColor : "transparent",
+        backdropFilter: shown ? (onLightBg ? "blur(4px)" : "blur(16px)") : "blur(0)",
         transition: "background 320ms ease-out, backdrop-filter 320ms",
       }}
     >
@@ -386,14 +395,15 @@ function HallLightboxDesktop({
         >
           <ChromeButton
             onClick={toggleDrawer}
+            variant="light"
             label={drawerVisible ? "Hide info panel (I)" : "Show info panel (I)"}
           >
             {drawerVisible ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
           </ChromeButton>
-          <ChromeButton onClick={toggleImmersive} label="Fullscreen (F)">
+          <ChromeButton onClick={toggleImmersive} variant="light" label="Fullscreen (F)">
             <Maximize2 size={16} />
           </ChromeButton>
-          <ChromeButton onClick={handleClose} label="Close (Esc)">
+          <ChromeButton onClick={handleClose} variant="light" label="Close (Esc)">
             <X size={16} />
           </ChromeButton>
         </div>
@@ -435,6 +445,7 @@ function HallLightboxDesktop({
             disabled={false}
             onClick={() => go(-1)}
             visible={navsVisible}
+            variant={onLightBg ? "light" : "dark"}
             onMouseEnter={handleNavMouseEnter}
             onMouseLeave={handleNavMouseLeave}
           />
@@ -518,12 +529,11 @@ function HallLightboxDesktop({
                   top: "50%",
                   left: "50%",
                   transform: "translate(-50%, -50%)",
-                  padding: frameVisible ? 16 : 0,
-                  background: frameVisible ? "#fff" : "transparent",
-                  boxShadow: frameVisible
-                    ? "0 30px 80px rgba(0,0,0,0.5), 0 10px 24px rgba(0,0,0,0.3)"
-                    : "none",
-                  display: "flex",
+                  width:
+                    mode === "normal"
+                      ? "min(calc(100vw - 596px), calc(100vh - 308px))"
+                      : "min(calc(100vw - 236px), calc(100vh - 308px))",
+                  aspectRatio: "1 / 1",
                   opacity: incomingOpacity,
                   transition:
                     outgoingIndex !== null
@@ -531,19 +541,23 @@ function HallLightboxDesktop({
                       : undefined,
                 }}
               >
-                <img
-                  src={photo.url}
-                  alt={photo.title ?? ""}
-                  style={{
-                    display: "block",
-                    maxWidth:
-                      mode === "normal"
-                        ? "calc(100vw - 596px)"
-                        : "calc(100vw - 236px)",
-                    maxHeight: "calc(100vh - 308px)",
-                    width: "auto",
-                    height: "auto",
+                <Slide
+                  photo={{
+                    id: photo.id,
+                    url: photo.url,
+                    thumbnailUrl: photo.thumbnailUrl,
+                    title: photo.title,
+                    width: photo.width,
+                    height: photo.height,
+                    takenAt: photo.takenAt ?? photo.createdAt,
                   }}
+                  tilt={0}
+                  frameNumber={deriveFrameNumber(displayIndex)}
+                  filmStamp={filmStamp}
+                  handwritingFont={handwritingFont}
+                  stampFont={stampFont}
+                  useThumbnail={false}
+                  sizes="80vh"
                 />
               </div>
               {outgoingPhoto && (
@@ -555,30 +569,33 @@ function HallLightboxDesktop({
                     top: "50%",
                     left: "50%",
                     transform: "translate(-50%, -50%)",
-                    padding: frameVisible ? 16 : 0,
-                    background: frameVisible ? "#fff" : "transparent",
-                    boxShadow: frameVisible
-                      ? "0 30px 80px rgba(0,0,0,0.5), 0 10px 24px rgba(0,0,0,0.3)"
-                      : "none",
-                    display: "flex",
+                    width:
+                      mode === "normal"
+                        ? "min(calc(100vw - 596px), calc(100vh - 308px))"
+                        : "min(calc(100vw - 236px), calc(100vh - 308px))",
+                    aspectRatio: "1 / 1",
                     opacity: crossfading ? 0 : 1,
                     transition: `opacity ${FADE_MS}ms ease`,
                     pointerEvents: "none",
                   }}
                 >
-                  <img
-                    src={outgoingPhoto.url}
-                    alt=""
-                    style={{
-                      display: "block",
-                      maxWidth:
-                        mode === "normal"
-                          ? "calc(100vw - 596px)"
-                          : "calc(100vw - 236px)",
-                      maxHeight: "calc(100vh - 308px)",
-                      width: "auto",
-                      height: "auto",
+                  <Slide
+                    photo={{
+                      id: outgoingPhoto.id,
+                      url: outgoingPhoto.url,
+                      thumbnailUrl: outgoingPhoto.thumbnailUrl,
+                      title: outgoingPhoto.title,
+                      width: outgoingPhoto.width,
+                      height: outgoingPhoto.height,
+                      takenAt: outgoingPhoto.takenAt ?? outgoingPhoto.createdAt,
                     }}
+                    tilt={0}
+                    frameNumber={deriveFrameNumber(outgoingIndex!)}
+                    filmStamp={filmStamp}
+                    handwritingFont={handwritingFont}
+                    stampFont={stampFont}
+                    useThumbnail={false}
+                    sizes="80vh"
                   />
                 </div>
               )}
@@ -590,6 +607,7 @@ function HallLightboxDesktop({
             disabled={false}
             onClick={() => go(1)}
             visible={navsVisible}
+            variant={onLightBg ? "light" : "dark"}
             onMouseEnter={handleNavMouseEnter}
             onMouseLeave={handleNavMouseLeave}
           />
@@ -600,13 +618,14 @@ function HallLightboxDesktop({
           <div
             key={`drawer-${photo.id}`}
             style={{
-              background: "var(--ex-paper)",
+              background: "#ffffff",
               padding: 32,
               overflowY: "auto",
               transform: shown ? "translateX(0)" : "translateX(20px)",
               transition: "transform 400ms cubic-bezier(.2,.9,.3,1)",
               borderRadius: 2,
-              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+              border: "1px solid rgba(0,0,0,0.08)",
+              boxShadow: "0 14px 40px rgba(60,50,35,0.10), 0 2px 6px rgba(60,50,35,0.05)",
               display: "flex",
               flexDirection: "column",
               gap: 20,
@@ -637,7 +656,7 @@ function HallLightboxDesktop({
             ...fontRole("labels"),
             fontSize: 9,
             letterSpacing: 2,
-            color: "rgba(255,255,255,0.5)",
+            color: onLightBg ? "rgba(0,0,0,0.45)" : "rgba(255,255,255,0.5)",
             display: "flex",
             gap: 20,
             alignItems: "center",
@@ -1170,13 +1189,16 @@ function ChromeButton({
   onClick,
   label,
   active,
+  variant = "dark",
   children,
 }: {
   onClick: () => void;
   label: string;
   active?: boolean;
+  variant?: "dark" | "light";
   children: React.ReactNode;
 }) {
+  const onLight = variant === "light";
   return (
     <button
       onClick={onClick}
@@ -1187,10 +1209,14 @@ function ChromeButton({
         width: 36,
         height: 36,
         borderRadius: "50%",
-        border: "1px solid rgba(255,255,255,0.35)",
-        background: active ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.08)",
+        border: onLight
+          ? "1px solid rgba(0,0,0,0.15)"
+          : "1px solid rgba(255,255,255,0.35)",
+        background: onLight
+          ? active ? "rgba(0,0,0,0.10)" : "rgba(0,0,0,0.04)"
+          : active ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.08)",
         cursor: "pointer",
-        color: "#fff",
+        color: onLight ? "rgba(0,0,0,0.65)" : "#fff",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -1207,6 +1233,7 @@ function NavArrow({
   disabled,
   onClick,
   visible = true,
+  variant = "dark",
   onMouseEnter,
   onMouseLeave,
 }: {
@@ -1214,10 +1241,12 @@ function NavArrow({
   disabled: boolean;
   onClick: () => void;
   visible?: boolean;
+  variant?: "dark" | "light";
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
 }) {
   const isPrev = dir === "prev";
+  const onLight = variant === "light";
   return (
     <button
       onClick={onClick}
@@ -1233,14 +1262,18 @@ function NavArrow({
         width: 56,
         height: 56,
         borderRadius: "50%",
-        border: visible ? "1px solid rgba(255,255,255,0.3)" : "1px solid transparent",
+        border: visible
+          ? onLight ? "1px solid rgba(0,0,0,0.15)" : "1px solid rgba(255,255,255,0.3)"
+          : "1px solid transparent",
         background: disabled
-          ? "rgba(255,255,255,0.02)"
+          ? onLight ? "rgba(0,0,0,0.02)" : "rgba(255,255,255,0.02)"
           : visible
-            ? "rgba(255,255,255,0.08)"
+            ? onLight ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.08)"
             : "transparent",
         backdropFilter: visible ? "blur(8px)" : "none",
-        color: disabled ? "rgba(255,255,255,0.2)" : "#fff",
+        color: disabled
+          ? onLight ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)"
+          : onLight ? "rgba(0,0,0,0.65)" : "#fff",
         cursor: disabled ? "not-allowed" : "pointer",
         display: "flex",
         alignItems: "center",
