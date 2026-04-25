@@ -414,12 +414,29 @@
   .sorter-channels {
     /* hide channels 2 and 3 on mobile; only channel 1 is populated */
     flex-direction: row;
-    /* Pin the channel to the bottom of the available area so the slide's
-       bottom edge lands just above the fixed metabox. padding-bottom must
-       match (or slightly exceed) the metabox height — the small surplus is
-       the breathing-room gap between slide and sheet. */
-    align-items: flex-end;
-    padding: 0 0 38vh 0;
+    /* Default: slide + ridge unit is vertically centered in the room. When
+       the metabox is open, the room sets data-meta-open="true" and we shift
+       this whole unit upward (transition below) so the slide's top edge
+       lands just under the info-fab. The fixed metabox slides up from the
+       bottom and overlaps the lower portion of the slide. Slide size never
+       changes between states — only position. */
+    align-items: center;
+    padding: 0;
+    transition: transform 320ms cubic-bezier(.2, .9, .3, 1);
+  }
+
+  /* Shift formula derivation (keep in sync with .sorter-channel height
+     and the 5% slide overhang above the channel top):
+       channel_height = slide * 0.95 + 6px
+       centered channel_top = 50vh - channel_height/2
+       slide_top = channel_top - slide * 0.05
+       target slide_top = 72px (info-fab bottom 56px + 16px gap)
+       translateY = (72 + slide*0.05) - (50vh - slide*0.475 - 3)
+                  = 75px - 50vh + slide * 0.525                                    */
+  .sorter-room[data-meta-open="true"] .sorter-channels {
+    transform: translateY(
+      calc(75px - 50vh + var(--sorter-slide-size, 220px) * 0.525)
+    );
   }
 
   .sorter-channel {

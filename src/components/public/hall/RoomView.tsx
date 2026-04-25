@@ -220,7 +220,11 @@ export default function RoomView({
     <>
       <HallTokens />
 
-      <div ref={roomRef} className="sorter-room">
+      <div
+        ref={roomRef}
+        className="sorter-room"
+        data-meta-open={metaboxOpen ? "true" : undefined}
+      >
         <div
           ref={scrollerRef}
           className="sorter-scroller"
@@ -339,7 +343,27 @@ export default function RoomView({
           accentColor={accentColor}
           photos={photos}
           index={lightboxIndex}
-          onClose={() => setLightboxIndex(null)}
+          onClose={() => {
+            // Sync the mobile sorter to wherever the user left off in the
+            // lightbox so closing returns to that photo, not the one they
+            // originally clicked. Mobile-only: on mobile slots render in
+            // photo order in a single channel, so slots[i] === photos[i].
+            // Done before the state update so the scroll happens behind
+            // the still-open lightbox and the user never sees it move.
+            const idx = lightboxIndex;
+            if (idx !== null && isMobile && scrollerRef.current) {
+              const slots = scrollerRef.current.querySelectorAll<HTMLElement>(
+                ".sorter-slot"
+              );
+              slots[idx]?.scrollIntoView({
+                behavior: "auto",
+                block: "nearest",
+                inline: "center",
+              });
+              setCenteredIndex(idx);
+            }
+            setLightboxIndex(null);
+          }}
           onIndexChange={setLightboxIndex}
           filmStamp={filmStamp}
           handwritingFont={handwritingFont}
