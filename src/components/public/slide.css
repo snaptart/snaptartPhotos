@@ -58,32 +58,32 @@
     inset 0 -1px 2px rgba(180, 160, 120, 0.10);
 }
 
-/* Embossed bevel around the aperture (sits ~1% outside) */
-.slide-aperture-bevel {
-  position: absolute;
-  left: 12.5%;
-  top: 24.5%;
-  width: 75%;
-  height: 51%;
-  border-radius: 2px;
-  box-shadow:
-    inset 2px 2px 4px rgba(80, 55, 20, 0.40),
-    inset -1px -1px 2px rgba(255, 250, 230, 0.75);
-  pointer-events: none;
-}
-
-/* Landscape 3:2 aperture — 72% wide × 48% tall, centered on the 1:1 mount */
+/* Landscape 3:2 aperture — 75% wide × 50% tall, centered on the 1:1 mount.
+   No embossed matte ring — real slide mounts have the cardboard meeting the
+   film aperture cleanly. */
 .slide-aperture {
   position: absolute;
-  left: 14%;
-  top: 26%;
-  width: 72%;
-  height: 48%;
+  left: 12.5%;
+  top: 25%;
+  width: 75%;
+  height: 50%;
   background: #1a110a;
   overflow: hidden;
+}
+
+/* Recess shadows must paint over the photo, otherwise the absolutely-
+   positioned <Image fill> inside .slide-film covers them. ::after is the
+   last child in source order, so it paints on top of film + vignette.
+   Recess implies light from upper-left, matching .slide-root's drop-shadow
+   direction. The sorter context overrides this to top-down. */
+.slide-aperture::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
   box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.55),
-    inset 0 2px 5px rgba(0, 0, 0, 0.45);
+    inset 0 0 2px 2px rgba(0, 0, 0, 0.35),
+    inset 2px 2px 6px rgba(0, 0, 0, 0.55);
 }
 
 /* Photo fills the aperture as-is for landscape photos. */
@@ -120,7 +120,7 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(ellipse at center, transparent 58%, rgba(40, 20, 5, 0.28) 100%);
+  background: radial-gradient(ellipse at center, transparent 58%, rgba(40, 20, 5, 0.15) 100%);
   mix-blend-mode: multiply;
 }
 

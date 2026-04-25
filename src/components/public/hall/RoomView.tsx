@@ -101,7 +101,7 @@ export default function RoomView({
       const h = el.clientHeight;
       const size = isMobile
         ? Math.max(180, Math.min(380, h - 110))
-        : Math.max(180, Math.min(400, Math.round(((h - 56) / 3 - 6) / 0.95)));
+        : Math.max(180, Math.min(400, Math.round(((h - 96) / 3 - 6) / 0.95)));
       setSlideSize(size);
     };
     update();

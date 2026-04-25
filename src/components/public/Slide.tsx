@@ -77,9 +77,6 @@ export default function Slide({
       onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } : undefined}
     >
       <div className="slide-mount">
-        {/* Aperture bevel */}
-        <div className="slide-aperture-bevel" />
-
         {/* Aperture with photo */}
         <div className="slide-aperture">
           <div className={"slide-film" + (isPortrait ? " slide-film-rotated" : "")}>

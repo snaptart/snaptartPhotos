@@ -335,27 +335,29 @@ export default function FieldMap({
     } catch {}
   }, [filter, years]);
 
-  // Fit to viewport — useLayoutEffect so the correct view is set before the
-  // first paint, preventing a flash of the unfitted map at view={0,0,1}.
-  useIsomorphicLayoutEffect(() => {
-    const fit = () => {
-      const vp = vpRef.current;
-      if (!vp) return;
-      const r = vp.getBoundingClientRect();
-      // Mobile fits to width (no left/right gap regardless of orientation) and
-      // sits a bit higher; desktop uses min-fit so both dimensions show.
-      const padX = isMobile ? 0 : 60;
-      const padY = isMobile ? 120 : 160;
-      const yOffset = isMobile ? -60 : -20;
-      const widthFit = (r.width - padX) / MAP_W;
-      const heightFit = (r.height - padY) / MAP_H;
-      const s = isMobile ? widthFit : Math.min(widthFit, heightFit);
-      setView({ s, x: (r.width - MAP_W * s) / 2, y: (r.height - MAP_H * s) / 2 + yOffset });
-    };
-    fit();
-    window.addEventListener("resize", fit);
-    return () => window.removeEventListener("resize", fit);
+  // Fit to viewport — also exposed as resetView so a button can recenter.
+  const resetView = useCallback(() => {
+    const vp = vpRef.current;
+    if (!vp) return;
+    const r = vp.getBoundingClientRect();
+    // Mobile fits to width (no left/right gap regardless of orientation) and
+    // sits a bit higher; desktop uses min-fit so both dimensions show.
+    const padX = isMobile ? 0 : 60;
+    const padY = isMobile ? 120 : 160;
+    const yOffset = isMobile ? -60 : -20;
+    const widthFit = (r.width - padX) / MAP_W;
+    const heightFit = (r.height - padY) / MAP_H;
+    const s = isMobile ? widthFit : Math.min(widthFit, heightFit);
+    setView({ s, x: (r.width - MAP_W * s) / 2, y: (r.height - MAP_H * s) / 2 + yOffset });
   }, [MAP_W, MAP_H, isMobile]);
+
+  // useLayoutEffect so the correct view is set before the first paint,
+  // preventing a flash of the unfitted map at view={0,0,1}.
+  useIsomorphicLayoutEffect(() => {
+    resetView();
+    window.addEventListener("resize", resetView);
+    return () => window.removeEventListener("resize", resetView);
+  }, [resetView]);
 
   // Enforce "no horizontal gap on mobile": scale can't drop below what's
   // needed to cover the viewport width, and horizontal pan can't move a
@@ -988,7 +990,7 @@ export default function FieldMap({
             ["+", 1.3],
             ["−", 1 / 1.3],
           ] as const
-        ).map(([l, f], i) => (
+        ).map(([l, f]) => (
           <button
             key={l}
             onClick={() => zoomBy(f)}
@@ -997,7 +999,7 @@ export default function FieldMap({
               height: 34,
               background: "transparent",
               border: "none",
-              borderBottom: i === 0 ? `1px solid ${palette.panelBorder}` : "none",
+              borderBottom: `1px solid ${palette.panelBorder}`,
               color: palette.ink,
               cursor: "pointer",
               fontFamily: "'Inter', system-ui, sans-serif",
@@ -1008,6 +1010,37 @@ export default function FieldMap({
             {l}
           </button>
         ))}
+        <button
+          onClick={resetView}
+          aria-label="Reset map position"
+          title="Reset map position"
+          style={{
+            width: 34,
+            height: 34,
+            background: "transparent",
+            border: "none",
+            color: palette.ink,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="8" cy="8" r="2" />
+            <path d="M8 1v2.2M8 12.8V15M1 8h2.2M12.8 8H15" />
+          </svg>
+        </button>
       </div>
       )}
     </div>
