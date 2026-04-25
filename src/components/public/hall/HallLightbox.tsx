@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Info, Maximize2, PanelRightClose, PanelRightOpen, X } from "lucide-react";
+import { Maximize2, PanelRightClose, PanelRightOpen, X } from "lucide-react";
 import { fontRole } from "@/lib/theme/role-style";
 import type { RoomPhoto } from "./RoomView";
 import Slide, { deriveFrameNumber } from "../Slide";
@@ -687,28 +687,17 @@ function HallLightboxDesktop({
 }
 
 // ====================================================================
-// Mobile — immersive-only, bottom sheet drawer, drag-to-slide carousel.
+// Mobile — immersive-only carousel: black backdrop, bare image, drag to
+// navigate. Metadata lives on the room screen, not here.
 // ====================================================================
 
-const DRAWER_STORAGE_KEY = "snaptart-lightbox-drawer";
-
 function HallLightboxMobile({
-  galleryTitle,
-  accentColor,
   photos,
   index,
   onClose,
   onIndexChange,
 }: HallLightboxProps) {
   const [shown, setShown] = useState(false);
-  const [showDrawer, setShowDrawer] = useState(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      return sessionStorage.getItem(DRAWER_STORAGE_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
   const [dragOffset, setDragOffset] = useState(0);
   const [animating, setAnimating] = useState(false);
   const [viewportW, setViewportW] = useState(1200);
@@ -722,14 +711,6 @@ function HallLightboxMobile({
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
   }, []);
-
-  useEffect(() => {
-    try {
-      sessionStorage.setItem(DRAWER_STORAGE_KEY, showDrawer ? "1" : "0");
-    } catch {}
-  }, [showDrawer]);
-
-  const toggleDrawer = useCallback(() => setShowDrawer((v) => !v), []);
 
   const handleClose = useCallback(() => {
     setShown(false);
@@ -765,11 +746,10 @@ function HallLightboxMobile({
       if (e.key === "Escape") handleClose();
       else if (e.key === "ArrowRight") go(1);
       else if (e.key === "ArrowLeft") go(-1);
-      else if (e.key === "i" || e.key === "I") toggleDrawer();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [go, handleClose, toggleDrawer]);
+  }, [go, handleClose]);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -820,7 +800,6 @@ function HallLightboxMobile({
       const threshold = Math.max(50, viewportW * 0.2);
 
       if (absX < TAP_MAX_MOVE && absY < TAP_MAX_MOVE && dt < TAP_MAX_MS) {
-        if (showDrawer) setShowDrawer(false);
         setAnimating(false);
         setDragOffset(0);
         return;
@@ -836,7 +815,7 @@ function HallLightboxMobile({
         setDragOffset(0);
       }
     },
-    [viewportW, showDrawer, photos.length],
+    [viewportW, photos.length],
   );
 
   const onSlideTransitionEnd = useCallback(() => {
@@ -851,30 +830,6 @@ function HallLightboxMobile({
       setAnimating(false);
     }
   }, [index, photos.length, onIndexChange]);
-
-  const photo = photos[index];
-  const locationLink = parseMarkdownLink(photo.location);
-  const locationHref =
-    locationLink.href ??
-    (photo.latitude != null && photo.longitude != null
-      ? `https://www.google.com/maps/search/?api=1&query=${photo.latitude},${photo.longitude}`
-      : locationLink.label
-        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationLink.label)}`
-        : null);
-
-  const camera = photo.cameraSettings ?? null;
-  const cameraLine = camera
-    ? [camera.camera, camera.lens].filter(Boolean).join(" · ")
-    : "";
-  const settingsLine = camera
-    ? [
-        camera.iso ? `ISO ${camera.iso}` : null,
-        camera.aperture ? `ƒ/${String(camera.aperture).replace(/^f\//i, "")}` : null,
-        camera.shutter ?? null,
-      ]
-        .filter(Boolean)
-        .join(" · ")
-    : "";
 
   const slotIndices = [-1, 0, 1]
     .map((rel) => ({ rel, i: (index + rel + photos.length) % photos.length }))
@@ -902,13 +857,6 @@ function HallLightboxMobile({
           gap: 8,
         }}
       >
-        <ChromeButton
-          onClick={toggleDrawer}
-          label={showDrawer ? "Hide info panel (I)" : "Show info panel (I)"}
-          active={showDrawer}
-        >
-          <Info size={16} />
-        </ChromeButton>
         <ChromeButton onClick={handleClose} label="Close (Esc)">
           <X size={16} />
         </ChromeButton>
@@ -966,42 +914,6 @@ function HallLightboxMobile({
           );
         })}
       </div>
-
-      <div
-        aria-hidden={!showDrawer}
-        style={{
-          position: "fixed",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          maxHeight: "48vh",
-          zIndex: 20,
-          background: "var(--ex-paper)",
-          padding: "20px 20px 32px",
-          overflowY: "auto",
-          borderRadius: "16px 16px 0 0",
-          boxShadow:
-            "0 -10px 40px rgba(0,0,0,0.4), 0 20px 60px rgba(0,0,0,0.3)",
-          display: "flex",
-          flexDirection: "column",
-          gap: 20,
-          transform: showDrawer ? "translateY(0)" : "translateY(100%)",
-          transition: "transform 320ms cubic-bezier(.2,.9,.3,1)",
-          pointerEvents: showDrawer ? "auto" : "none",
-        }}
-      >
-        <DrawerContent
-          galleryTitle={galleryTitle}
-          accentColor={accentColor ?? null}
-          photo={photo}
-          index={index}
-          total={photos.length}
-          locationLink={locationLink}
-          locationHref={locationHref}
-          cameraLine={cameraLine}
-          settingsLine={settingsLine}
-        />
-      </div>
     </div>
   );
 
@@ -1013,6 +925,60 @@ function HallLightboxMobile({
 // ====================================================================
 // Shared helpers
 // ====================================================================
+
+// Public wrapper that derives the location/camera fields from a RoomPhoto and
+// renders the same content used by the desktop drawer. Used by RoomView's
+// mobile metabox bottom sheet.
+export function PhotoInfoPanel({
+  galleryTitle,
+  accentColor,
+  photo,
+  index,
+  total,
+}: {
+  galleryTitle: string;
+  accentColor: string | null;
+  photo: RoomPhoto;
+  index: number;
+  total: number;
+}) {
+  const locationLink = parseMarkdownLink(photo.location);
+  const locationHref =
+    locationLink.href ??
+    (photo.latitude != null && photo.longitude != null
+      ? `https://www.google.com/maps/search/?api=1&query=${photo.latitude},${photo.longitude}`
+      : locationLink.label
+        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationLink.label)}`
+        : null);
+  const camera = photo.cameraSettings ?? null;
+  const cameraLine = camera
+    ? [camera.camera, camera.lens].filter(Boolean).join(" · ")
+    : "";
+  const settingsLine = camera
+    ? [
+        camera.iso ? `ISO ${camera.iso}` : null,
+        camera.aperture
+          ? `ƒ/${String(camera.aperture).replace(/^f\//i, "")}`
+          : null,
+        camera.shutter ?? null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
+  return (
+    <DrawerContent
+      galleryTitle={galleryTitle}
+      accentColor={accentColor}
+      photo={photo}
+      index={index}
+      total={total}
+      locationLink={locationLink}
+      locationHref={locationHref}
+      cameraLine={cameraLine}
+      settingsLine={settingsLine}
+    />
+  );
+}
 
 function DrawerContent({
   galleryTitle,

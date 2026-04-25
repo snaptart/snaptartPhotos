@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import HallLightbox from "./HallLightbox";
+import { ArrowLeft, PanelBottomClose, PanelBottomOpen } from "lucide-react";
+import HallLightbox, { PhotoInfoPanel } from "./HallLightbox";
 import Slide, { deriveFrameNumber } from "../Slide";
 import "./SlideSorter.css";
 
@@ -18,11 +19,6 @@ export const ROOM_CAPTION_FIELD_OPTIONS = [
 export type RoomCaptionField = (typeof ROOM_CAPTION_FIELD_OPTIONS)[number]["key"];
 
 export const DEFAULT_ROOM_CAPTION_FIELDS: RoomCaptionField[] = ["title", "location", "year"];
-
-// Inline plate cadence in row 0. Each plate occupies one flex slot, so slides
-// can never render on top of it. Spacing ≈ viewport width at typical slide
-// sizes, so as one plate scrolls off, the next is already approaching.
-const PLATE_EVERY = 5;
 
 export type RoomPhoto = {
   id: string;
@@ -79,6 +75,12 @@ export default function RoomView({
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [slideSize, setSlideSize] = useState(220);
+  // Mobile-only metabox: bottom sheet that mirrors the desktop lightbox drawer
+  // but lives in the room. The currently-centered slide drives its content, so
+  // swiping between slides updates the info live. The sheet just translates
+  // over the bottom of the screen — the room and slides don't resize.
+  const [metaboxOpen, setMetaboxOpen] = useState(false);
+  const [centeredIndex, setCenteredIndex] = useState(0);
   const roomRef = useRef<HTMLDivElement | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
@@ -91,16 +93,61 @@ export default function RoomView({
     return () => mql.removeEventListener("change", onMql);
   }, []);
 
+  // Metabox is mobile-only — close it if the viewport widens to desktop.
+  useEffect(() => {
+    if (!isMobile && metaboxOpen) setMetaboxOpen(false);
+  }, [isMobile, metaboxOpen]);
+
+  // Track which slide is currently snap-centered in the mobile scroller, so
+  // the metabox content reflects the slide the user is actually looking at.
+  // Listener is mobile-only; on desktop the user opens the lightbox to see
+  // metadata, not this metabox.
+  useEffect(() => {
+    if (!isMobile) return;
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    let raf = 0;
+    const update = () => {
+      const slots = scroller.querySelectorAll<HTMLElement>(".sorter-slot");
+      if (!slots.length) return;
+      const sRect = scroller.getBoundingClientRect();
+      const viewportCenterX = sRect.left + sRect.width / 2;
+      let closest = 0;
+      let minDist = Infinity;
+      slots.forEach((slot, idx) => {
+        const r = slot.getBoundingClientRect();
+        const dist = Math.abs(r.left + r.width / 2 - viewportCenterX);
+        if (dist < minDist) {
+          minDist = dist;
+          closest = idx;
+        }
+      });
+      setCenteredIndex(closest);
+    };
+    const onScroll = () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(update);
+    };
+    update();
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      scroller.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [isMobile, photos.length]);
+
   // Measure room height → derive slide size so rows fit vertically.
   // Desktop: 3 rows → slide = (roomH / 3) - channel padding allowance.
-  // Mobile: 1 row → slide = roomH - plate area - bottom padding.
+  // Mobile: 1 row, slide capped slightly smaller so its bottom lands just
+  // above the fixed-height metabox without ever needing to resize when the
+  // sheet opens/closes.
   useLayoutEffect(() => {
     const el = roomRef.current;
     if (!el) return;
     const update = () => {
       const h = el.clientHeight;
       const size = isMobile
-        ? Math.max(180, Math.min(380, h - 110))
+        ? Math.max(180, Math.min(340, h - 110))
         : Math.max(180, Math.min(400, Math.round(((h - 96) / 3 - 6) / 0.95)));
       setSlideSize(size);
     };
@@ -190,21 +237,15 @@ export default function RoomView({
                   {rowPhotos.flatMap((p, rowPos) => {
                     const i = indexById.get(p.id)!;
                     const out: React.ReactElement[] = [];
-                    // Inline plates live only in the top row; repeat every
-                    // PLATE_EVERY photos so a fresh one slides in as the
-                    // previous scrolls out of view.
-                    if (rowIdx === 0 && rowPos % PLATE_EVERY === 0) {
+                    // One title plate at the start of the top channel — a
+                    // room placard, not a repeating chrome strip.
+                    if (rowIdx === 0 && rowPos === 0) {
                       out.push(
-                        <PlateChrome
-                          key={`plate-${rowPos}`}
-                          variant="inline"
+                        <SorterPlate
+                          key="plate"
                           galleryTitle={galleryTitle}
                           galleryNo={galleryNo}
                           worksLabel={worksLabel}
-                          backLabel={backLabel}
-                          backHref={backHref}
-                          onBack={onBack}
-                          accentColor={accentColor}
                         />
                       );
                     }
@@ -252,17 +293,45 @@ export default function RoomView({
           </div>
         </div>
 
-        <PlateChrome
-          variant="fixed"
-          galleryTitle={galleryTitle}
-          galleryNo={galleryNo}
-          worksLabel={worksLabel}
-          backLabel={backLabel}
-          backHref={backHref}
+        <FloatingBack
           onBack={onBack}
-          accentColor={accentColor}
+          backHref={backHref}
+          backLabel={backLabel}
         />
       </div>
+
+      {isMobile && (
+        <button
+          type="button"
+          className="info-fab"
+          onClick={() => setMetaboxOpen((v) => !v)}
+          aria-label={metaboxOpen ? "Hide info" : "Show info"}
+          aria-pressed={metaboxOpen}
+          title={metaboxOpen ? "Hide info" : "Show info"}
+        >
+          {metaboxOpen ? (
+            <PanelBottomClose size={16} />
+          ) : (
+            <PanelBottomOpen size={16} />
+          )}
+        </button>
+      )}
+
+      {isMobile && (
+        <div
+          className="room-meta-sheet"
+          aria-hidden={!metaboxOpen}
+          data-open={metaboxOpen ? "true" : undefined}
+        >
+          <PhotoInfoPanel
+            galleryTitle={galleryTitle}
+            accentColor={accentColor}
+            photo={photos[centeredIndex] ?? photos[0]}
+            index={centeredIndex}
+            total={photos.length}
+          />
+        </div>
+      )}
 
       {lightboxIndex !== null && (
         <HallLightbox
@@ -281,81 +350,41 @@ export default function RoomView({
   );
 }
 
-function PlateChrome({
-  variant,
+function SorterPlate({
   galleryTitle,
   galleryNo,
   worksLabel,
-  backLabel,
-  backHref,
-  onBack,
 }: {
-  variant: "inline" | "fixed";
   galleryTitle: string;
   galleryNo: string | null;
   worksLabel: string;
-  backLabel: string;
-  backHref: string;
-  onBack?: () => void;
-  accentColor: string | null;
 }) {
   return (
-    <div className={`sorter-plate sorter-plate--${variant}`}>
-      <BackControl
-        onBack={onBack}
-        backHref={backHref}
-        backLabel={backLabel}
-        galleryNo={galleryNo}
-      />
+    <div className="sorter-plate sorter-plate--inline">
+      {galleryNo && <div className="plate-no">No.{galleryNo}</div>}
       <div className="plate-name" title={galleryTitle}>
         {galleryTitle}
       </div>
-      <div className="plate-tag">ILLUMINATED</div>
       <div className="plate-works">{worksLabel}</div>
-      <div className="plate-bottom">
-        SLIDE
-        <br />
-        SORTER
-      </div>
     </div>
   );
 }
 
-function BackControl({
+function FloatingBack({
   onBack,
   backHref,
   backLabel,
-  galleryNo,
 }: {
   onBack?: () => void;
   backHref: string;
   backLabel: string;
-  galleryNo: string | null;
 }) {
-  const inner = (
-    <>
-      <svg
-        className="plate-back-arrow"
-        viewBox="0 0 20 14"
-        aria-hidden
-        fill="none"
-      >
-        <path
-          d="M 1 7 L 18 7 M 6 2 L 1 7 L 6 12"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-      {galleryNo && <span className="plate-back-no">No.{galleryNo}</span>}
-    </>
-  );
+  const inner = <ArrowLeft size={16} />;
   if (onBack) {
     return (
       <button
         type="button"
-        className="plate-back"
+        className="back-fab"
         onClick={onBack}
         aria-label={backLabel}
         title={backLabel}
@@ -367,7 +396,7 @@ function BackControl({
   return (
     <Link
       href={backHref}
-      className="plate-back"
+      className="back-fab"
       aria-label={backLabel}
       title={backLabel}
     >
