@@ -176,6 +176,17 @@ export default function FieldMap({
 
   const vpRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null);
+  const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinchRef = useRef<{
+    id1: number;
+    id2: number;
+    d0: number;
+    mx0: number;
+    my0: number;
+    vx0: number;
+    vy0: number;
+    vs0: number;
+  } | null>(null);
   const hoverCloseRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const openHover = useCallback((id: string) => {
@@ -331,18 +342,42 @@ export default function FieldMap({
       const vp = vpRef.current;
       if (!vp) return;
       const r = vp.getBoundingClientRect();
-      // On mobile the map runs edge-to-edge horizontally and sits a bit
-      // higher; on desktop we keep side gutters for the chrome.
+      // Mobile fits to width (no left/right gap regardless of orientation) and
+      // sits a bit higher; desktop uses min-fit so both dimensions show.
       const padX = isMobile ? 0 : 60;
       const padY = isMobile ? 120 : 160;
       const yOffset = isMobile ? -60 : -20;
-      const s = Math.min((r.width - padX) / MAP_W, (r.height - padY) / MAP_H);
+      const widthFit = (r.width - padX) / MAP_W;
+      const heightFit = (r.height - padY) / MAP_H;
+      const s = isMobile ? widthFit : Math.min(widthFit, heightFit);
       setView({ s, x: (r.width - MAP_W * s) / 2, y: (r.height - MAP_H * s) / 2 + yOffset });
     };
     fit();
     window.addEventListener("resize", fit);
     return () => window.removeEventListener("resize", fit);
   }, [MAP_W, MAP_H, isMobile]);
+
+  // Enforce "no horizontal gap on mobile": scale can't drop below what's
+  // needed to cover the viewport width, and horizontal pan can't move a
+  // map edge inside the viewport.
+  const clampScale = useCallback((s: number) => {
+    const vp = vpRef.current;
+    const minS = vp && isMobile ? vp.getBoundingClientRect().width / MAP_W : 0.4;
+    return Math.min(4, Math.max(minS, s));
+  }, [isMobile, MAP_W]);
+
+  const clampView = useCallback((v: { x: number; y: number; s: number }) => {
+    const vp = vpRef.current;
+    if (!vp) return v;
+    const r = vp.getBoundingClientRect();
+    const s = clampScale(v.s);
+    let x = v.x;
+    if (isMobile) {
+      const mapW = MAP_W * s;
+      x = Math.min(0, Math.max(r.width - mapW, v.x));
+    }
+    return { s, x, y: v.y };
+  }, [clampScale, isMobile, MAP_W]);
 
   // Wheel pan + zoom
   useEffect(() => {
@@ -356,30 +391,56 @@ export default function FieldMap({
           const r = vp.getBoundingClientRect();
           const cx = e.clientX - r.left;
           const cy = e.clientY - r.top;
-          const ns = Math.min(4, Math.max(0.4, v.s * f));
+          const ns = clampScale(v.s * f);
           const k = ns / v.s;
-          return { s: ns, x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k };
+          return clampView({ s: ns, x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k });
         });
       } else {
-        setView((v) => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }));
+        setView((v) => clampView({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }));
       }
     };
     vp.addEventListener("wheel", onWheel, { passive: false });
     return () => vp.removeEventListener("wheel", onWheel);
-  }, []);
+  }, [clampScale, clampView]);
 
   const onDown = (e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest("[data-region]")) return;
     // Capture the pointer so we keep getting move/up events even if the
     // finger slides off the viewport (touch dragging the map off-screen).
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    dragRef.current = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointersRef.current.size >= 2 && !pinchRef.current) {
+      // Second finger landed — start pinch and cancel any single-finger drag.
+      const vp = vpRef.current;
+      if (!vp) return;
+      const r = vp.getBoundingClientRect();
+      const entries = Array.from(pointersRef.current.entries()).slice(0, 2);
+      const [id1, p1] = entries[0];
+      const [id2, p2] = entries[1];
+      pinchRef.current = {
+        id1,
+        id2,
+        d0: Math.hypot(p1.x - p2.x, p1.y - p2.y) || 1,
+        mx0: (p1.x + p2.x) / 2 - r.left,
+        my0: (p1.y + p2.y) / 2 - r.top,
+        vx0: view.x,
+        vy0: view.y,
+        vs0: view.s,
+      };
+      dragRef.current = null;
+    } else if (pointersRef.current.size === 1) {
+      dragRef.current = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
+    }
   };
 
   const onMove = (e: React.PointerEvent) => {
     const vp = vpRef.current;
     if (!vp) return;
     const r = vp.getBoundingClientRect();
+    if (pointersRef.current.has(e.pointerId)) {
+      pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    }
     const sx = (e.clientX - r.left - view.x) / view.s;
     const sy = (e.clientY - r.top - view.y) / view.s;
     let lat = 0;
@@ -392,9 +453,29 @@ export default function FieldMap({
       }
     }
     setCursor({ x: e.clientX - r.left, y: e.clientY - r.top, lat, lng });
+
+    // Pinch takes priority: scale around the initial midpoint, then translate
+    // by the midpoint delta so the gesture follows the fingers.
+    const pinch = pinchRef.current;
+    if (pinch) {
+      const p1 = pointersRef.current.get(pinch.id1);
+      const p2 = pointersRef.current.get(pinch.id2);
+      if (p1 && p2) {
+        const d = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+        const mx = (p1.x + p2.x) / 2 - r.left;
+        const my = (p1.y + p2.y) / 2 - r.top;
+        const ns = clampScale(pinch.vs0 * (d / pinch.d0));
+        const k = ns / pinch.vs0;
+        const x = pinch.mx0 - (pinch.mx0 - pinch.vx0) * k + (mx - pinch.mx0);
+        const y = pinch.my0 - (pinch.my0 - pinch.vy0) * k + (my - pinch.my0);
+        setView(clampView({ s: ns, x, y }));
+      }
+      return;
+    }
+
     const drag = dragRef.current;
     if (!drag) return;
-    setView((v) => ({
+    setView((v) => clampView({
       ...v,
       x: drag.vx + (e.clientX - drag.x),
       y: drag.vy + (e.clientY - drag.y),
@@ -405,7 +486,26 @@ export default function FieldMap({
     if ((e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) {
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
     }
-    dragRef.current = null;
+    pointersRef.current.delete(e.pointerId);
+    if (
+      pinchRef.current &&
+      (pinchRef.current.id1 === e.pointerId || pinchRef.current.id2 === e.pointerId)
+    ) {
+      pinchRef.current = null;
+    }
+    if (pointersRef.current.size === 0) {
+      dragRef.current = null;
+    } else if (pointersRef.current.size === 1 && !pinchRef.current) {
+      // Hand off to single-finger pan with the remaining pointer so the user
+      // can keep dragging after lifting one finger from a pinch.
+      const remaining = Array.from(pointersRef.current.values())[0];
+      dragRef.current = {
+        x: remaining.x,
+        y: remaining.y,
+        vx: view.x,
+        vy: view.y,
+      };
+    }
   };
 
   // Project regions
@@ -442,11 +542,11 @@ export default function FieldMap({
     const cx = r.width / 2;
     const cy = r.height / 2;
     setView((v) => {
-      const ns = Math.min(4, Math.max(0.4, v.s * factor));
+      const ns = clampScale(v.s * factor);
       const k = ns / v.s;
-      return { s: ns, x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k };
+      return clampView({ s: ns, x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k });
     });
-  }, []);
+  }, [clampScale, clampView]);
 
   return (
     <div

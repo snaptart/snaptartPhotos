@@ -172,20 +172,6 @@
   transform-origin: center bottom;
 }
 
-/* contact shadow beneath slide — pooled at the ridge where the slide meets it */
-.sorter-slot::after {
-  content: "";
-  position: absolute;
-  left: 4%;
-  right: 4%;
-  bottom: -6px;
-  height: 12px;
-  background: radial-gradient(ellipse at center, rgba(25, 35, 55, 0.42) 0%, transparent 70%);
-  filter: blur(4px);
-  z-index: 0;
-  pointer-events: none;
-}
-
 /* Override Slide's big directional drop-shadow — in a channel the slide
    rests on the ridge; shadow should be tight and close, not a lifted cast.
    Leave the slide-root transform alone — base slide.css handles the 90°
@@ -385,26 +371,44 @@
     /* one tall row — channel fills the whole room */
   }
 
+  .sorter-scroller {
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .sorter-channels {
     /* hide channels 2 and 3 on mobile; only channel 1 is populated */
     flex-direction: row;
+    /* center the (now-shrunk) channel vertically in the room so the molded
+       plastic body shows above and below it */
+    align-items: center;
     padding: 0;
   }
 
   .sorter-channel {
     flex: 1;
-    padding: 0 24px;
-    align-items: center;
+    /* channel slightly shorter than slide so the mount overhangs the top
+       ridge by ~5%; bottom 6px keeps the slide resting on the lower ridge */
+    height: calc(var(--sorter-slide-size, 220px) * 0.95 + 6px);
+    /* large inline padding so first/last slide can snap to viewport center */
+    padding: 0 calc(50vw - var(--sorter-slide-size, 220px) / 2) 6px;
+    align-items: flex-end;
+  }
+
+  /* slightly larger molded ridge beads on mobile */
+  .sorter-channel::before {
+    top: -18px;
+    height: 36px;
+  }
+  .sorter-channel::after {
+    bottom: -18px;
+    height: 36px;
   }
 
   .sorter-slot {
-    align-items: center;
-  }
-
-  /* kill the ridge beads since there's only one row */
-  .sorter-channel::before,
-  .sorter-channel::after {
-    display: none;
+    align-items: flex-end;
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
   }
 
   /* Inline plates are a desktop-only device; mobile keeps the single fixed plate. */
