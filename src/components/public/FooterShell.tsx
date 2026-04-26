@@ -1,28 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
 import { parseLinks } from "@/lib/parseLinks";
-
-const alignClass: Record<string, string> = {
-  left: "text-left",
-  center: "text-center",
-  right: "text-right",
-};
 
 interface FooterShellProps {
   footerText: string | null;
-  footerAlignment: string;
   contactEmail: string | null;
 }
 
 export function FooterShell({
   footerText,
-  footerAlignment,
   contactEmail,
 }: FooterShellProps) {
-  const pathname = usePathname();
-  const isHome = pathname === "/";
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -63,23 +52,6 @@ export function FooterShell({
       )}
     </>
   );
-
-  if (isHome) {
-    const alignment = alignClass[footerAlignment] ?? "text-center";
-    return (
-      <footer
-        className={`border-t border-neutral-200 px-4 py-4 md:px-6 md:py-8 ${alignment}`}
-        style={{
-          backgroundColor: "var(--theme-color-footer-bg)",
-          fontFamily: "var(--theme-font-footer-family, var(--theme-font-footer))",
-          fontSize: "var(--theme-font-footer-size, var(--theme-footer-font-size))",
-          color: "var(--theme-color-footer-text)",
-        }}
-      >
-        {body}
-      </footer>
-    );
-  }
 
   return (
     <div

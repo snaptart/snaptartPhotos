@@ -5,7 +5,6 @@ import { FooterShell } from "./FooterShell";
 export async function Footer() {
   let settings: {
     footerText: string | null;
-    footerAlignment: string;
     contactEmail: string | null;
   } | null = null;
 
@@ -21,7 +20,6 @@ export async function Footer() {
   return (
     <FooterShell
       footerText={settings.footerText}
-      footerAlignment={settings.footerAlignment}
       contactEmail={settings.contactEmail}
     />
   );

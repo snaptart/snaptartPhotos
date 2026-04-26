@@ -1,4 +1,5 @@
 import { Navbar } from "@/components/public/Navbar";
+import { Footer } from "@/components/public/Footer";
 import { db } from "@/lib/db";
 import { siteSettings, themes } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -58,6 +59,7 @@ export default async function PublicLayout({
       >
         <Navbar />
         <main className="flex flex-1 flex-col">{children}</main>
+        <Footer />
       </div>
     </>
   );
