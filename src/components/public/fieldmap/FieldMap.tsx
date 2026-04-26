@@ -318,14 +318,22 @@ export default function FieldMap({
     };
   }, [projection, projectionKey]);
 
-  // Restore persisted view state
+  // Restore persisted view state. Clamp years to current yearBounds so an old
+  // saved range from before new photos were added can't shrink the visible
+  // set and hide pins. yearBounds is read via ref so deps stay [] (length must
+  // be stable across HMR).
+  const yearBoundsRef = useRef(yearBounds);
+  yearBoundsRef.current = yearBounds;
   useEffect(() => {
     try {
       const saved = localStorage.getItem("snaptart-fm-view");
       if (saved) {
         const s = JSON.parse(saved) as { filter?: string; years?: [number, number] };
         if (s.filter) setFilter(s.filter);
-        if (s.years) setYears(s.years);
+        if (s.years) {
+          const [lo, hi] = yearBoundsRef.current;
+          setYears([Math.max(s.years[0], lo), Math.min(s.years[1], hi)]);
+        }
       }
     } catch {}
   }, []);
@@ -477,10 +485,12 @@ export default function FieldMap({
 
     const drag = dragRef.current;
     if (!drag) return;
+    // Mobile: lock vertical drag — only horizontal pan with one finger.
+    // Pinch (two fingers) still freely adjusts y to anchor on the midpoint.
     setView((v) => clampView({
       ...v,
       x: drag.vx + (e.clientX - drag.x),
-      y: drag.vy + (e.clientY - drag.y),
+      y: isMobile ? v.y : drag.vy + (e.clientY - drag.y),
     }));
   };
 

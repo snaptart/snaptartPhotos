@@ -161,6 +161,26 @@ export default function RoomView({
     return () => ro.disconnect();
   }, [isMobile]);
 
+  // Keep the mobile sorter centered on whatever photo the user is viewing in
+  // the lightbox. As they navigate (onIndexChange fires), the room scrolls in
+  // sync underneath the lightbox. By the time the lightbox finishes its 300ms
+  // close fade, the room is already on the matching slide — no visible jump.
+  // Mobile-only: on mobile, slots render in photo order in a single channel,
+  // so slots[i] === photos[i].
+  useEffect(() => {
+    if (!isMobile) return;
+    if (lightboxIndex === null) return;
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const slots = scroller.querySelectorAll<HTMLElement>(".sorter-slot");
+    slots[lightboxIndex]?.scrollIntoView({
+      behavior: "auto",
+      block: "nearest",
+      inline: "center",
+    });
+    setCenteredIndex(lightboxIndex);
+  }, [lightboxIndex, isMobile]);
+
   // Vertical wheel → horizontal scroll; keyboard arrows to walk the sorter.
   useEffect(() => {
     const el = scrollerRef.current;
@@ -343,27 +363,7 @@ export default function RoomView({
           accentColor={accentColor}
           photos={photos}
           index={lightboxIndex}
-          onClose={() => {
-            // Sync the mobile sorter to wherever the user left off in the
-            // lightbox so closing returns to that photo, not the one they
-            // originally clicked. Mobile-only: on mobile slots render in
-            // photo order in a single channel, so slots[i] === photos[i].
-            // Done before the state update so the scroll happens behind
-            // the still-open lightbox and the user never sees it move.
-            const idx = lightboxIndex;
-            if (idx !== null && isMobile && scrollerRef.current) {
-              const slots = scrollerRef.current.querySelectorAll<HTMLElement>(
-                ".sorter-slot"
-              );
-              slots[idx]?.scrollIntoView({
-                behavior: "auto",
-                block: "nearest",
-                inline: "center",
-              });
-              setCenteredIndex(idx);
-            }
-            setLightboxIndex(null);
-          }}
+          onClose={() => setLightboxIndex(null)}
           onIndexChange={setLightboxIndex}
           filmStamp={filmStamp}
           handwritingFont={handwritingFont}

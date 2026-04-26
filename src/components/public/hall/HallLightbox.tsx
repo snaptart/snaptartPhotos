@@ -524,6 +524,16 @@ function HallLightboxDesktop({
             >
               <div
                 key={`in-${displayIndex}`}
+                role="button"
+                tabIndex={0}
+                aria-label="Open fullscreen (F)"
+                onClick={toggleImmersive}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    toggleImmersive();
+                  }
+                }}
                 style={{
                   position: "absolute",
                   top: "50%",
@@ -539,6 +549,7 @@ function HallLightboxDesktop({
                     outgoingIndex !== null
                       ? `opacity ${FADE_MS}ms ease`
                       : undefined,
+                  cursor: "zoom-in",
                 }}
               >
                 <Slide
