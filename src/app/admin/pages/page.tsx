@@ -29,6 +29,7 @@ interface Page {
   slug: string;
   pageType: string;
   showTitle: boolean;
+  isFullBleed: boolean;
   isPublished: boolean;
   position: number;
   metaTitle: string | null;
@@ -109,6 +110,7 @@ export default function PagesPage() {
         title: form.get("title"),
         pageType: form.get("pageType"),
         showTitle: form.get("showTitle") === "on",
+        isFullBleed: form.get("isFullBleed") === "on",
         metaTitle: form.get("metaTitle") || null,
         metaDescription: form.get("metaDescription") || null,
       }),
@@ -270,6 +272,15 @@ export default function PagesPage() {
                   className="accent-admin-accent"
                 />
                 Show page title
+              </label>
+              <label className="flex items-center gap-2 text-[13px] text-admin-ink cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="isFullBleed"
+                  defaultChecked={editingPage.isFullBleed}
+                  className="accent-admin-accent"
+                />
+                Full bleed (drop the centered max-width wrapper — for big blocks like Field Map)
               </label>
               <details className="rounded-md border border-admin-border p-3">
                 <summary className="cursor-pointer text-[13px] font-medium text-admin-ink-soft">

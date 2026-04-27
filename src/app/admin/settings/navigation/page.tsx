@@ -51,13 +51,6 @@ interface FooterDraft {
   footerText: string;
 }
 
-type FieldMapStyle = "modern" | "mono" | "blueprint";
-
-interface HomepageDraft {
-  homepageType: "page" | "field_map";
-  fieldMapStyle: FieldMapStyle;
-}
-
 const emptyForm: FormState = {
   label: "",
   url: "",
@@ -65,26 +58,8 @@ const emptyForm: FormState = {
   targetId: null,
 };
 
-function isFieldMapStyle(v: unknown): v is FieldMapStyle {
-  return v === "modern" || v === "mono" || v === "blueprint";
-}
-
 export default function NavigationSettingsPage() {
   const [loaded, setLoaded] = useState(false);
-
-  // Homepage behaviour
-  const [homepage, setHomepage] = useState<HomepageDraft>({
-    homepageType: "page",
-    fieldMapStyle: "modern",
-  });
-  const [savingHomepage, setSavingHomepage] = useState(false);
-  const {
-    message: hpMsg,
-    showSuccess: hpOK,
-    showError: hpBad,
-    clear: hpClear,
-    alertClass: hpAlert,
-  } = useMessage();
 
   // Footer settings
   const [footer, setFooter] = useState<FooterDraft>({
@@ -135,10 +110,6 @@ export default function NavigationSettingsPage() {
       setFooter({
         footerText: settings.footerText ?? "",
       });
-      setHomepage({
-        homepageType: settings.homepageType === "field_map" ? "field_map" : "page",
-        fieldMapStyle: isFieldMapStyle(settings.fieldMapStyle) ? settings.fieldMapStyle : "modern",
-      });
     }
     setItems(items);
     setPageOptions(pages as LinkOption[]);
@@ -149,24 +120,6 @@ export default function NavigationSettingsPage() {
   useEffect(() => {
     fetchEverything();
   }, [fetchEverything]);
-
-  // ── Homepage save ────────────────────────────────────────────
-  async function handleHomepageSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setSavingHomepage(true);
-    hpClear();
-    const res = await fetch("/api/settings", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        homepageType: homepage.homepageType,
-        fieldMapStyle: homepage.fieldMapStyle,
-      }),
-    });
-    if (res.ok) hpOK("Homepage saved.");
-    else hpBad("Failed to save homepage.");
-    setSavingHomepage(false);
-  }
 
   // ── Footer save ────────────────────────────────────────────────
   async function handleFooterSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -281,54 +234,6 @@ export default function NavigationSettingsPage() {
 
   return (
     <div className="max-w-[640px]">
-      {/* ── Homepage behaviour ──────────────────────── */}
-      <form onSubmit={handleHomepageSubmit}>
-        <SettingGroup
-          title="Homepage"
-          desc="What visitors see at the site root."
-        >
-          {hpMsg && <div className={`${hpAlert} mb-2`}>{hpMsg.text}</div>}
-          <Field label="Show at /" htmlFor="homepageType" inline hint="Pick an existing page by setting the homepage in the page editor, or serve the Field Map at /.">
-            <Select
-              id="homepageType"
-              value={homepage.homepageType}
-              onChange={(e) =>
-                setHomepage((h) => ({
-                  ...h,
-                  homepageType: e.target.value === "field_map" ? "field_map" : "page",
-                }))
-              }
-            >
-              <option value="page">A page (default — uses your selected homepage)</option>
-              <option value="field_map">The Field Map</option>
-            </Select>
-          </Field>
-          {homepage.homepageType === "field_map" && (
-            <Field label="Map style" htmlFor="fieldMapStyle" inline hint="Colors and mood of the world map.">
-              <Select
-                id="fieldMapStyle"
-                value={homepage.fieldMapStyle}
-                onChange={(e) =>
-                  setHomepage((h) => ({
-                    ...h,
-                    fieldMapStyle: isFieldMapStyle(e.target.value) ? e.target.value : "modern",
-                  }))
-                }
-              >
-                <option value="modern">Modern — white, soft beige land, pale blue ocean</option>
-                <option value="mono">Mono — greyscale, quiet</option>
-                <option value="blueprint">Blueprint — dark navy, cobalt accents</option>
-              </Select>
-            </Field>
-          )}
-        </SettingGroup>
-        <div className="flex justify-end mb-4">
-          <Button type="submit" kind="primary" disabled={savingHomepage}>
-            {savingHomepage ? "Saving..." : "Save homepage"}
-          </Button>
-        </div>
-      </form>
-
       {/* ── Main menu ───────────────────────────────── */}
       <SettingGroup
         title="Main menu"

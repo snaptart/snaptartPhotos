@@ -58,6 +58,16 @@ body {
   }
 }
 
+/* Full-bleed Puck pages: make Puck's outer wrapper participate in the
+   flex chain so blocks set to fill (e.g. Field Map) get the available
+   height instead of overflowing the viewport. */
+.fullbleed-puck-host > div {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0%;
+  min-height: 0;
+}
+
 /* Puck Columns: single column on mobile, custom widths at md+ */
 .puck-columns {
   grid-template-columns: 1fr;

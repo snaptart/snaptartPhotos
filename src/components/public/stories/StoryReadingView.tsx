@@ -3,6 +3,23 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { fontRole } from "@/lib/theme/role-style";
+import PaginatedReader from "./PaginatedReader";
+
+const DEFAULT_END_MARK = "❦";
+
+export type StoryChrome = {
+  accentColor?: string;
+  paperColor?: string;
+  inkColor?: string;
+  frontispieceAspect?: string;
+  dropCap?: boolean;
+  showEndMark?: boolean;
+  endMark?: string;
+  showProgressBar?: boolean;
+  showNextStory?: boolean;
+  bodyMaxWidth?: number;
+  paginate?: boolean;
+};
 
 export default function StoryReadingView({
   number,
@@ -14,6 +31,7 @@ export default function StoryReadingView({
   readTime,
   frontispiece,
   nextStory,
+  chrome,
   children,
 }: {
   number: number;
@@ -25,8 +43,25 @@ export default function StoryReadingView({
   readTime: string;
   frontispiece: string | null;
   nextStory: { title: string; slug: string; dek: string } | null;
+  chrome?: StoryChrome;
   children: React.ReactNode;
 }) {
+  const paginate = chrome?.paginate === true;
+  const showProgressBar = chrome?.showProgressBar !== false && !paginate;
+  const dropCap = chrome?.dropCap !== false;
+  const showEndMark = chrome?.showEndMark !== false;
+  const endMarkGlyph = chrome?.endMark || DEFAULT_END_MARK;
+  const showNext = chrome?.showNextStory !== false && !!nextStory;
+  const bodyMaxWidth = chrome?.bodyMaxWidth ?? 680;
+  const aspect = chrome?.frontispieceAspect ?? "16/9";
+  const aspectStyle = aspect === "original"
+    ? { aspectRatio: undefined, objectFit: undefined as React.CSSProperties["objectFit"] }
+    : { aspectRatio: aspect.replace("/", " / "), objectFit: "cover" as const };
+
+  const tokenOverrides: React.CSSProperties = {};
+  if (chrome?.accentColor) (tokenOverrides as Record<string, string>)["--st-accent"] = chrome.accentColor;
+  if (chrome?.paperColor) (tokenOverrides as Record<string, string>)["--st-paper"] = chrome.paperColor;
+  if (chrome?.inkColor) (tokenOverrides as Record<string, string>)["--st-ink"] = chrome.inkColor;
   const [progress, setProgress] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -42,11 +77,20 @@ export default function StoryReadingView({
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const Wrapper: React.FC<{ children: React.ReactNode }> = paginate
+    ? PaginatedReader
+    : ({ children }) => <>{children}</>;
+
   return (
-    <div ref={rootRef} className="stories-ex">
+    <div
+      ref={rootRef}
+      className={`stories-ex${dropCap ? "" : " stories-ex--no-dropcap"}${paginate ? " stories-ex--paginate" : ""}`}
+      style={tokenOverrides}
+    >
       <StoryTokens />
 
       {/* progress bar */}
+      {showProgressBar && (
       <div
         style={{
           position: "fixed",
@@ -67,7 +111,9 @@ export default function StoryReadingView({
           }}
         />
       </div>
+      )}
 
+      <Wrapper>
       {/* title page */}
       <div
         style={{
@@ -162,8 +208,7 @@ export default function StoryReadingView({
                 display: "block",
                 width: "100%",
                 height: "auto",
-                aspectRatio: "16 / 9",
-                objectFit: "cover",
+                ...aspectStyle,
               }}
             />
           </div>
@@ -186,7 +231,7 @@ export default function StoryReadingView({
       <article
         className="story-body"
         style={{
-          maxWidth: 680,
+          maxWidth: bodyMaxWidth,
           margin: "0 auto",
           padding: "40px 32px 80px",
           ...fontRole("body"),
@@ -199,17 +244,19 @@ export default function StoryReadingView({
       </article>
 
       {/* end mark */}
-      <div
-        style={{
-          textAlign: "center",
-          padding: "20px 0 80px",
-          ...fontRole("headings"),
-          fontSize: 22,
-          color: "var(--st-ink-soft)",
-        }}
-      >
-        ❦
-      </div>
+      {showEndMark && (
+        <div
+          style={{
+            textAlign: "center",
+            padding: "20px 0 80px",
+            ...fontRole("headings"),
+            fontSize: 22,
+            color: "var(--st-ink-soft)",
+          }}
+        >
+          {endMarkGlyph}
+        </div>
+      )}
 
       {/* colophon / next */}
       <div
@@ -223,7 +270,7 @@ export default function StoryReadingView({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: nextStory ? "1fr 1fr" : "1fr",
+            gridTemplateColumns: showNext ? "1fr 1fr" : "1fr",
             gap: 40,
             alignItems: "start",
           }}
@@ -255,7 +302,7 @@ export default function StoryReadingView({
               </Link>
             </div>
           </div>
-          {nextStory && (
+          {showNext && nextStory && (
             <Link
               href={`/stories/${nextStory.slug}`}
               style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
@@ -312,6 +359,7 @@ export default function StoryReadingView({
           )}
         </div>
       </div>
+      </Wrapper>
     </div>
   );
 }
@@ -357,8 +405,8 @@ function StoryTokens() {
         --st-ink-faint: #c9c4bb;
         --st-accent: #b8824a;
       }
-      .story-body > *:first-child::first-letter,
-      .story-body > p:first-of-type::first-letter {
+      .stories-ex:not(.stories-ex--no-dropcap) .story-body > *:first-child::first-letter,
+      .stories-ex:not(.stories-ex--no-dropcap) .story-body > p:first-of-type::first-letter {
         float: left;
         font-family: var(--theme-font-headings-family);
         font-weight: var(--theme-font-headings-weight);
@@ -408,6 +456,19 @@ function StoryTokens() {
         font-size: 40px;
         color: var(--st-accent);
         letter-spacing: -0.2px;
+      }
+      .stories-ex--paginate .story-body img,
+      .stories-ex--paginate .story-body figure,
+      .stories-ex--paginate .story-body blockquote {
+        break-inside: avoid;
+      }
+      .stories-ex--paginate .story-body img {
+        max-height: 80vh;
+        width: auto;
+      }
+      .stories-ex--paginate .story-body h2,
+      .stories-ex--paginate .story-body h3 {
+        break-after: avoid;
       }
     `}</style>
   );

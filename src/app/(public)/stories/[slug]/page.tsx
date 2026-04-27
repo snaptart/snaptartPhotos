@@ -17,6 +17,17 @@ type StoryMeta = {
   readTime?: string;
   wordCount?: number;
   frontispieceUrl?: string;
+  accentColor?: string;
+  paperColor?: string;
+  inkColor?: string;
+  frontispieceAspect?: string;
+  dropCap?: boolean;
+  showEndMark?: boolean;
+  endMark?: string;
+  showProgressBar?: boolean;
+  showNextStory?: boolean;
+  bodyMaxWidth?: number;
+  paginate?: boolean;
 };
 
 interface Props {
@@ -105,6 +116,20 @@ export default async function StoryPage({ params }: Props) {
   const readTime = meta.readTime ??
     (meta.wordCount ? `${Math.max(1, Math.round(meta.wordCount / 220))} min read` : "");
 
+  const chrome = {
+    accentColor: meta.accentColor,
+    paperColor: meta.paperColor,
+    inkColor: meta.inkColor,
+    frontispieceAspect: meta.frontispieceAspect,
+    dropCap: meta.dropCap,
+    showEndMark: meta.showEndMark,
+    endMark: meta.endMark,
+    showProgressBar: meta.showProgressBar,
+    showNextStory: meta.showNextStory,
+    bodyMaxWidth: meta.bodyMaxWidth,
+    paginate: meta.paginate,
+  };
+
   if (!isPuckData(story.content)) {
     return (
       <StoryReadingView
@@ -117,6 +142,7 @@ export default async function StoryPage({ params }: Props) {
         readTime={readTime}
         frontispiece={meta.frontispieceUrl ?? story.ogImageUrl ?? null}
         nextStory={nextStory}
+        chrome={chrome}
       >
         <p style={{ textAlign: "center", fontStyle: "italic", color: "var(--st-ink-soft)" }}>
           This story has no content yet.
@@ -182,6 +208,7 @@ export default async function StoryPage({ params }: Props) {
       readTime={readTime}
       frontispiece={meta.frontispieceUrl ?? story.ogImageUrl ?? null}
       nextStory={nextStory}
+      chrome={chrome}
     >
       <PuckRenderer data={story.content} galleryPhotos={galleryPhotos} globalLightbox={globalLightbox} />
     </StoryReadingView>

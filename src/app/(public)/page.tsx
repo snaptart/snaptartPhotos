@@ -9,10 +9,9 @@ import TextAlign from "@tiptap/extension-text-align";
 import Underline from "@tiptap/extension-underline";
 import PuckRenderer from "@/components/public/PuckRenderer";
 import type { Data } from "@puckeditor/core";
-import type { EmbedPhoto, GlobalLightboxSettings } from "@/lib/puck/config";
+import type { EmbedPhoto, FieldMapBlockData, GlobalLightboxSettings } from "@/lib/puck/config";
 import siteConfig from "@/lib/site.config";
 import { fontRole } from "@/lib/theme/role-style";
-import FieldMap from "@/components/public/fieldmap/FieldMap";
 import { getFieldMapData } from "@/lib/fieldmap/query";
 
 const tiptapExtensions = [
@@ -34,30 +33,6 @@ function isPuckData(content: unknown): content is Data {
 
 export default async function HomePage() {
   const [settingsRow] = await db.select().from(siteSettings).limit(1);
-
-  if (settingsRow?.homepageType === "field_map") {
-    const data = await getFieldMapData();
-    const rawStyle = settingsRow?.fieldMapStyle;
-    const mapStyle: "modern" | "mono" | "blueprint" =
-      rawStyle === "mono" || rawStyle === "blueprint" ? rawStyle : "modern";
-    return (
-      <>
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
-        />
-        <div className="relative flex-1 bg-white">
-          <FieldMap
-            regions={data.regions}
-            yearBounds={data.yearBounds}
-            filters={data.filters}
-            mapStyle={mapStyle}
-            siteTitle={settingsRow?.siteTitle ?? siteConfig.siteName}
-          />
-        </div>
-      </>
-    );
-  }
 
   if (!settingsRow?.homepageId) {
     return (
@@ -130,17 +105,50 @@ export default async function HomePage() {
         }));
     }
 
+    const hasFieldMap = (page.content.content ?? []).some(
+      (item: { type: string }) => item.type === "FieldMap"
+    );
+    const fieldMap: FieldMapBlockData | null = hasFieldMap
+      ? {
+          ...(await getFieldMapData()),
+          siteTitle: settingsRow?.siteTitle ?? siteConfig.siteName,
+        }
+      : null;
+
     const firstItem = (page.content.content ?? [])[0] as { type: string } | undefined;
     const heroFirst = firstItem?.type === "HeroSlideshow";
 
+    if (page.isFullBleed) {
+      return (
+        <div className="fullbleed-puck-host flex flex-1 flex-col">
+          {page.showTitle && (
+            <h1 className="px-4 pt-12 pb-8 text-center text-4xl tracking-tight" style={fontRole("headings")}>
+              {page.title}
+            </h1>
+          )}
+          <PuckRenderer
+            data={page.content}
+            galleryPhotos={galleryPhotos}
+            globalLightbox={globalLightbox}
+            fieldMap={fieldMap}
+          />
+        </div>
+      );
+    }
+
     return (
-      <div className={`mx-auto max-w-5xl px-4 ${heroFirst ? "pt-0 pb-12" : "py-12"}`}>
+      <div className={`mx-auto w-full max-w-5xl px-4 ${heroFirst ? "pt-0 pb-12" : "py-12"}`}>
         {page.showTitle && (
           <h1 className="mb-8 text-center text-4xl tracking-tight" style={fontRole("headings")}>
             {page.title}
           </h1>
         )}
-        <PuckRenderer data={page.content} galleryPhotos={galleryPhotos} globalLightbox={globalLightbox} />
+        <PuckRenderer
+          data={page.content}
+          galleryPhotos={galleryPhotos}
+          globalLightbox={globalLightbox}
+          fieldMap={fieldMap}
+        />
       </div>
     );
   }

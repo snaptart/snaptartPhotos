@@ -23,6 +23,12 @@ import Lightbox from "@/components/public/Lightbox";
 import type { LightboxPhoto, LightboxSettings } from "@/components/public/Lightbox";
 import StoriesIndex, { STORIES_INDEX_DEFAULTS } from "@/components/public/stories/StoriesIndex";
 import type { IndexStory } from "@/components/public/stories/StoriesIndex";
+import FieldMap from "@/components/public/fieldmap/FieldMap";
+import type {
+  FieldMapFilter,
+  FieldMapRegion,
+  MapStyle,
+} from "@/components/public/fieldmap/types";
 import { FormWrapperRender } from "@/components/puck/form/FormWrapper";
 import type { FormWrapperProps } from "@/components/puck/form/FormWrapper";
 import {
@@ -176,6 +182,19 @@ type StoriesIndexBlockProps = {
   dek: string;
 };
 
+type FieldMapBlockProps = {
+  mapStyle: MapStyle;
+  height: string;
+  showBrand: boolean;
+};
+
+export type FieldMapBlockData = {
+  regions: FieldMapRegion[];
+  yearBounds: [number, number];
+  filters: FieldMapFilter[];
+  siteTitle?: string;
+};
+
 type CarouselProps = {
   slides: CarouselSlide[];
   slidesPerView: number;
@@ -193,6 +212,133 @@ type CarouselProps = {
   borderRadius: number;
 };
 
+type GalleriesIndexProps = {
+  sourceMode: "all" | "manual";
+  selectedSlugs: string[];
+  maxItems: number;
+  sortOrder: "manual" | "position" | "newest" | "oldest" | "title-asc" | "title-desc";
+  columns: "1" | "2" | "3" | "4" | "5" | "6";
+  gap: number;
+  fullBleed: boolean;
+  maxWidth: number;
+  aspectRatio: "natural" | "square" | "4:3" | "3:2" | "16:9";
+  borderRadius: number;
+  imageHoverEffect: "none" | "zoom" | "lift" | "fade" | "darken";
+  showTitle: boolean;
+  showDescription: boolean;
+  titlePosition: "below" | "overlay-bottom" | "overlay-top" | "overlay-center";
+  textAlignment: "left" | "center" | "right";
+  titleFontRole: "headings" | "body" | "navMenu" | "labels";
+  titleSize: number;
+  titleColor: string;
+  titleWeight: "300" | "400" | "500" | "600" | "700" | "800";
+  titleTransform: "none" | "uppercase" | "lowercase" | "capitalize";
+  descriptionSize: number;
+  descriptionColor: string;
+  textPaddingX: number;
+  textPaddingY: number;
+  textGap: number;
+  overlayBgColor: string;
+  overlayOpacity: number;
+  marginTop: number;
+  marginBottom: number;
+  transitionMs: number;
+};
+
+type LinkListItem = {
+  id: string;
+  label: string;
+  description: string;
+  link: string;
+  linkTarget: "_self" | "_blank";
+  imageUrl: string;
+  iconText: string;
+};
+
+type LinkListProps = {
+  items: LinkListItem[];
+  layout: "vertical-list" | "horizontal-pills" | "button-stack" | "card-grid";
+  columns: "1" | "2" | "3" | "4";
+  gap: number;
+  alignment: "left" | "center" | "right";
+  itemAlignment: "left" | "center" | "right";
+  showImage: boolean;
+  showDescription: boolean;
+  showIcon: boolean;
+  imagePosition: "left" | "right" | "top";
+  imageSize: number;
+  imageAspectRatio: "square" | "4:3" | "3:2" | "16:9" | "natural";
+  imageBorderRadius: number;
+  iconGap: number;
+  bgColor: string;
+  bgOpacity: number;
+  textColor: string;
+  borderColor: string;
+  borderWidth: number;
+  borderRadius: number;
+  paddingX: number;
+  paddingY: number;
+  fontRoleKey: "body" | "headings" | "navMenu" | "labels";
+  fontSize: number;
+  fontWeight: "300" | "400" | "500" | "600" | "700" | "800";
+  letterSpacing: number;
+  textTransform: "none" | "uppercase" | "lowercase" | "capitalize";
+  italic: boolean;
+  underline: boolean;
+  descriptionSize: number;
+  descriptionColor: string;
+  hoverBgColor: string;
+  hoverTextColor: string;
+  hoverBorderColor: string;
+  hoverEffect: "none" | "lift" | "scale-up" | "underline" | "indent";
+  shadow: "none" | "sm" | "md" | "lg";
+  hoverShadow: "none" | "sm" | "md" | "lg";
+  marginTop: number;
+  marginBottom: number;
+  transitionMs: number;
+  dividers: boolean;
+  dividerColor: string;
+};
+
+type ButtonProps = {
+  label: string;
+  iconText: string;
+  iconPosition: "left" | "right";
+  iconGap: number;
+  link: string;
+  linkTarget: "_self" | "_blank";
+  ariaLabel: string;
+  alignment: "left" | "center" | "right";
+  widthMode: "auto" | "full" | "custom";
+  customWidth: number;
+  minWidth: number;
+  bgColor: string;
+  bgOpacity: number;
+  textColor: string;
+  borderColor: string;
+  borderWidth: number;
+  borderStyle: "solid" | "dashed" | "dotted";
+  borderRadius: number;
+  paddingX: number;
+  paddingY: number;
+  marginTop: number;
+  marginBottom: number;
+  fontRoleKey: "body" | "headings" | "navMenu" | "labels";
+  fontSize: number;
+  fontWeight: "300" | "400" | "500" | "600" | "700" | "800";
+  letterSpacing: number;
+  textTransform: "none" | "uppercase" | "lowercase" | "capitalize";
+  italic: boolean;
+  underline: boolean;
+  hoverBgColor: string;
+  hoverTextColor: string;
+  hoverBorderColor: string;
+  hoverEffect: "none" | "lift" | "scale-up" | "scale-down";
+  shadow: "none" | "sm" | "md" | "lg";
+  hoverShadow: "none" | "sm" | "md" | "lg";
+  transitionMs: number;
+};
+
 type Components = {
   RichText: RichTextProps;
   Hero: HeroProps;
@@ -203,7 +349,11 @@ type Components = {
   Columns: ColumnsProps;
   GalleryEmbed: GalleryEmbedProps;
   StoriesIndexBlock: StoriesIndexBlockProps;
+  FieldMap: FieldMapBlockProps;
   Carousel: CarouselProps;
+  GalleriesIndex: GalleriesIndexProps;
+  LinkList: LinkListProps;
+  Button: ButtonProps;
   Form: FormWrapperProps;
   TextField: TextFieldProps;
   TextArea: TextAreaProps;
@@ -217,7 +367,7 @@ type Components = {
 
 export const puckConfig: Config<Components> = {
   categories: {
-    content: { components: ["RichText", "ImageBlock", "GalleryEmbed", "Carousel"] },
+    content: { components: ["RichText", "ImageBlock", "Button", "LinkList", "GalleryEmbed", "GalleriesIndex", "Carousel", "FieldMap"] },
     layout: { components: ["Columns", "Spacer", "Container"] },
     hero: { components: ["Hero", "HeroSlideshow"] },
     stories: { title: "Stories", components: ["StoriesIndexBlock"] },
@@ -589,6 +739,990 @@ export const puckConfig: Config<Components> = {
           </figure>
         );
       },
+    },
+
+    GalleriesIndex: {
+      label: `${siteConfig.labels.gallery} Index`,
+      fields: {
+        sourceMode: {
+          type: "radio",
+          label: "Source",
+          options: [
+            { label: "All Published", value: "all" },
+            { label: "Hand-Picked", value: "manual" },
+          ],
+        },
+        selectedSlugs: {
+          type: "custom",
+          label: `Pick ${siteConfig.labels.gallery} (used when Source = Hand-Picked)`,
+          render: ({ value, onChange }) => (
+            <GalleriesMultiSelect value={value} onChange={onChange} />
+          ),
+        },
+        sortOrder: {
+          type: "select",
+          label: "Sort Order",
+          options: [
+            { label: "Manual / As Picked", value: "manual" },
+            { label: "Admin Position", value: "position" },
+            { label: "Newest First", value: "newest" },
+            { label: "Oldest First", value: "oldest" },
+            { label: "Title (A→Z)", value: "title-asc" },
+            { label: "Title (Z→A)", value: "title-desc" },
+          ],
+        },
+        maxItems: {
+          type: "custom",
+          label: "Max Items (0 = no limit)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={48} step={1} unit="" label="Max Items" />
+          ),
+        },
+        columns: {
+          type: "select",
+          label: "Columns",
+          options: [
+            { label: "1", value: "1" },
+            { label: "2", value: "2" },
+            { label: "3", value: "3" },
+            { label: "4", value: "4" },
+            { label: "5", value: "5" },
+            { label: "6", value: "6" },
+          ],
+        },
+        gap: {
+          type: "custom",
+          label: "Gap (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={64} step={2} unit="px" label="Gap" />
+          ),
+        },
+        fullBleed: {
+          type: "radio",
+          label: "Full Bleed",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        maxWidth: {
+          type: "custom",
+          label: "Max Width (% — when not full bleed)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={30} max={100} step={1} unit="%" label="Max Width" />
+          ),
+        },
+        aspectRatio: {
+          type: "select",
+          label: "Image Aspect Ratio",
+          options: [
+            { label: "Natural", value: "natural" },
+            { label: "Square (1:1)", value: "square" },
+            { label: "4:3", value: "4:3" },
+            { label: "3:2", value: "3:2" },
+            { label: "16:9", value: "16:9" },
+          ],
+        },
+        borderRadius: {
+          type: "custom",
+          label: "Corner Radius (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={48} step={1} unit="px" label="Corner Radius" />
+          ),
+        },
+        imageHoverEffect: {
+          type: "select",
+          label: "Image Hover Effect",
+          options: [
+            { label: "None", value: "none" },
+            { label: "Zoom", value: "zoom" },
+            { label: "Lift", value: "lift" },
+            { label: "Fade", value: "fade" },
+            { label: "Darken", value: "darken" },
+          ],
+        },
+        showTitle: {
+          type: "radio",
+          label: "Show Title",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        showDescription: {
+          type: "radio",
+          label: "Show Description",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        titlePosition: {
+          type: "select",
+          label: "Title Position",
+          options: [
+            { label: "Below Image", value: "below" },
+            { label: "Overlay — Bottom", value: "overlay-bottom" },
+            { label: "Overlay — Top", value: "overlay-top" },
+            { label: "Overlay — Center", value: "overlay-center" },
+          ],
+        },
+        textAlignment: {
+          type: "radio",
+          label: "Text Alignment",
+          options: [
+            { label: "Left", value: "left" },
+            { label: "Center", value: "center" },
+            { label: "Right", value: "right" },
+          ],
+        },
+        titleFontRole: {
+          type: "select",
+          label: "Title Font Role",
+          options: [
+            { label: "Headings", value: "headings" },
+            { label: "Body", value: "body" },
+            { label: "Nav / Menu", value: "navMenu" },
+            { label: "Labels", value: "labels" },
+          ],
+        },
+        titleSize: {
+          type: "custom",
+          label: "Title Size (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={10} max={48} step={1} unit="px" label="Title Size" />
+          ),
+        },
+        titleColor: {
+          type: "custom",
+          label: "Title Color",
+          render: ({ value, onChange }) => (
+            <ColorField value={value} onChange={onChange} />
+          ),
+        },
+        titleWeight: {
+          type: "select",
+          label: "Title Weight",
+          options: [
+            { label: "Light (300)", value: "300" },
+            { label: "Regular (400)", value: "400" },
+            { label: "Medium (500)", value: "500" },
+            { label: "Semibold (600)", value: "600" },
+            { label: "Bold (700)", value: "700" },
+            { label: "Extra Bold (800)", value: "800" },
+          ],
+        },
+        titleTransform: {
+          type: "select",
+          label: "Title Transform",
+          options: [
+            { label: "None", value: "none" },
+            { label: "UPPERCASE", value: "uppercase" },
+            { label: "lowercase", value: "lowercase" },
+            { label: "Capitalize", value: "capitalize" },
+          ],
+        },
+        descriptionSize: {
+          type: "custom",
+          label: "Description Size (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={10} max={24} step={1} unit="px" label="Description Size" />
+          ),
+        },
+        descriptionColor: {
+          type: "custom",
+          label: "Description Color",
+          render: ({ value, onChange }) => (
+            <ColorField value={value} onChange={onChange} />
+          ),
+        },
+        textPaddingX: {
+          type: "custom",
+          label: "Text Horizontal Padding (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={48} step={1} unit="px" label="Padding X" />
+          ),
+        },
+        textPaddingY: {
+          type: "custom",
+          label: "Text Vertical Padding (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={48} step={1} unit="px" label="Padding Y" />
+          ),
+        },
+        textGap: {
+          type: "custom",
+          label: "Title→Description Gap (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={32} step={1} unit="px" label="Gap" />
+          ),
+        },
+        overlayBgColor: {
+          type: "custom",
+          label: "Overlay Background Color",
+          render: ({ value, onChange }) => (
+            <ColorField value={value} onChange={onChange} />
+          ),
+        },
+        overlayOpacity: {
+          type: "custom",
+          label: "Overlay Opacity",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={100} step={5} unit="%" label="Opacity" />
+          ),
+        },
+        marginTop: {
+          type: "custom",
+          label: "Margin Top (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={120} step={2} unit="px" label="Margin Top" />
+          ),
+        },
+        marginBottom: {
+          type: "custom",
+          label: "Margin Bottom (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={120} step={2} unit="px" label="Margin Bottom" />
+          ),
+        },
+        transitionMs: {
+          type: "custom",
+          label: "Hover Transition (ms)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={800} step={10} unit="ms" label="Transition" />
+          ),
+        },
+      },
+      defaultProps: {
+        sourceMode: "all",
+        selectedSlugs: [],
+        maxItems: 0,
+        sortOrder: "position",
+        columns: "3",
+        gap: 16,
+        fullBleed: false,
+        maxWidth: 100,
+        aspectRatio: "4:3",
+        borderRadius: 4,
+        imageHoverEffect: "zoom",
+        showTitle: true,
+        showDescription: false,
+        titlePosition: "below",
+        textAlignment: "center",
+        titleFontRole: "headings",
+        titleSize: 18,
+        titleColor: "#171717",
+        titleWeight: "500",
+        titleTransform: "none",
+        descriptionSize: 13,
+        descriptionColor: "#737373",
+        textPaddingX: 8,
+        textPaddingY: 12,
+        textGap: 4,
+        overlayBgColor: "#000000",
+        overlayOpacity: 35,
+        marginTop: 0,
+        marginBottom: 0,
+        transitionMs: 300,
+      },
+      render: (props) => <GalleriesIndexRender {...props} />,
+    },
+
+    LinkList: {
+      label: "Link List",
+      fields: {
+        items: {
+          type: "custom",
+          label: "Items",
+          render: ({ value, onChange }) => (
+            <LinkListItemEditor value={value} onChange={onChange} />
+          ),
+        },
+        layout: {
+          type: "select",
+          label: "Layout",
+          options: [
+            { label: "Vertical List", value: "vertical-list" },
+            { label: "Horizontal Pills", value: "horizontal-pills" },
+            { label: "Button Stack", value: "button-stack" },
+            { label: "Card Grid", value: "card-grid" },
+          ],
+        },
+        columns: {
+          type: "select",
+          label: "Columns (Card Grid)",
+          options: [
+            { label: "1", value: "1" },
+            { label: "2", value: "2" },
+            { label: "3", value: "3" },
+            { label: "4", value: "4" },
+          ],
+        },
+        gap: {
+          type: "custom",
+          label: "Gap (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={48} step={1} unit="px" label="Gap" />
+          ),
+        },
+        alignment: {
+          type: "radio",
+          label: "Block Alignment",
+          options: [
+            { label: "Left", value: "left" },
+            { label: "Center", value: "center" },
+            { label: "Right", value: "right" },
+          ],
+        },
+        itemAlignment: {
+          type: "radio",
+          label: "Item Text Alignment",
+          options: [
+            { label: "Left", value: "left" },
+            { label: "Center", value: "center" },
+            { label: "Right", value: "right" },
+          ],
+        },
+        showImage: {
+          type: "radio",
+          label: "Show Item Image",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        showDescription: {
+          type: "radio",
+          label: "Show Description",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        showIcon: {
+          type: "radio",
+          label: "Show Icon",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        imagePosition: {
+          type: "select",
+          label: "Image Position",
+          options: [
+            { label: "Left of text", value: "left" },
+            { label: "Right of text", value: "right" },
+            { label: "Above text", value: "top" },
+          ],
+        },
+        imageSize: {
+          type: "custom",
+          label: "Image Size (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={24} max={400} step={4} unit="px" label="Image Size" />
+          ),
+        },
+        imageAspectRatio: {
+          type: "select",
+          label: "Image Aspect Ratio",
+          options: [
+            { label: "Square (1:1)", value: "square" },
+            { label: "4:3", value: "4:3" },
+            { label: "3:2", value: "3:2" },
+            { label: "16:9", value: "16:9" },
+            { label: "Natural", value: "natural" },
+          ],
+        },
+        imageBorderRadius: {
+          type: "custom",
+          label: "Image Corner Radius (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={200} step={1} unit="px" label="Image Radius" />
+          ),
+        },
+        iconGap: {
+          type: "custom",
+          label: "Icon/Image Gap (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={32} step={1} unit="px" label="Icon Gap" />
+          ),
+        },
+        bgColor: {
+          type: "custom",
+          label: "Item Background Color",
+          render: ({ value, onChange }) => (
+            <ColorField value={value} onChange={onChange} />
+          ),
+        },
+        bgOpacity: {
+          type: "custom",
+          label: "Item Background Opacity",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={100} step={5} unit="%" label="Opacity" />
+          ),
+        },
+        textColor: {
+          type: "custom",
+          label: "Text Color",
+          render: ({ value, onChange }) => (
+            <ColorField value={value} onChange={onChange} />
+          ),
+        },
+        borderColor: {
+          type: "custom",
+          label: "Border Color",
+          render: ({ value, onChange }) => (
+            <ColorField value={value} onChange={onChange} />
+          ),
+        },
+        borderWidth: {
+          type: "custom",
+          label: "Border Width (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={6} step={1} unit="px" label="Border Width" />
+          ),
+        },
+        borderRadius: {
+          type: "custom",
+          label: "Item Corner Radius (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={100} step={1} unit="px" label="Corner Radius" />
+          ),
+        },
+        paddingX: {
+          type: "custom",
+          label: "Item Padding X (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={64} step={1} unit="px" label="Padding X" />
+          ),
+        },
+        paddingY: {
+          type: "custom",
+          label: "Item Padding Y (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={48} step={1} unit="px" label="Padding Y" />
+          ),
+        },
+        fontRoleKey: {
+          type: "select",
+          label: "Font Role",
+          options: [
+            { label: "Body", value: "body" },
+            { label: "Headings", value: "headings" },
+            { label: "Nav / Menu", value: "navMenu" },
+            { label: "Labels", value: "labels" },
+          ],
+        },
+        fontSize: {
+          type: "custom",
+          label: "Font Size (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={10} max={36} step={1} unit="px" label="Font Size" />
+          ),
+        },
+        fontWeight: {
+          type: "select",
+          label: "Font Weight",
+          options: [
+            { label: "Light (300)", value: "300" },
+            { label: "Regular (400)", value: "400" },
+            { label: "Medium (500)", value: "500" },
+            { label: "Semibold (600)", value: "600" },
+            { label: "Bold (700)", value: "700" },
+            { label: "Extra Bold (800)", value: "800" },
+          ],
+        },
+        letterSpacing: {
+          type: "custom",
+          label: "Letter Spacing (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={-2} max={12} step={0.5} unit="px" label="Letter Spacing" />
+          ),
+        },
+        textTransform: {
+          type: "select",
+          label: "Text Transform",
+          options: [
+            { label: "None", value: "none" },
+            { label: "UPPERCASE", value: "uppercase" },
+            { label: "lowercase", value: "lowercase" },
+            { label: "Capitalize", value: "capitalize" },
+          ],
+        },
+        italic: {
+          type: "radio",
+          label: "Italic",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        underline: {
+          type: "radio",
+          label: "Underline",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        descriptionSize: {
+          type: "custom",
+          label: "Description Size (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={10} max={24} step={1} unit="px" label="Description Size" />
+          ),
+        },
+        descriptionColor: {
+          type: "custom",
+          label: "Description Color",
+          render: ({ value, onChange }) => (
+            <ColorField value={value} onChange={onChange} />
+          ),
+        },
+        hoverBgColor: {
+          type: "custom",
+          label: "Hover Background Color",
+          render: ({ value, onChange }) => (
+            <ColorField value={value} onChange={onChange} />
+          ),
+        },
+        hoverTextColor: {
+          type: "custom",
+          label: "Hover Text Color",
+          render: ({ value, onChange }) => (
+            <ColorField value={value} onChange={onChange} />
+          ),
+        },
+        hoverBorderColor: {
+          type: "custom",
+          label: "Hover Border Color",
+          render: ({ value, onChange }) => (
+            <ColorField value={value} onChange={onChange} />
+          ),
+        },
+        hoverEffect: {
+          type: "select",
+          label: "Hover Effect",
+          options: [
+            { label: "None", value: "none" },
+            { label: "Lift", value: "lift" },
+            { label: "Scale Up", value: "scale-up" },
+            { label: "Underline", value: "underline" },
+            { label: "Indent (slide right)", value: "indent" },
+          ],
+        },
+        shadow: {
+          type: "select",
+          label: "Shadow",
+          options: [
+            { label: "None", value: "none" },
+            { label: "Small", value: "sm" },
+            { label: "Medium", value: "md" },
+            { label: "Large", value: "lg" },
+          ],
+        },
+        hoverShadow: {
+          type: "select",
+          label: "Hover Shadow",
+          options: [
+            { label: "None", value: "none" },
+            { label: "Small", value: "sm" },
+            { label: "Medium", value: "md" },
+            { label: "Large", value: "lg" },
+          ],
+        },
+        dividers: {
+          type: "radio",
+          label: "Dividers (Vertical List only)",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        dividerColor: {
+          type: "custom",
+          label: "Divider Color",
+          render: ({ value, onChange }) => (
+            <ColorField value={value} onChange={onChange} />
+          ),
+        },
+        marginTop: {
+          type: "custom",
+          label: "Margin Top (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={120} step={2} unit="px" label="Margin Top" />
+          ),
+        },
+        marginBottom: {
+          type: "custom",
+          label: "Margin Bottom (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={120} step={2} unit="px" label="Margin Bottom" />
+          ),
+        },
+        transitionMs: {
+          type: "custom",
+          label: "Transition (ms)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={800} step={10} unit="ms" label="Transition" />
+          ),
+        },
+      },
+      defaultProps: {
+        items: [],
+        layout: "vertical-list",
+        columns: "3",
+        gap: 8,
+        alignment: "center",
+        itemAlignment: "left",
+        showImage: false,
+        showDescription: false,
+        showIcon: false,
+        imagePosition: "left",
+        imageSize: 64,
+        imageAspectRatio: "square",
+        imageBorderRadius: 4,
+        iconGap: 12,
+        bgColor: "#ffffff",
+        bgOpacity: 0,
+        textColor: "#171717",
+        borderColor: "#e5e5e5",
+        borderWidth: 0,
+        borderRadius: 4,
+        paddingX: 16,
+        paddingY: 12,
+        fontRoleKey: "body",
+        fontSize: 16,
+        fontWeight: "500",
+        letterSpacing: 0,
+        textTransform: "none",
+        italic: false,
+        underline: false,
+        descriptionSize: 13,
+        descriptionColor: "#737373",
+        hoverBgColor: "#f5f5f5",
+        hoverTextColor: "#171717",
+        hoverBorderColor: "#d4d4d4",
+        hoverEffect: "indent",
+        shadow: "none",
+        hoverShadow: "none",
+        dividers: false,
+        dividerColor: "#e5e5e5",
+        marginTop: 0,
+        marginBottom: 0,
+        transitionMs: 200,
+      },
+      render: (props) => <LinkListRender {...props} />,
+    },
+
+    Button: {
+      label: "Button",
+      fields: {
+        label: { type: "text", label: "Label" },
+        link: {
+          type: "custom",
+          label: "Link",
+          render: ({ value, onChange }) => (
+            <LinkPicker value={value} onChange={onChange} />
+          ),
+        },
+        linkTarget: {
+          type: "select",
+          label: "Link Opens In",
+          options: [
+            { label: "Same Tab", value: "_self" },
+            { label: "New Tab", value: "_blank" },
+          ],
+        },
+        ariaLabel: { type: "text", label: "Aria Label (accessibility)" },
+        iconText: { type: "text", label: "Icon (text/emoji, e.g. → ↗ ★)" },
+        iconPosition: {
+          type: "radio",
+          label: "Icon Position",
+          options: [
+            { label: "Left", value: "left" },
+            { label: "Right", value: "right" },
+          ],
+        },
+        iconGap: {
+          type: "custom",
+          label: "Icon Gap (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={32} step={1} unit="px" label="Icon Gap" />
+          ),
+        },
+        alignment: {
+          type: "radio",
+          label: "Alignment",
+          options: [
+            { label: "Left", value: "left" },
+            { label: "Center", value: "center" },
+            { label: "Right", value: "right" },
+          ],
+        },
+        widthMode: {
+          type: "select",
+          label: "Width Mode",
+          options: [
+            { label: "Auto (fits content)", value: "auto" },
+            { label: "Full Width", value: "full" },
+            { label: "Custom %", value: "custom" },
+          ],
+        },
+        customWidth: {
+          type: "custom",
+          label: "Custom Width (%)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={10} max={100} step={1} unit="%" label="Width" />
+          ),
+        },
+        minWidth: {
+          type: "custom",
+          label: "Min Width (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={400} step={4} unit="px" label="Min Width" />
+          ),
+        },
+        bgColor: {
+          type: "custom",
+          label: "Background Color",
+          render: ({ value, onChange }) => (
+            <ColorField value={value} onChange={onChange} />
+          ),
+        },
+        bgOpacity: {
+          type: "custom",
+          label: "Background Opacity",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={100} step={5} unit="%" label="Opacity" />
+          ),
+        },
+        textColor: {
+          type: "custom",
+          label: "Text Color",
+          render: ({ value, onChange }) => (
+            <ColorField value={value} onChange={onChange} />
+          ),
+        },
+        borderColor: {
+          type: "custom",
+          label: "Border Color",
+          render: ({ value, onChange }) => (
+            <ColorField value={value} onChange={onChange} />
+          ),
+        },
+        borderWidth: {
+          type: "custom",
+          label: "Border Width (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={8} step={1} unit="px" label="Border Width" />
+          ),
+        },
+        borderStyle: {
+          type: "select",
+          label: "Border Style",
+          options: [
+            { label: "Solid", value: "solid" },
+            { label: "Dashed", value: "dashed" },
+            { label: "Dotted", value: "dotted" },
+          ],
+        },
+        borderRadius: {
+          type: "custom",
+          label: "Corner Radius (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={100} step={1} unit="px" label="Corner Radius" />
+          ),
+        },
+        paddingX: {
+          type: "custom",
+          label: "Horizontal Padding (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={80} step={1} unit="px" label="Horizontal Padding" />
+          ),
+        },
+        paddingY: {
+          type: "custom",
+          label: "Vertical Padding (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={60} step={1} unit="px" label="Vertical Padding" />
+          ),
+        },
+        marginTop: {
+          type: "custom",
+          label: "Margin Top (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={120} step={2} unit="px" label="Margin Top" />
+          ),
+        },
+        marginBottom: {
+          type: "custom",
+          label: "Margin Bottom (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={120} step={2} unit="px" label="Margin Bottom" />
+          ),
+        },
+        fontRoleKey: {
+          type: "select",
+          label: "Font Role",
+          options: [
+            { label: "Body", value: "body" },
+            { label: "Headings", value: "headings" },
+            { label: "Nav / Menu", value: "navMenu" },
+            { label: "Labels", value: "labels" },
+          ],
+        },
+        fontSize: {
+          type: "custom",
+          label: "Font Size (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={10} max={48} step={1} unit="px" label="Font Size" />
+          ),
+        },
+        fontWeight: {
+          type: "select",
+          label: "Font Weight",
+          options: [
+            { label: "Light (300)", value: "300" },
+            { label: "Regular (400)", value: "400" },
+            { label: "Medium (500)", value: "500" },
+            { label: "Semibold (600)", value: "600" },
+            { label: "Bold (700)", value: "700" },
+            { label: "Extra Bold (800)", value: "800" },
+          ],
+        },
+        letterSpacing: {
+          type: "custom",
+          label: "Letter Spacing (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={-2} max={12} step={0.5} unit="px" label="Letter Spacing" />
+          ),
+        },
+        textTransform: {
+          type: "select",
+          label: "Text Transform",
+          options: [
+            { label: "None", value: "none" },
+            { label: "UPPERCASE", value: "uppercase" },
+            { label: "lowercase", value: "lowercase" },
+            { label: "Capitalize", value: "capitalize" },
+          ],
+        },
+        italic: {
+          type: "radio",
+          label: "Italic",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        underline: {
+          type: "radio",
+          label: "Underline",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        hoverBgColor: {
+          type: "custom",
+          label: "Hover Background Color",
+          render: ({ value, onChange }) => (
+            <ColorField value={value} onChange={onChange} />
+          ),
+        },
+        hoverTextColor: {
+          type: "custom",
+          label: "Hover Text Color",
+          render: ({ value, onChange }) => (
+            <ColorField value={value} onChange={onChange} />
+          ),
+        },
+        hoverBorderColor: {
+          type: "custom",
+          label: "Hover Border Color",
+          render: ({ value, onChange }) => (
+            <ColorField value={value} onChange={onChange} />
+          ),
+        },
+        hoverEffect: {
+          type: "select",
+          label: "Hover Effect",
+          options: [
+            { label: "None", value: "none" },
+            { label: "Lift", value: "lift" },
+            { label: "Scale Up", value: "scale-up" },
+            { label: "Scale Down (press)", value: "scale-down" },
+          ],
+        },
+        shadow: {
+          type: "select",
+          label: "Shadow",
+          options: [
+            { label: "None", value: "none" },
+            { label: "Small", value: "sm" },
+            { label: "Medium", value: "md" },
+            { label: "Large", value: "lg" },
+          ],
+        },
+        hoverShadow: {
+          type: "select",
+          label: "Hover Shadow",
+          options: [
+            { label: "None", value: "none" },
+            { label: "Small", value: "sm" },
+            { label: "Medium", value: "md" },
+            { label: "Large", value: "lg" },
+          ],
+        },
+        transitionMs: {
+          type: "custom",
+          label: "Transition Duration (ms)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={800} step={10} unit="ms" label="Transition" />
+          ),
+        },
+      },
+      defaultProps: {
+        label: "Click me",
+        link: "",
+        linkTarget: "_self",
+        ariaLabel: "",
+        iconText: "",
+        iconPosition: "right",
+        iconGap: 8,
+        alignment: "center",
+        widthMode: "auto",
+        customWidth: 50,
+        minWidth: 0,
+        bgColor: "#171717",
+        bgOpacity: 100,
+        textColor: "#ffffff",
+        borderColor: "#171717",
+        borderWidth: 1,
+        borderStyle: "solid",
+        borderRadius: 4,
+        paddingX: 24,
+        paddingY: 12,
+        marginTop: 0,
+        marginBottom: 0,
+        fontRoleKey: "labels",
+        fontSize: 14,
+        fontWeight: "500",
+        letterSpacing: 0,
+        textTransform: "none",
+        italic: false,
+        underline: false,
+        hoverBgColor: "#404040",
+        hoverTextColor: "#ffffff",
+        hoverBorderColor: "#404040",
+        hoverEffect: "lift",
+        shadow: "none",
+        hoverShadow: "md",
+        transitionMs: 200,
+      },
+      render: (props) => <ButtonRender {...props} />,
     },
 
     Spacer: {
@@ -1210,6 +2344,85 @@ export const puckConfig: Config<Components> = {
       },
     },
 
+    FieldMap: {
+      label: "Field Map",
+      fields: {
+        mapStyle: {
+          type: "select",
+          label: "Map style",
+          options: [
+            { label: "Modern — white, soft beige land, pale blue ocean", value: "modern" },
+            { label: "Mono — greyscale, quiet", value: "mono" },
+            { label: "Blueprint — dark navy, cobalt accents", value: "blueprint" },
+          ],
+        },
+        height: {
+          type: "select",
+          label: "Height",
+          options: [
+            { label: "Tall (700px)", value: "700px" },
+            { label: "Fill page area (full bleed only)", value: "fill" },
+          ],
+        },
+        showBrand: {
+          type: "radio",
+          label: "Show site title in corner",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+      },
+      defaultProps: {
+        mapStyle: "modern",
+        height: "fill",
+        showBrand: false,
+      },
+      render: ({ mapStyle, height, showBrand, puck }) => {
+        const injected = (puck?.metadata as Record<string, unknown>)?.fieldMap as
+          | FieldMapBlockData
+          | undefined
+          | null;
+        if (!injected) {
+          return (
+            <div
+              className="flex items-center justify-center rounded border-2 border-dashed border-neutral-300 bg-neutral-50 text-center text-neutral-500"
+              style={{ minHeight: 240 }}
+            >
+              <div className="px-6 py-10">
+                <div className="font-medium">Field Map</div>
+                <div className="mt-1 text-sm text-neutral-400">
+                  Renders on the published page. Pulls every published gallery with coordinates.
+                </div>
+              </div>
+            </div>
+          );
+        }
+        const isFill = height === "fill" || height === "100vh";
+        const fillStyle: React.CSSProperties = isFill
+          ? { flex: "1 1 0%", minHeight: 0 }
+          : { height };
+        return (
+          <>
+            <link
+              rel="stylesheet"
+              href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+            />
+            <div className="relative w-full bg-white" style={fillStyle}>
+              <FieldMap
+                regions={injected.regions}
+                yearBounds={injected.yearBounds}
+                filters={injected.filters}
+                mapStyle={mapStyle}
+                siteTitle={injected.siteTitle}
+                showBrand={showBrand}
+              />
+            </div>
+          </>
+        );
+      },
+    },
+
     // ----- Form components -----
 
     Form: {
@@ -1544,6 +2757,866 @@ function hexToRgba(hex: string, alpha: number): string {
   const g = parseInt(hex.slice(3, 5), 16) || 0;
   const b = parseInt(hex.slice(5, 7), 16) || 0;
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// ----- Button render -----
+
+const BUTTON_SHADOWS: Record<string, string> = {
+  none: "none",
+  sm: "0 1px 2px rgba(0,0,0,0.08)",
+  md: "0 4px 12px rgba(0,0,0,0.15)",
+  lg: "0 10px 30px rgba(0,0,0,0.22)",
+};
+
+const BUTTON_HOVER_TRANSFORMS: Record<string, string> = {
+  none: "none",
+  lift: "translateY(-2px)",
+  "scale-up": "scale(1.05)",
+  "scale-down": "scale(0.97)",
+};
+
+function ButtonRender(props: ButtonProps) {
+  const [hovered, setHovered] = useState(false);
+
+  const {
+    label,
+    iconText,
+    iconPosition,
+    iconGap,
+    link,
+    linkTarget,
+    ariaLabel,
+    alignment,
+    widthMode,
+    customWidth,
+    minWidth,
+    bgColor,
+    bgOpacity,
+    textColor,
+    borderColor,
+    borderWidth,
+    borderStyle,
+    borderRadius,
+    paddingX,
+    paddingY,
+    marginTop,
+    marginBottom,
+    fontRoleKey,
+    fontSize,
+    fontWeight,
+    letterSpacing,
+    textTransform,
+    italic,
+    underline,
+    hoverBgColor,
+    hoverTextColor,
+    hoverBorderColor,
+    hoverEffect,
+    shadow,
+    hoverShadow,
+    transitionMs,
+  } = props;
+
+  const opacity = (bgOpacity ?? 100) / 100;
+  const bg = hovered ? hoverBgColor : hexToRgba(bgColor, opacity);
+  const fg = hovered ? hoverTextColor : textColor;
+  const bd = hovered ? hoverBorderColor : borderColor;
+  const sh = BUTTON_SHADOWS[hovered ? hoverShadow : shadow] ?? "none";
+  const transform = hovered ? (BUTTON_HOVER_TRANSFORMS[hoverEffect] ?? "none") : "none";
+
+  const widthStyle: React.CSSProperties =
+    widthMode === "full"
+      ? { width: "100%", display: "block" }
+      : widthMode === "custom"
+        ? { width: `${customWidth}%`, display: "block" }
+        : { display: "inline-block" };
+
+  const buttonStyle: React.CSSProperties = {
+    ...fontRole(fontRoleKey),
+    fontSize: `${fontSize}px`,
+    fontWeight,
+    letterSpacing: `${letterSpacing}px`,
+    textTransform,
+    fontStyle: italic ? "italic" : "normal",
+    textDecoration: underline ? "underline" : "none",
+    color: fg,
+    backgroundColor: bg,
+    border: `${borderWidth}px ${borderStyle} ${bd}`,
+    borderRadius: `${borderRadius}px`,
+    padding: `${paddingY}px ${paddingX}px`,
+    minWidth: minWidth ? `${minWidth}px` : undefined,
+    boxShadow: sh,
+    transform,
+    transition: `background-color ${transitionMs}ms, color ${transitionMs}ms, border-color ${transitionMs}ms, box-shadow ${transitionMs}ms, transform ${transitionMs}ms`,
+    cursor: link ? "pointer" : "default",
+    textAlign: "center",
+    lineHeight: 1.2,
+    boxSizing: "border-box",
+    ...widthStyle,
+  };
+
+  const iconEl = iconText ? (
+    <span style={{ display: "inline-flex", alignItems: "center" }}>{iconText}</span>
+  ) : null;
+
+  const inner = (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: `${iconGap}px`,
+        flexDirection: iconPosition === "left" ? "row" : "row-reverse",
+      }}
+    >
+      {iconEl}
+      <span>{label}</span>
+    </span>
+  );
+
+  const wrapperStyle: React.CSSProperties = {
+    textAlign: alignment,
+    marginTop: `${marginTop}px`,
+    marginBottom: `${marginBottom}px`,
+  };
+
+  const sharedHandlers = {
+    onMouseEnter: () => setHovered(true),
+    onMouseLeave: () => setHovered(false),
+    onFocus: () => setHovered(true),
+    onBlur: () => setHovered(false),
+  };
+
+  return (
+    <div style={wrapperStyle}>
+      {link ? (
+        <a
+          href={link}
+          target={linkTarget}
+          rel={linkTarget === "_blank" ? "noopener noreferrer" : undefined}
+          aria-label={ariaLabel || undefined}
+          style={buttonStyle}
+          {...sharedHandlers}
+        >
+          {inner}
+        </a>
+      ) : (
+        <span
+          role="button"
+          aria-label={ariaLabel || undefined}
+          style={buttonStyle}
+          {...sharedHandlers}
+        >
+          {inner}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ----- Galleries multi-select picker -----
+
+type GalleryRow = {
+  id: string;
+  title: string;
+  slug: string;
+  description: string | null;
+  coverImageUrl: string | null;
+  position: number;
+  isPublished: boolean;
+  createdAt?: string;
+};
+
+function GalleriesMultiSelect({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const [galleries, setGalleries] = useState<GalleryRow[]>([]);
+  const selected = value ?? [];
+
+  useEffect(() => {
+    fetch("/api/galleries")
+      .then((r) => r.json())
+      .then((data: GalleryRow[]) => setGalleries(data))
+      .catch(() => setGalleries([]));
+  }, []);
+
+  const toggle = (slug: string) => {
+    if (selected.includes(slug)) {
+      onChange(selected.filter((s) => s !== slug));
+    } else {
+      onChange([...selected, slug]);
+    }
+  };
+
+  const move = (index: number, dir: -1 | 1) => {
+    const next = index + dir;
+    if (next < 0 || next >= selected.length) return;
+    const updated = [...selected];
+    [updated[index], updated[next]] = [updated[next], updated[index]];
+    onChange(updated);
+  };
+
+  const bySlug = new Map(galleries.map((g) => [g.slug, g]));
+  const unpicked = galleries.filter((g) => !selected.includes(g.slug));
+
+  return (
+    <div className="space-y-2">
+      {selected.length > 0 && (
+        <div className="space-y-1 rounded border border-neutral-200 bg-white p-2">
+          <div className="text-xs font-medium text-neutral-500">Picked (in order)</div>
+          {selected.map((slug, i) => {
+            const g = bySlug.get(slug);
+            return (
+              <div key={slug} className="flex items-center gap-1 text-sm">
+                <button onClick={() => move(i, -1)} disabled={i === 0} className="px-1 text-neutral-400 hover:text-neutral-700 disabled:opacity-30" title="Move up">↑</button>
+                <button onClick={() => move(i, 1)} disabled={i === selected.length - 1} className="px-1 text-neutral-400 hover:text-neutral-700 disabled:opacity-30" title="Move down">↓</button>
+                <span className="flex-1 truncate">{g ? g.title : slug}</span>
+                <button onClick={() => toggle(slug)} className="px-1 text-red-400 hover:text-red-600" title="Remove">×</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {unpicked.length > 0 && (
+        <div className="space-y-1 rounded border border-dashed border-neutral-300 p-2">
+          <div className="text-xs font-medium text-neutral-500">Available</div>
+          {unpicked.map((g) => (
+            <button
+              key={g.slug}
+              onClick={() => toggle(g.slug)}
+              className="block w-full truncate rounded px-2 py-1 text-left text-sm text-neutral-700 hover:bg-neutral-100"
+            >
+              + {g.title}
+            </button>
+          ))}
+        </div>
+      )}
+      {galleries.length === 0 && (
+        <div className="rounded border border-dashed border-neutral-300 p-3 text-xs text-neutral-500">
+          Loading galleries…
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ----- Galleries index render -----
+
+const GALLERY_AR_MAP: Record<string, string | undefined> = {
+  natural: undefined,
+  square: "1/1",
+  "4:3": "4/3",
+  "3:2": "3/2",
+  "16:9": "16/9",
+};
+
+function GalleriesIndexRender(props: GalleriesIndexProps) {
+  const {
+    sourceMode,
+    selectedSlugs,
+    maxItems,
+    sortOrder,
+    columns,
+    gap,
+    fullBleed,
+    maxWidth,
+    aspectRatio,
+    borderRadius,
+    imageHoverEffect,
+    showTitle,
+    showDescription,
+    titlePosition,
+    textAlignment,
+    titleFontRole,
+    titleSize,
+    titleColor,
+    titleWeight,
+    titleTransform,
+    descriptionSize,
+    descriptionColor,
+    textPaddingX,
+    textPaddingY,
+    textGap,
+    overlayBgColor,
+    overlayOpacity,
+    marginTop,
+    marginBottom,
+    transitionMs,
+  } = props;
+
+  const [galleries, setGalleries] = useState<GalleryRow[]>([]);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/galleries")
+      .then((r) => r.json())
+      .then((data: GalleryRow[]) => setGalleries(data.filter((g) => g.isPublished)))
+      .catch(() => setGalleries([]));
+  }, []);
+
+  let list: GalleryRow[] = [];
+  if (sourceMode === "manual") {
+    const bySlug = new Map(galleries.map((g) => [g.slug, g]));
+    list = (selectedSlugs ?? []).map((s) => bySlug.get(s)).filter((g): g is GalleryRow => Boolean(g));
+  } else {
+    list = [...galleries];
+  }
+
+  const sorted = [...list];
+  if (sortOrder === "position") {
+    sorted.sort((a, b) => a.position - b.position);
+  } else if (sortOrder === "newest") {
+    sorted.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+  } else if (sortOrder === "oldest") {
+    sorted.sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""));
+  } else if (sortOrder === "title-asc") {
+    sorted.sort((a, b) => a.title.localeCompare(b.title));
+  } else if (sortOrder === "title-desc") {
+    sorted.sort((a, b) => b.title.localeCompare(a.title));
+  }
+  // "manual" preserves the order from selectedSlugs (or API response in "all" mode)
+
+  const limited = maxItems > 0 ? sorted.slice(0, maxItems) : sorted;
+
+  const colCount = parseInt(columns, 10) || 3;
+  const arValue = GALLERY_AR_MAP[aspectRatio];
+  const isOverlay = titlePosition !== "below";
+
+  const wrapperStyle: React.CSSProperties = {
+    width: fullBleed ? "100%" : `${maxWidth}%`,
+    margin: fullBleed ? `${marginTop}px 0 ${marginBottom}px` : `${marginTop}px auto ${marginBottom}px`,
+  };
+
+  const gridStyle: React.CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))`,
+    gap: `${gap}px`,
+  };
+
+  if (limited.length === 0) {
+    return (
+      <div style={wrapperStyle}>
+        <div className="rounded border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-500">
+          {sourceMode === "manual" ? `Pick at least one ${siteConfig.labels.gallery.toLowerCase()}.` : `No published ${siteConfig.labels.gallery.toLowerCase()} found.`}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={wrapperStyle}>
+      <div style={gridStyle}>
+        {limited.map((g) => {
+          const hovered = hoveredId === g.id;
+          const href = `/${siteConfig.labels.gallerySlug}/${g.slug}`;
+
+          const overlayInset =
+            titlePosition === "overlay-top"
+              ? { top: 0, left: 0, right: 0 }
+              : titlePosition === "overlay-center"
+                ? { top: 0, left: 0, right: 0, bottom: 0, display: "flex", alignItems: "center", justifyContent: "center" }
+                : { bottom: 0, left: 0, right: 0 };
+
+          const titleEl = showTitle && (
+            <div
+              style={{
+                ...fontRole(titleFontRole),
+                fontSize: `${titleSize}px`,
+                fontWeight: titleWeight,
+                color: titleColor,
+                textTransform: titleTransform,
+                textAlign: textAlignment,
+                lineHeight: 1.25,
+              }}
+            >
+              {g.title}
+            </div>
+          );
+
+          const descEl = showDescription && g.description && (
+            <div
+              style={{
+                fontSize: `${descriptionSize}px`,
+                color: descriptionColor,
+                textAlign: textAlignment,
+                marginTop: `${textGap}px`,
+                lineHeight: 1.4,
+              }}
+            >
+              {g.description}
+            </div>
+          );
+
+          const imageWrapperStyle: React.CSSProperties = {
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: `${borderRadius}px`,
+            aspectRatio: arValue,
+            transition: `transform ${transitionMs}ms, box-shadow ${transitionMs}ms`,
+            transform: hovered && imageHoverEffect === "lift" ? "translateY(-4px)" : "none",
+            boxShadow: hovered && imageHoverEffect === "lift" ? "0 10px 25px rgba(0,0,0,0.15)" : "none",
+          };
+
+          const imageStyle: React.CSSProperties = {
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: "block",
+            transition: `transform ${transitionMs}ms, opacity ${transitionMs}ms, filter ${transitionMs}ms`,
+            transform: hovered && imageHoverEffect === "zoom" ? "scale(1.06)" : "scale(1)",
+            opacity: hovered && imageHoverEffect === "fade" ? 0.7 : 1,
+            filter: hovered && imageHoverEffect === "darken" ? "brightness(0.7)" : "none",
+          };
+
+          const overlayBg = isOverlay ? hexToRgba(overlayBgColor, overlayOpacity / 100) : undefined;
+
+          return (
+            <a
+              key={g.id}
+              href={href}
+              style={{ display: "block", textDecoration: "none", color: "inherit" }}
+              onMouseEnter={() => setHoveredId(g.id)}
+              onMouseLeave={() => setHoveredId(null)}
+            >
+              <div style={imageWrapperStyle}>
+                {g.coverImageUrl ? (
+                  arValue ? (
+                    <img src={g.coverImageUrl} alt={g.title} style={imageStyle} loading="lazy" />
+                  ) : (
+                    <img src={g.coverImageUrl} alt={g.title} style={{ ...imageStyle, height: "auto" }} loading="lazy" />
+                  )
+                ) : (
+                  <div className="flex h-48 w-full items-center justify-center bg-neutral-100 text-xs text-neutral-400">
+                    No cover image
+                  </div>
+                )}
+                {isOverlay && (showTitle || showDescription) && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      ...overlayInset,
+                      backgroundColor: overlayBg,
+                      padding: `${textPaddingY}px ${textPaddingX}px`,
+                      pointerEvents: "none",
+                    }}
+                  >
+                    <div>
+                      {titleEl}
+                      {descEl}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {!isOverlay && (showTitle || showDescription) && (
+                <div style={{ padding: `${textPaddingY}px ${textPaddingX}px` }}>
+                  {titleEl}
+                  {descEl}
+                </div>
+              )}
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ----- Link list editor + render -----
+
+function LinkListItemEditor({ value, onChange }: { value: LinkListItem[]; onChange: (v: LinkListItem[]) => void }) {
+  const items = value ?? [];
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const addItem = () => {
+    const item: LinkListItem = {
+      id: crypto.randomUUID(),
+      label: "New item",
+      description: "",
+      link: "",
+      linkTarget: "_self",
+      imageUrl: "",
+      iconText: "",
+    };
+    onChange([...items, item]);
+    setExpandedId(item.id);
+  };
+
+  const updateItem = (id: string, patch: Partial<LinkListItem>) => {
+    onChange(items.map((it) => (it.id === id ? { ...it, ...patch } : it)));
+  };
+
+  const removeItem = (id: string) => {
+    onChange(items.filter((it) => it.id !== id));
+    if (expandedId === id) setExpandedId(null);
+  };
+
+  const moveItem = (index: number, dir: -1 | 1) => {
+    const next = index + dir;
+    if (next < 0 || next >= items.length) return;
+    const updated = [...items];
+    [updated[index], updated[next]] = [updated[next], updated[index]];
+    onChange(updated);
+  };
+
+  return (
+    <div className="space-y-2">
+      {items.map((item, i) => (
+        <div key={item.id} className="rounded border border-neutral-200 bg-white">
+          <div className="flex items-center gap-1 px-2 py-1.5 text-sm">
+            <button onClick={() => moveItem(i, -1)} disabled={i === 0} className="px-1 text-neutral-400 hover:text-neutral-700 disabled:opacity-30" title="Move up">↑</button>
+            <button onClick={() => moveItem(i, 1)} disabled={i === items.length - 1} className="px-1 text-neutral-400 hover:text-neutral-700 disabled:opacity-30" title="Move down">↓</button>
+            <button onClick={() => setExpandedId(expandedId === item.id ? null : item.id)} className="flex-1 truncate text-left font-medium">
+              {i + 1}. {item.label || "(no label)"}
+            </button>
+            <button onClick={() => removeItem(item.id)} className="px-1 text-red-400 hover:text-red-600" title="Remove">×</button>
+          </div>
+          {expandedId === item.id && (
+            <div className="space-y-2 border-t border-neutral-100 px-2 py-2">
+              <div>
+                <label className="text-xs font-medium text-neutral-500">Label</label>
+                <input
+                  type="text"
+                  value={item.label}
+                  onChange={(e) => updateItem(item.id, { label: e.target.value })}
+                  className="mt-0.5 w-full rounded border border-neutral-200 px-2 py-1 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-neutral-500">Description (optional)</label>
+                <input
+                  type="text"
+                  value={item.description}
+                  onChange={(e) => updateItem(item.id, { description: e.target.value })}
+                  className="mt-0.5 w-full rounded border border-neutral-200 px-2 py-1 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-neutral-500">Link</label>
+                <LinkPicker value={item.link} onChange={(v) => updateItem(item.id, { link: v })} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-neutral-500">Opens In</label>
+                <select
+                  value={item.linkTarget}
+                  onChange={(e) => updateItem(item.id, { linkTarget: e.target.value as LinkListItem["linkTarget"] })}
+                  className="mt-0.5 w-full rounded border border-neutral-200 px-2 py-1 text-sm"
+                >
+                  <option value="_self">Same Tab</option>
+                  <option value="_blank">New Tab</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-neutral-500">Icon (text/emoji)</label>
+                <input
+                  type="text"
+                  value={item.iconText}
+                  onChange={(e) => updateItem(item.id, { iconText: e.target.value })}
+                  className="mt-0.5 w-full rounded border border-neutral-200 px-2 py-1 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-neutral-500">Image (optional)</label>
+                <ImagePicker value={item.imageUrl} onChange={(url) => updateItem(item.id, { imageUrl: url })} />
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+      <button
+        onClick={addItem}
+        className="block w-full rounded border border-dashed border-neutral-300 px-2 py-2 text-xs text-neutral-500 hover:border-neutral-400 hover:text-neutral-700"
+      >
+        + Add Item
+      </button>
+    </div>
+  );
+}
+
+const LINKLIST_SHADOWS: Record<string, string> = {
+  none: "none",
+  sm: "0 1px 2px rgba(0,0,0,0.08)",
+  md: "0 4px 12px rgba(0,0,0,0.15)",
+  lg: "0 10px 30px rgba(0,0,0,0.22)",
+};
+
+const LINKLIST_AR_MAP: Record<string, string | undefined> = {
+  natural: undefined,
+  square: "1/1",
+  "4:3": "4/3",
+  "3:2": "3/2",
+  "16:9": "16/9",
+};
+
+function LinkListRender(props: LinkListProps) {
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  const {
+    items,
+    layout,
+    columns,
+    gap,
+    alignment,
+    itemAlignment,
+    showImage,
+    showDescription,
+    showIcon,
+    imagePosition,
+    imageSize,
+    imageAspectRatio,
+    imageBorderRadius,
+    iconGap,
+    bgColor,
+    bgOpacity,
+    textColor,
+    borderColor,
+    borderWidth,
+    borderRadius,
+    paddingX,
+    paddingY,
+    fontRoleKey,
+    fontSize,
+    fontWeight,
+    letterSpacing,
+    textTransform,
+    italic,
+    underline,
+    descriptionSize,
+    descriptionColor,
+    hoverBgColor,
+    hoverTextColor,
+    hoverBorderColor,
+    hoverEffect,
+    shadow,
+    hoverShadow,
+    dividers,
+    dividerColor,
+    marginTop,
+    marginBottom,
+    transitionMs,
+  } = props;
+
+  const safeItems = items ?? [];
+
+  const justify =
+    alignment === "left" ? "flex-start" : alignment === "right" ? "flex-end" : "center";
+
+  const colCount = parseInt(columns, 10) || 3;
+  const arValue = LINKLIST_AR_MAP[imageAspectRatio];
+
+  let containerStyle: React.CSSProperties = {
+    marginTop: `${marginTop}px`,
+    marginBottom: `${marginBottom}px`,
+  };
+
+  if (layout === "card-grid") {
+    containerStyle = {
+      ...containerStyle,
+      display: "grid",
+      gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))`,
+      gap: `${gap}px`,
+    };
+  } else if (layout === "horizontal-pills") {
+    containerStyle = {
+      ...containerStyle,
+      display: "flex",
+      flexWrap: "wrap",
+      gap: `${gap}px`,
+      justifyContent: justify,
+    };
+  } else {
+    // vertical-list, button-stack
+    containerStyle = {
+      ...containerStyle,
+      display: "flex",
+      flexDirection: "column",
+      gap: `${gap}px`,
+      alignItems:
+        layout === "button-stack"
+          ? alignment === "left"
+            ? "flex-start"
+            : alignment === "right"
+              ? "flex-end"
+              : "center"
+          : "stretch",
+    };
+  }
+
+  if (safeItems.length === 0) {
+    return (
+      <div style={containerStyle}>
+        <div className="rounded border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-500">
+          Add at least one item.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={containerStyle}>
+      {safeItems.map((item, i) => {
+        const hovered = hoveredId === item.id;
+        const isLast = i === safeItems.length - 1;
+
+        const bg = hovered
+          ? hoverBgColor
+          : bgOpacity > 0
+            ? hexToRgba(bgColor, bgOpacity / 100)
+            : "transparent";
+
+        const fg = hovered ? hoverTextColor : textColor;
+        const bd = hovered ? hoverBorderColor : borderColor;
+        const sh = LINKLIST_SHADOWS[hovered ? hoverShadow : shadow] ?? "none";
+
+        let transform = "none";
+        if (hovered) {
+          if (hoverEffect === "lift") transform = "translateY(-2px)";
+          else if (hoverEffect === "scale-up") transform = "scale(1.03)";
+          else if (hoverEffect === "indent") transform = "translateX(6px)";
+        }
+
+        const showHoverUnderline = hovered && hoverEffect === "underline";
+
+        const itemStyle: React.CSSProperties = {
+          ...fontRole(fontRoleKey),
+          fontSize: `${fontSize}px`,
+          fontWeight,
+          letterSpacing: `${letterSpacing}px`,
+          textTransform,
+          fontStyle: italic ? "italic" : "normal",
+          textDecoration: underline || showHoverUnderline ? "underline" : "none",
+          color: fg,
+          backgroundColor: bg,
+          border: borderWidth > 0 ? `${borderWidth}px solid ${bd}` : "none",
+          borderRadius: `${borderRadius}px`,
+          padding: `${paddingY}px ${paddingX}px`,
+          boxShadow: sh,
+          transform,
+          transition: `background-color ${transitionMs}ms, color ${transitionMs}ms, border-color ${transitionMs}ms, box-shadow ${transitionMs}ms, transform ${transitionMs}ms, text-decoration ${transitionMs}ms`,
+          textAlign: itemAlignment,
+          display: "flex",
+          flexDirection: imagePosition === "top" ? "column" : "row",
+          alignItems:
+            imagePosition === "top"
+              ? itemAlignment === "left"
+                ? "flex-start"
+                : itemAlignment === "right"
+                  ? "flex-end"
+                  : "center"
+              : "center",
+          gap: `${iconGap}px`,
+          textDecorationColor: fg,
+          width: layout === "card-grid" || layout === "vertical-list" ? "100%" : "auto",
+          boxSizing: "border-box",
+          cursor: item.link ? "pointer" : "default",
+        };
+
+        if (borderWidth === 0 && layout === "vertical-list" && dividers && !isLast) {
+          itemStyle.borderBottom = `1px solid ${dividerColor}`;
+        }
+
+        const isTopImage = imagePosition === "top";
+        const useNatural = isTopImage && !arValue;
+        const imageWrapperStyle: React.CSSProperties = useNatural
+          ? {
+              flexShrink: 0,
+              width: "100%",
+              overflow: "hidden",
+              borderRadius: `${imageBorderRadius}px`,
+            }
+          : {
+              flexShrink: 0,
+              width: isTopImage ? "100%" : `${imageSize}px`,
+              height: isTopImage ? undefined : `${imageSize}px`,
+              aspectRatio: isTopImage ? arValue : (arValue ?? "1/1"),
+              overflow: "hidden",
+              borderRadius: `${imageBorderRadius}px`,
+            };
+
+        const imageEl =
+          showImage && item.imageUrl ? (
+            <div style={imageWrapperStyle}>
+              <img
+                src={item.imageUrl}
+                alt=""
+                style={
+                  useNatural
+                    ? { width: "100%", height: "auto", display: "block" }
+                    : { width: "100%", height: "100%", objectFit: "cover", display: "block" }
+                }
+                loading="lazy"
+              />
+            </div>
+          ) : null;
+
+        const iconEl = showIcon && item.iconText ? (
+          <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center" }}>{item.iconText}</span>
+        ) : null;
+
+        const textEl = (
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div>{item.label}</div>
+            {showDescription && item.description && (
+              <div
+                style={{
+                  fontSize: `${descriptionSize}px`,
+                  color: hovered ? hoverTextColor : descriptionColor,
+                  marginTop: 2,
+                  fontWeight: 400,
+                  textTransform: "none",
+                  letterSpacing: 0,
+                  fontStyle: "normal",
+                  textDecoration: "none",
+                  lineHeight: 1.4,
+                }}
+              >
+                {item.description}
+              </div>
+            )}
+          </div>
+        );
+
+        const inner =
+          imagePosition === "right" ? (
+            <>
+              {iconEl}
+              {textEl}
+              {imageEl}
+            </>
+          ) : (
+            <>
+              {imageEl}
+              {iconEl}
+              {textEl}
+            </>
+          );
+
+        const handlers = {
+          onMouseEnter: () => setHoveredId(item.id),
+          onMouseLeave: () => setHoveredId(null),
+          onFocus: () => setHoveredId(item.id),
+          onBlur: () => setHoveredId(null),
+        };
+
+        if (item.link) {
+          return (
+            <a
+              key={item.id}
+              href={item.link}
+              target={item.linkTarget}
+              rel={item.linkTarget === "_blank" ? "noopener noreferrer" : undefined}
+              style={itemStyle}
+              {...handlers}
+            >
+              {inner}
+            </a>
+          );
+        }
+        return (
+          <div key={item.id} style={itemStyle} {...handlers}>
+            {inner}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 // ----- Metadata fields picker -----

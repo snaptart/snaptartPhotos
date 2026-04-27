@@ -30,6 +30,36 @@ interface StoryMeta {
   readTime?: string;
   wordCount?: number;
   frontispieceUrl?: string;
+  accentColor?: string;
+  paperColor?: string;
+  inkColor?: string;
+  frontispieceAspect?: string;
+  dropCap?: boolean;
+  showEndMark?: boolean;
+  endMark?: string;
+  showProgressBar?: boolean;
+  showNextStory?: boolean;
+  bodyMaxWidth?: number;
+  paginate?: boolean;
+}
+
+const BODY_MAX_WIDTH_DEFAULT = 680;
+const BODY_MAX_WIDTH_MIN = 480;
+const BODY_MAX_WIDTH_MAX = 1080;
+
+const FRONTISPIECE_ASPECTS = [
+  { value: "", label: "Default (16:9)" },
+  { value: "16/9", label: "16 : 9" },
+  { value: "3/2", label: "3 : 2" },
+  { value: "4/3", label: "4 : 3" },
+  { value: "1/1", label: "1 : 1 (square)" },
+  { value: "original", label: "Original (no crop)" },
+];
+
+const DEFAULT_END_MARK = "❦";
+
+function isValidHex(v: string): boolean {
+  return /^#[0-9a-fA-F]{6}$/.test(v);
 }
 
 interface Story {
@@ -43,6 +73,7 @@ interface Story {
   metaTitle: string | null;
   metaDescription: string | null;
   storyMeta: StoryMeta | null;
+  hasGalleryEmbed?: boolean;
 }
 
 export default function StoriesPage() {
@@ -51,6 +82,17 @@ export default function StoriesPage() {
   const [showNewForm, setShowNewForm] = useState(false);
   const [editSettings, setEditSettings] = useState<string | null>(null);
   const [frontispieceUrl, setFrontispieceUrl] = useState("");
+  const [accentColor, setAccentColor] = useState("");
+  const [paperColor, setPaperColor] = useState("");
+  const [inkColor, setInkColor] = useState("");
+  const [frontispieceAspect, setFrontispieceAspect] = useState("");
+  const [dropCap, setDropCap] = useState(true);
+  const [showEndMark, setShowEndMark] = useState(true);
+  const [endMark, setEndMark] = useState("");
+  const [showProgressBar, setShowProgressBar] = useState(true);
+  const [showNextStory, setShowNextStory] = useState(true);
+  const [bodyMaxWidth, setBodyMaxWidth] = useState<string>("");
+  const [paginate, setPaginate] = useState(false);
   const { message, showSuccess, showError, alertClass } = useMessage();
   const router = useRouter();
 
@@ -74,7 +116,19 @@ export default function StoriesPage() {
 
   useEffect(() => {
     const current = stories.find((s) => s.id === editSettings);
-    setFrontispieceUrl(current?.storyMeta?.frontispieceUrl ?? "");
+    const meta = current?.storyMeta ?? {};
+    setFrontispieceUrl(meta.frontispieceUrl ?? "");
+    setAccentColor(meta.accentColor ?? "");
+    setPaperColor(meta.paperColor ?? "");
+    setInkColor(meta.inkColor ?? "");
+    setFrontispieceAspect(meta.frontispieceAspect ?? "");
+    setDropCap(meta.dropCap !== false);
+    setShowEndMark(meta.showEndMark !== false);
+    setEndMark(meta.endMark ?? "");
+    setShowProgressBar(meta.showProgressBar !== false);
+    setShowNextStory(meta.showNextStory !== false);
+    setBodyMaxWidth(meta.bodyMaxWidth != null ? String(meta.bodyMaxWidth) : "");
+    setPaginate(meta.paginate === true);
   }, [editSettings, stories]);
 
   async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
@@ -118,6 +172,24 @@ export default function StoriesPage() {
       if (Number.isFinite(n) && n > 0) storyMeta.wordCount = n;
     }
     if (frontispieceUrl) storyMeta.frontispieceUrl = frontispieceUrl;
+    if (isValidHex(accentColor)) storyMeta.accentColor = accentColor;
+    if (isValidHex(paperColor)) storyMeta.paperColor = paperColor;
+    if (isValidHex(inkColor)) storyMeta.inkColor = inkColor;
+    if (frontispieceAspect) storyMeta.frontispieceAspect = frontispieceAspect;
+    if (!dropCap) storyMeta.dropCap = false;
+    if (!showEndMark) storyMeta.showEndMark = false;
+    if (endMark && endMark !== DEFAULT_END_MARK) storyMeta.endMark = endMark;
+    if (!showProgressBar) storyMeta.showProgressBar = false;
+    if (!showNextStory) storyMeta.showNextStory = false;
+    if (bodyMaxWidth) {
+      const n = parseInt(bodyMaxWidth, 10);
+      if (Number.isFinite(n) && n !== BODY_MAX_WIDTH_DEFAULT) {
+        const clamped = Math.max(BODY_MAX_WIDTH_MIN, Math.min(BODY_MAX_WIDTH_MAX, n));
+        storyMeta.bodyMaxWidth = clamped;
+      }
+    }
+    const currentStory = stories.find((s) => s.id === editSettings);
+    if (paginate && !currentStory?.hasGalleryEmbed) storyMeta.paginate = true;
 
     const payload: Record<string, unknown> = {
       id: editSettings,
@@ -339,6 +411,124 @@ export default function StoriesPage() {
 
               <details className="rounded-md border border-admin-border p-3">
                 <summary className="cursor-pointer text-[13px] font-medium text-admin-ink-soft">
+                  Reading-page chrome
+                </summary>
+                <div className="mt-3 space-y-4">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <Field label="Accent color" hint="Default #b8824a">
+                      <ColorField value={accentColor} onChange={setAccentColor} fallback="#b8824a" />
+                    </Field>
+                    <Field label="Paper color" hint="Default #ffffff">
+                      <ColorField value={paperColor} onChange={setPaperColor} fallback="#ffffff" />
+                    </Field>
+                    <Field label="Ink color" hint="Default #2a2620">
+                      <ColorField value={inkColor} onChange={setInkColor} fallback="#2a2620" />
+                    </Field>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <Field label="Frontispiece aspect" htmlFor="es-aspect">
+                      <select
+                        id="es-aspect"
+                        value={frontispieceAspect}
+                        onChange={(e) => setFrontispieceAspect(e.target.value)}
+                        className="w-full rounded-md border border-admin-border bg-admin-input-bg px-3 py-2 text-[13px] text-admin-ink"
+                      >
+                        {FRONTISPIECE_ASPECTS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field
+                      label="Body max width (px)"
+                      htmlFor="es-bodywidth"
+                      hint={`Default ${BODY_MAX_WIDTH_DEFAULT}, range ${BODY_MAX_WIDTH_MIN}–${BODY_MAX_WIDTH_MAX}`}
+                    >
+                      <Input
+                        id="es-bodywidth"
+                        type="number"
+                        min={BODY_MAX_WIDTH_MIN}
+                        max={BODY_MAX_WIDTH_MAX}
+                        step={20}
+                        value={bodyMaxWidth}
+                        onChange={(e) => setBodyMaxWidth(e.target.value)}
+                        placeholder={String(BODY_MAX_WIDTH_DEFAULT)}
+                      />
+                    </Field>
+                  </div>
+                  <div className="rounded-md border border-admin-border bg-admin-bg-soft p-3">
+                    <label className={`flex items-center gap-2 text-[13px] ${editingStory.hasGalleryEmbed ? "text-admin-ink-soft cursor-not-allowed" : "text-admin-ink cursor-pointer"}`}>
+                      <input
+                        type="checkbox"
+                        checked={paginate && !editingStory.hasGalleryEmbed}
+                        onChange={(e) => setPaginate(e.target.checked)}
+                        disabled={editingStory.hasGalleryEmbed}
+                        className="accent-admin-accent"
+                      />
+                      Paginate (Kindle-style page turns)
+                    </label>
+                    <p className="mt-1.5 text-[11px] text-admin-ink-soft leading-snug">
+                      {editingStory.hasGalleryEmbed
+                        ? "Disabled: this story contains a GalleryEmbed block, which doesn’t fit a paginated reader. Remove the embed to enable pagination."
+                        : "Reader advances by tap, arrow keys, or swipe. Replaces the scroll/progress bar."}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <label className="flex items-center gap-2 text-[13px] text-admin-ink cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={dropCap}
+                        onChange={(e) => setDropCap(e.target.checked)}
+                        className="accent-admin-accent"
+                      />
+                      Drop-cap on first paragraph
+                    </label>
+                    <label className="flex items-center gap-2 text-[13px] text-admin-ink cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showProgressBar}
+                        onChange={(e) => setShowProgressBar(e.target.checked)}
+                        className="accent-admin-accent"
+                      />
+                      Show reading progress bar
+                    </label>
+                    <label className="flex items-center gap-2 text-[13px] text-admin-ink cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showNextStory}
+                        onChange={(e) => setShowNextStory(e.target.checked)}
+                        className="accent-admin-accent"
+                      />
+                      Show &ldquo;next story&rdquo; card
+                    </label>
+                    <label className="flex items-center gap-2 text-[13px] text-admin-ink cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showEndMark}
+                        onChange={(e) => setShowEndMark(e.target.checked)}
+                        className="accent-admin-accent"
+                      />
+                      Show end mark
+                    </label>
+                  </div>
+                  {showEndMark && (
+                    <Field label="End-mark glyph" htmlFor="es-endmark" hint={`Leave blank to use ${DEFAULT_END_MARK}`}>
+                      <Input
+                        id="es-endmark"
+                        value={endMark}
+                        onChange={(e) => setEndMark(e.target.value)}
+                        placeholder={DEFAULT_END_MARK}
+                        maxLength={8}
+                      />
+                    </Field>
+                  )}
+                </div>
+              </details>
+
+              <details className="rounded-md border border-admin-border p-3">
+                <summary className="cursor-pointer text-[13px] font-medium text-admin-ink-soft">
                   Password protection
                 </summary>
                 <div className="mt-3 space-y-3">
@@ -482,6 +672,55 @@ export default function StoriesPage() {
           </Card>
         )}
       </div>
+    </div>
+  );
+}
+
+function ColorField({
+  value,
+  onChange,
+  fallback,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  fallback: string;
+}) {
+  const valid = isValidHex(value);
+  return (
+    <div className="flex items-center gap-2">
+      <label className="relative inline-block h-9 w-9 cursor-pointer rounded overflow-hidden border border-admin-border-strong shrink-0">
+        <input
+          type="color"
+          value={valid ? value : fallback}
+          onChange={(e) => onChange(e.target.value)}
+          className="absolute inset-0 h-full w-full opacity-0 cursor-pointer"
+          aria-label="Pick color"
+        />
+        <span
+          className="absolute inset-0 block"
+          style={{
+            background: valid ? value : "transparent",
+            backgroundImage: !valid
+              ? "repeating-conic-gradient(#e4e1db 0% 25%, #fff 0% 50%) 50% / 8px 8px"
+              : undefined,
+          }}
+        />
+      </label>
+      <Input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={fallback}
+        pattern="^#[0-9a-fA-F]{6}$"
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          className="text-[11px] font-mono uppercase tracking-[1.5px] text-admin-ink-soft hover:text-admin-danger"
+        >
+          Clear
+        </button>
+      )}
     </div>
   );
 }

@@ -20,7 +20,14 @@ export async function GET() {
           .from(pages)
           .where(and(eq(pages.pageType, "story"), eq(pages.isPublished, true)))
           .orderBy(asc(pages.position));
-    return NextResponse.json(items);
+    const annotated = items.map((item) => {
+      const c = item.content as { content?: Array<{ type?: string }> } | null;
+      const hasGalleryEmbed = Array.isArray(c?.content)
+        ? c!.content.some((b) => b?.type === "GalleryEmbed")
+        : false;
+      return { ...item, hasGalleryEmbed };
+    });
+    return NextResponse.json(annotated);
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

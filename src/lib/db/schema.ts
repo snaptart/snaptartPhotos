@@ -29,8 +29,6 @@ export const siteSettings = pgTable("site_settings", {
   footerAlignment: text("footer_alignment").notNull().default("center"),
   contactEmail: text("contact_email"),
   homepageId: uuid("homepage_id"),
-  homepageType: text("homepage_type").notNull().default("page"), // "page" | "field_map"
-  fieldMapStyle: text("field_map_style").notNull().default("modern"), // "modern" | "mono" | "blueprint"
   // Global lightbox defaults
   lightboxMetadataFields: text("lightbox_metadata_fields").array().default(["title", "description"]),
   lightboxCornerRadius: integer("lightbox_corner_radius").default(0),
@@ -85,6 +83,7 @@ export const pages = pgTable("pages", {
     frontispieceUrl?: string;
   }>(),
   showTitle: boolean("show_title").notNull().default(true),
+  isFullBleed: boolean("is_full_bleed").notNull().default(false),
   isPublished: boolean("is_published").notNull().default(false),
   position: integer("position").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),

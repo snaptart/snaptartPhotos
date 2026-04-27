@@ -66,9 +66,7 @@ export default async function FieldMapRegionPage({ params }: Props) {
     createdAt: p.createdAt.toISOString(),
   }));
 
-  const rawStyle = settingsRow?.fieldMapStyle;
-  const mapStyle: MapStyle =
-    rawStyle === "mono" || rawStyle === "blueprint" ? rawStyle : "modern";
+  const mapStyle: MapStyle = "modern";
 
   return (
     <>

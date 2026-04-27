@@ -65,16 +65,14 @@ function StoriesIndexInner({
 
   return (
     <div
-      className="grid"
+      className="stories-ex__index"
       style={{
-        gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-        minHeight: "calc(100dvh - var(--hall-nav-offset, 80px))",
         background: "var(--st-paper)",
         color: "var(--st-ink)",
       }}
     >
       {/* LEFT — contents */}
-      <div style={{ padding: "80px 64px 120px", maxWidth: 720, margin: "0 auto", width: "100%" }}>
+      <div className="stories-ex__index-main">
         <div
           style={{
             ...fontRole("labels"),
@@ -86,9 +84,9 @@ function StoriesIndexInner({
           {volumeLabel}
         </div>
         <div
+          className="stories-ex__index-headline"
           style={{
             ...fontRole("headings"),
-            fontSize: 84,
             lineHeight: 0.95,
             marginTop: 18,
             letterSpacing: -1.5,
@@ -146,20 +144,8 @@ function StoriesIndexInner({
         </div>
       </div>
 
-      {/* RIGHT — hovered frontispiece */}
-      <div
-        style={{
-          position: "sticky",
-          top: 0,
-          height: "calc(100dvh - var(--hall-nav-offset, 80px))",
-          overflow: "hidden",
-          background: "var(--st-paper-room)",
-          borderLeft: "1px solid var(--st-ink-faint)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
+      {/* RIGHT — hovered frontispiece (desktop only) */}
+      <div className="stories-ex__index-aside">
         <IndexPreview story={preview} active={!!hovered} />
       </div>
     </div>
@@ -179,17 +165,14 @@ function TOCEntry({
   onLeave: () => void;
   active: boolean;
 }) {
+  const numPad = String(num).padStart(2, "0");
   return (
     <Link
       href={`/stories/${story.slug}`}
       onMouseEnter={onHover}
       onMouseLeave={onLeave}
+      className="stories-ex__entry"
       style={{
-        display: "grid",
-        gridTemplateColumns: "48px 1fr auto",
-        gap: 24,
-        alignItems: "baseline",
-        padding: "22px 0",
         borderBottom: "1px solid var(--st-ink-faint)",
         cursor: "pointer",
         transition: "padding-left 260ms cubic-bezier(.2,.9,.3,1), opacity 200ms",
@@ -200,6 +183,15 @@ function TOCEntry({
       }}
     >
       <div
+        className={`stories-ex__entry-thumb${story.frontispiece ? " has-image" : ""}`}
+        style={story.frontispiece ? { backgroundImage: `url(${story.frontispiece})` } : undefined}
+      >
+        <span className="stories-ex__thumb-num" style={fontRole("labels")}>
+          № {numPad}
+        </span>
+      </div>
+      <div
+        className="stories-ex__entry-num"
         style={{
           ...fontRole("labels"),
           fontSize: 11,
@@ -208,13 +200,13 @@ function TOCEntry({
           transition: "color 200ms",
         }}
       >
-        № {String(num).padStart(2, "0")}
+        № {numPad}
       </div>
-      <div>
+      <div className="stories-ex__entry-content">
         <div
+          className="stories-ex__entry-title"
           style={{
             ...fontRole("headings"),
-            fontSize: 28,
             lineHeight: 1.15,
             color: "var(--st-ink)",
             letterSpacing: -0.2,
@@ -271,6 +263,7 @@ function TOCEntry({
         </div>
       </div>
       <div
+        className="stories-ex__entry-arrow"
         style={{
           ...fontRole("headings"),
           fontSize: 14,
@@ -388,9 +381,125 @@ export function StoryTokens() {
         --st-paper: #ffffff;
         --st-paper-room: #fafaf8;
         --st-ink: #2a2620;
-        --st-ink-soft: #6b6258;
         --st-ink-faint: #c9c4bb;
+        --st-ink-soft: #6b6258;
         --st-accent: #b8824a;
+      }
+
+      /* index layout */
+      .stories-ex__index {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        min-height: calc(100dvh - var(--hall-nav-offset, 80px));
+      }
+      .stories-ex__index-main {
+        padding: 80px 64px 120px;
+        max-width: 720px;
+        margin: 0 auto;
+        width: 100%;
+      }
+      .stories-ex__index-headline { font-size: 84px; }
+      .stories-ex__index-aside {
+        position: sticky;
+        top: 0;
+        height: calc(100dvh - var(--hall-nav-offset, 80px));
+        overflow: hidden;
+        background: var(--st-paper-room);
+        border-left: 1px solid var(--st-ink-faint);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* TOC entry — desktop */
+      .stories-ex__entry {
+        display: grid;
+        grid-template-columns: 48px 1fr auto;
+        grid-template-areas: "num content arrow";
+        gap: 24px;
+        align-items: baseline;
+        padding: 22px 0;
+      }
+      .stories-ex__entry-num { grid-area: num; }
+      .stories-ex__entry-content { grid-area: content; }
+      .stories-ex__entry-arrow { grid-area: arrow; }
+      .stories-ex__entry-title { font-size: 28px; }
+      .stories-ex__entry-thumb { display: none; }
+
+      /* mobile */
+      @media (max-width: 768px) {
+        .stories-ex__index {
+          grid-template-columns: 1fr;
+        }
+        .stories-ex__index-main {
+          padding: 48px 24px 80px;
+          max-width: none;
+        }
+        .stories-ex__index-headline {
+          font-size: clamp(48px, 12vw, 72px);
+          letter-spacing: -1px;
+        }
+        .stories-ex__index-aside { display: none; }
+
+        .stories-ex__entry {
+          grid-template-columns: 96px minmax(0, 1fr);
+          grid-template-rows: auto 1fr;
+          grid-template-areas:
+            "thumb content"
+            "thumb content";
+          column-gap: 16px;
+          row-gap: 0;
+          align-items: start;
+          padding: 18px 0;
+        }
+        .stories-ex__entry-thumb {
+          display: flex;
+          grid-area: thumb;
+          width: 96px;
+          height: 124px;
+          background-color: var(--st-paper-room);
+          background-size: cover;
+          background-position: center;
+          border: 1px solid var(--st-ink-faint);
+          align-items: flex-end;
+          justify-content: flex-start;
+          padding: 8px;
+          position: relative;
+          overflow: hidden;
+        }
+        .stories-ex__entry-thumb.has-image::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(transparent 55%, rgba(0,0,0,0.5));
+          pointer-events: none;
+        }
+        .stories-ex__thumb-num {
+          position: relative;
+          z-index: 1;
+          font-size: 9px;
+          letter-spacing: 2px;
+          color: var(--st-ink-soft);
+        }
+        .stories-ex__entry-thumb.has-image .stories-ex__thumb-num {
+          color: #fff;
+        }
+        .stories-ex__entry-thumb:not(.has-image) .stories-ex__thumb-num {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          letter-spacing: 3px;
+          color: var(--st-ink-soft);
+        }
+        .stories-ex__entry-num { display: none; }
+        .stories-ex__entry-arrow { display: none; }
+        .stories-ex__entry-title {
+          font-size: clamp(20px, 5.5vw, 24px);
+          letter-spacing: -0.1px;
+        }
       }
     `}</style>
   );
