@@ -25,6 +25,7 @@ interface SelectedPhoto {
 
 interface BulkPatch {
   galleryId?: string;
+  addToGalleryId?: string;
   location?: string | null;
   tags?: string[];
 }
@@ -49,6 +50,7 @@ export function PhotoBulkEditDrawer({
   onDelete,
 }: Props) {
   const [moveToGalleryId, setMoveToGalleryId] = useState("");
+  const [addToGalleryId, setAddToGalleryId] = useState("");
   const [location, setLocation] = useState("");
   const [tagsInput, setTagsInput] = useState("");
   const [sharedCaption, setSharedCaption] = useState("");
@@ -57,13 +59,17 @@ export function PhotoBulkEditDrawer({
 
   const count = selectedPhotos.length;
   const hasOverwriteChange =
-    !!moveToGalleryId || !!location.trim() || !!tagsInput.trim();
+    !!moveToGalleryId ||
+    !!addToGalleryId ||
+    !!location.trim() ||
+    !!tagsInput.trim();
 
   async function handleApply() {
     if (!hasOverwriteChange) return;
     setApplying(true);
     const patch: BulkPatch = {};
     if (moveToGalleryId) patch.galleryId = moveToGalleryId;
+    if (addToGalleryId) patch.addToGalleryId = addToGalleryId;
     if (location.trim()) patch.location = location.trim();
     if (tagsInput.trim()) {
       patch.tags = tagsInput
@@ -73,6 +79,7 @@ export function PhotoBulkEditDrawer({
     }
     await onApply(patch);
     setMoveToGalleryId("");
+    setAddToGalleryId("");
     setLocation("");
     setTagsInput("");
     setApplying(false);
@@ -142,13 +149,32 @@ export function PhotoBulkEditDrawer({
         <div className="p-5 space-y-5">
           <Field
             label="Move to gallery"
-            hint="Moves every selected photo to this gallery."
+            hint="Replaces gallery memberships — photo will be in this gallery only."
           >
             <Select
               value={moveToGalleryId}
               onChange={(e) => setMoveToGalleryId(e.target.value)}
             >
               <option value="">— keep current —</option>
+              {galleries
+                .filter((g) => g.id !== currentGalleryId)
+                .map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.title}
+                  </option>
+                ))}
+            </Select>
+          </Field>
+
+          <Field
+            label="Add to gallery"
+            hint="Adds this gallery to existing memberships — photo stays in its current galleries too."
+          >
+            <Select
+              value={addToGalleryId}
+              onChange={(e) => setAddToGalleryId(e.target.value)}
+            >
+              <option value="">— don't add —</option>
               {galleries
                 .filter((g) => g.id !== currentGalleryId)
                 .map((g) => (

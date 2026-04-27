@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
-import { galleries, photos, siteSettings } from "@/lib/db/schema";
-import { eq, asc, and } from "drizzle-orm";
+import { galleries, siteSettings } from "@/lib/db/schema";
+import { selectPhotosForGallery } from "@/lib/db/photo-queries";
+import { eq, and } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { DEFAULT_LIGHTBOX_SETTINGS, type LightboxSettings } from "@/components/public/Lightbox";
@@ -42,7 +43,7 @@ export default async function GalleryPage({ params }: Props) {
   if (!gallery) notFound();
 
   const [galleryPhotos, [settingsRow]] = await Promise.all([
-    db.select().from(photos).where(eq(photos.galleryId, gallery.id)).orderBy(asc(photos.position)),
+    selectPhotosForGallery(gallery.id),
     db.select().from(siteSettings).limit(1),
   ]);
 

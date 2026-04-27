@@ -7,6 +7,8 @@ import {
   boolean,
   jsonb,
   real,
+  primaryKey,
+  index,
 } from "drizzle-orm/pg-core";
 
 export const adminUsers = pgTable("admin_users", {
@@ -118,9 +120,6 @@ export const galleries = pgTable("galleries", {
 
 export const photos = pgTable("photos", {
   id: uuid("id").defaultRandom().primaryKey(),
-  galleryId: uuid("gallery_id")
-    .notNull()
-    .references(() => galleries.id, { onDelete: "cascade" }),
   blobUrl: text("blob_url").notNull(),
   url: text("url").notNull(),
   thumbnailUrl: text("thumbnail_url").notNull(),
@@ -136,11 +135,28 @@ export const photos = pgTable("photos", {
   height: integer("height").notNull(),
   focalX: real("focal_x").notNull().default(50),
   focalY: real("focal_y").notNull().default(50),
-  position: integer("position").notNull().default(0),
   takenAt: timestamp("taken_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+export const galleryPhotos = pgTable(
+  "gallery_photos",
+  {
+    galleryId: uuid("gallery_id")
+      .notNull()
+      .references(() => galleries.id, { onDelete: "cascade" }),
+    photoId: uuid("photo_id")
+      .notNull()
+      .references(() => photos.id, { onDelete: "cascade" }),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.galleryId, t.photoId] }),
+    photoIdx: index("gallery_photos_photo_idx").on(t.photoId),
+  })
+);
 
 export const formSubmissions = pgTable("form_submissions", {
   id: uuid("id").defaultRandom().primaryKey(),

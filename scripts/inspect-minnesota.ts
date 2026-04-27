@@ -2,8 +2,8 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 
 import { db } from "@/lib/db";
-import { photos, galleries } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { galleries } from "@/lib/db/schema";
+import { selectPhotosForGallery } from "@/lib/db/photo-queries";
 
 async function main() {
   const gs = await db.select().from(galleries);
@@ -16,7 +16,7 @@ async function main() {
     return;
   }
 
-  const rows = await db.select().from(photos).where(eq(photos.galleryId, mn.id));
+  const rows = await selectPhotosForGallery(mn.id);
   console.log(`\n${mn.title} (slug=${mn.slug}) has ${rows.length} photos:\n`);
   for (const p of rows) {
     console.log(`  - ${p.title ?? "(no title)"}  |  filename=${p.filename}`);

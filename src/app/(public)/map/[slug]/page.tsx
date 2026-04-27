@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
-import { galleries, photos, siteSettings } from "@/lib/db/schema";
-import { and, asc, eq } from "drizzle-orm";
+import { galleries, siteSettings } from "@/lib/db/schema";
+import { selectPhotosForGallery } from "@/lib/db/photo-queries";
+import { and, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { DEFAULT_ROOM_CAPTION_FIELDS, type RoomPhoto } from "@/components/public/hall/RoomView";
@@ -44,11 +45,7 @@ export default async function FieldMapRegionPage({ params }: Props) {
   const [settingsRow] = await db.select().from(siteSettings).limit(1);
   const fieldMapData = await getFieldMapData();
 
-  const rows = await db
-    .select()
-    .from(photos)
-    .where(eq(photos.galleryId, gallery.id))
-    .orderBy(asc(photos.position));
+  const rows = await selectPhotosForGallery(gallery.id);
 
   const roomPhotos: RoomPhoto[] = rows.map((p) => ({
     id: p.id,

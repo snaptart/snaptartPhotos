@@ -2,7 +2,8 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 
 import { db } from "@/lib/db";
-import { photos, galleries } from "@/lib/db/schema";
+import { photos, galleries, galleryPhotos } from "@/lib/db/schema";
+import { inArray } from "drizzle-orm";
 
 async function main() {
   const allPhotos = await db.select().from(photos);
@@ -24,13 +25,30 @@ async function main() {
   const dups = [...byFilename.entries()].filter(([, rows]) => rows.length > 1);
   if (dups.length === 0) {
     console.log("No duplicate filenames.");
-  } else {
-    console.log(`${dups.length} filenames appear more than once:\n`);
-    for (const [fn, rows] of dups) {
-      console.log(`  ${fn}  (×${rows.length})`);
-      for (const r of rows) {
-        console.log(`    - gallery=${gMap.get(r.galleryId)}  title="${r.title ?? "(none)"}"  loc="${r.location?.slice(0, 60) ?? "(empty)"}..."`);
-      }
+    return;
+  }
+
+  // Pull all junction rows for the duplicate photo ids in one query.
+  const dupIds = dups.flatMap(([, rows]) => rows.map((r) => r.id));
+  const junctionRows = await db
+    .select()
+    .from(galleryPhotos)
+    .where(inArray(galleryPhotos.photoId, dupIds));
+  const galleriesByPhoto = new Map<string, string[]>();
+  for (const j of junctionRows) {
+    const arr = galleriesByPhoto.get(j.photoId) ?? [];
+    arr.push(gMap.get(j.galleryId) ?? j.galleryId);
+    galleriesByPhoto.set(j.photoId, arr);
+  }
+
+  console.log(`${dups.length} filenames appear more than once:\n`);
+  for (const [fn, rows] of dups) {
+    console.log(`  ${fn}  (×${rows.length})`);
+    for (const r of rows) {
+      const gs = galleriesByPhoto.get(r.id) ?? [];
+      console.log(
+        `    - galleries=[${gs.join(", ")}]  title="${r.title ?? "(none)"}"  loc="${r.location?.slice(0, 60) ?? "(empty)"}..."`
+      );
     }
   }
 }

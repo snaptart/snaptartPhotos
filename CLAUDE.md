@@ -76,14 +76,18 @@ src/
 ```
 
 ### Database Schema (src/lib/db/schema.ts)
-6 tables defined with Drizzle ORM:
+Tables defined with Drizzle ORM:
 - **admin_users** — id, email, password_hash, created_at
 - **site_settings** — id, site_title, logo_url, instagram_url, footer_text, contact_email, updated_at
 - **menu_items** — id, label, url, target_type, target_id, position, parent_id, created_at
 - **pages** — id, title, slug, content (jsonb), page_type, is_password_protected, password_hash, meta_title, meta_description, og_image_url, is_published, position, created_at, updated_at
 - **galleries** — id, title, slug, description, cover_image_url, parent_id, position, is_published, created_at, updated_at
-- **photos** — id, gallery_id (FK→galleries), blob_url, url, thumbnail_url, title, description, location, camera_settings (jsonb), tags (text[]), width, height, position, created_at, updated_at
+- **photos** — id, blob_url, url, thumbnail_url, title, description, location, latitude/longitude, camera_settings (jsonb), tags (text[]), width, height, focal_x/y, taken_at, created_at, updated_at — *standalone; no gallery FK on the photo itself*
+- **gallery_photos** *(junction)* — gallery_id (FK→galleries, cascade), photo_id (FK→photos, cascade), position, created_at; composite PK on (gallery_id, photo_id), index on photo_id. A photo can belong to many galleries; per-gallery ordering lives here.
 - **page_elements** — id, page_id (FK→pages), element_type, content (jsonb), position, created_at
+
+**Reading photos**: use `selectPhotosForGallery(galleryId)` / `selectPhotosForGalleries(ids)` from `src/lib/db/photo-queries.ts`. Returns flat photo rows joined with the junction (`galleryId` and `position` come from `gallery_photos`).
+**Writing memberships**: `addPhotoToGallery`, `setPhotoGalleries`, `selectGalleryIdsForPhoto` in the same module.
 
 ### Auth Flow
 - NextAuth v5 with credentials provider (src/lib/auth.ts)
@@ -101,7 +105,7 @@ src/
 - Settings API: GET (public) / PUT (auth required)
 - Menu items API: GET (public) / POST+PUT+DELETE (auth required), PUT supports bulk reorder via `{ items: [{ id, position }] }`
 - Galleries API: GET (public) / POST+PUT+DELETE (auth required), PUT supports bulk reorder, auto-generates slug from title
-- Photos API: GET (public, filterable by galleryId) / POST+PUT+DELETE (auth required), DELETE also removes from Vercel Blob
+- Photos API: GET (public, filterable by `galleryId` or `gallerySlug`; admin-only `?id=X` returns photo + galleryIds) / POST+PUT+DELETE (auth required). POST accepts `galleryIds: string[]` (or legacy single `galleryId`). PUT single accepts `galleryIds` to replace memberships; PUT bulk patch accepts `galleryId` (move = replace) or `addToGalleryId` (add). DELETE without `galleryId` deletes the photo and its blob; DELETE with `galleryId` removes only that membership and garbage-collects the photo if it has no remaining memberships.
 - Upload API: POST (auth required) — accepts multipart file, uploads to Vercel Blob, returns blobUrl/url
 
 ## Implementation Progress

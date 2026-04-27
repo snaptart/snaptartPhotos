@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
-import { pages, galleries, photos, siteSettings } from "@/lib/db/schema";
-import { eq, and, asc } from "drizzle-orm";
+import { pages, galleries, siteSettings } from "@/lib/db/schema";
+import { selectPhotosForGallery } from "@/lib/db/photo-queries";
+import { eq, and } from "drizzle-orm";
 import { generateHTML } from "@tiptap/html";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
@@ -82,11 +83,7 @@ export default async function HomePage() {
         .from(galleries)
         .where(and(eq(galleries.slug, props.gallerySlug), eq(galleries.isPublished, true)));
       if (!gallery) continue;
-      const galleryPhotoRows = await db
-        .select()
-        .from(photos)
-        .where(eq(photos.galleryId, gallery.id))
-        .orderBy(asc(photos.position));
+      const galleryPhotoRows = await selectPhotosForGallery(gallery.id);
       galleryPhotos[props.gallerySlug] = galleryPhotoRows
         .slice(0, props.maxPhotos ?? 12)
         .map((p) => ({

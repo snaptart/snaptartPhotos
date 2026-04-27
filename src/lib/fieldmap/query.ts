@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { galleries, photos } from "@/lib/db/schema";
+import { galleries, galleryPhotos, photos } from "@/lib/db/schema";
 import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import type { FieldMapFilter, FieldMapRegion } from "@/components/public/fieldmap/types";
 
@@ -61,17 +61,18 @@ export async function getFieldMapData(): Promise<FieldMapData> {
   const photoRows = await db
     .select({
       id: photos.id,
-      galleryId: photos.galleryId,
+      galleryId: galleryPhotos.galleryId,
       thumbnailUrl: photos.thumbnailUrl,
       url: photos.url,
       tags: photos.tags,
       takenAt: photos.takenAt,
       createdAt: photos.createdAt,
-      position: photos.position,
+      position: galleryPhotos.position,
     })
     .from(photos)
-    .where(inArray(photos.galleryId, galleryIds))
-    .orderBy(asc(photos.position));
+    .innerJoin(galleryPhotos, eq(galleryPhotos.photoId, photos.id))
+    .where(inArray(galleryPhotos.galleryId, galleryIds))
+    .orderBy(asc(galleryPhotos.position));
 
   const byGallery = new Map<string, typeof photoRows>();
   for (const p of photoRows) {

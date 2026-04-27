@@ -50,7 +50,6 @@ import {
 
 interface Photo {
   id: string;
-  galleryId: string;
   blobUrl: string;
   url: string;
   thumbnailUrl: string;
@@ -100,6 +99,8 @@ export default function PhotosPage() {
     x: 50,
     y: 50,
   });
+  const [editingGalleryIds, setEditingGalleryIds] = useState<Set<string>>(new Set());
+  const [editingGalleriesDirty, setEditingGalleriesDirty] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<Filter>("all");
   const [activeTag, setActiveTag] = useState<string | null>(null);
@@ -134,6 +135,27 @@ export default function PhotosPage() {
     const data = await res.json();
     setGalleries(data);
   }, []);
+
+  const openEdit = useCallback(
+    async (photo: Photo) => {
+      setEditingId(photo.id);
+      setEditingFocal({ x: photo.focalX ?? 50, y: photo.focalY ?? 50 });
+      setEditingGalleryIds(new Set(selectedGallery ? [selectedGallery] : []));
+      setEditingGalleriesDirty(false);
+      try {
+        const res = await fetch(`/api/photos?id=${photo.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data?.galleryIds)) {
+            setEditingGalleryIds(new Set(data.galleryIds));
+          }
+        }
+      } catch {
+        // keep the optimistic value
+      }
+    },
+    [selectedGallery],
+  );
 
   const fetchPhotos = useCallback(async () => {
     if (!selectedGallery) {
@@ -259,6 +281,9 @@ export default function PhotosPage() {
         tags: parseTagsInput(form.get("tags")),
         focalX: editingFocal.x,
         focalY: editingFocal.y,
+        ...(editingGalleriesDirty
+          ? { galleryIds: Array.from(editingGalleryIds) }
+          : {}),
       }),
     });
     if (res.ok) {
@@ -295,6 +320,7 @@ export default function PhotosPage() {
 
   async function handleBulkApply(patch: {
     galleryId?: string;
+    addToGalleryId?: string;
     location?: string | null;
     tags?: string[];
   }) {
@@ -683,13 +709,7 @@ export default function PhotosPage() {
                     photo={photo}
                     selected={selected.has(photo.id)}
                     onToggleSelect={() => toggleSelected(photo.id)}
-                    onEdit={() => {
-                      setEditingId(photo.id);
-                      setEditingFocal({
-                        x: photo.focalX ?? 50,
-                        y: photo.focalY ?? 50,
-                      });
-                    }}
+                    onEdit={() => openEdit(photo)}
                     onSetCover={() => setCover(photo)}
                     onDelete={() => handleDelete(photo.id)}
                   />
@@ -705,13 +725,7 @@ export default function PhotosPage() {
                 photo={photo}
                 selected={selected.has(photo.id)}
                 onToggleSelect={() => toggleSelected(photo.id)}
-                onEdit={() => {
-                  setEditingId(photo.id);
-                  setEditingFocal({
-                    x: photo.focalX ?? 50,
-                    y: photo.focalY ?? 50,
-                  });
-                }}
+                onEdit={() => openEdit(photo)}
                 onSetCover={() => setCover(photo)}
                 onDelete={() => handleDelete(photo.id)}
               />
@@ -726,6 +740,17 @@ export default function PhotosPage() {
           photo={editingPhoto}
           focal={editingFocal}
           onFocalChange={(x, y) => setEditingFocal({ x, y })}
+          galleries={galleries}
+          galleryIds={editingGalleryIds}
+          onToggleGallery={(id) => {
+            setEditingGalleriesDirty(true);
+            setEditingGalleryIds((prev) => {
+              const next = new Set(prev);
+              if (next.has(id)) next.delete(id);
+              else next.add(id);
+              return next;
+            });
+          }}
           onSubmit={handleUpdate}
           onClose={() => setEditingId(null)}
           onCopyUrl={() => {
@@ -986,6 +1011,9 @@ function EditPhotoModal({
   photo,
   focal,
   onFocalChange,
+  galleries,
+  galleryIds,
+  onToggleGallery,
   onSubmit,
   onClose,
   onCopyUrl,
@@ -993,6 +1021,9 @@ function EditPhotoModal({
   photo: Photo;
   focal: { x: number; y: number };
   onFocalChange: (x: number, y: number) => void;
+  galleries: Gallery[];
+  galleryIds: Set<string>;
+  onToggleGallery: (id: string) => void;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   onClose: () => void;
   onCopyUrl: () => void;
@@ -1101,6 +1132,27 @@ function EditPhotoModal({
                 name="tags"
                 defaultValue={photo.tags?.join(", ") ?? ""}
               />
+            </Field>
+            <Field
+              label={`In ${siteConfig.labels.galleries.toLowerCase()}`}
+              hint={`A ${siteConfig.labels.photo.toLowerCase()} can live in multiple ${siteConfig.labels.galleries.toLowerCase()} at once.`}
+            >
+              <div className="rounded-md border border-admin-border bg-admin-surface-2 p-2 max-h-[140px] overflow-y-auto flex flex-col gap-1">
+                {galleries.map((g) => (
+                  <label
+                    key={g.id}
+                    className="flex items-center gap-2 text-[13px] text-admin-ink cursor-pointer rounded px-1.5 py-1 hover:bg-admin-surface"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={galleryIds.has(g.id)}
+                      onChange={() => onToggleGallery(g.id)}
+                      className="accent-admin-accent"
+                    />
+                    <span className="truncate">{g.title}</span>
+                  </label>
+                ))}
+              </div>
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Latitude" htmlFor="p-lat" hint="Decimal (e.g. 48.8566)">
