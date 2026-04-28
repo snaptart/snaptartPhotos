@@ -352,16 +352,19 @@ export default function LookAndFeelPage() {
           label="Site background"
           value={themeDraft.colorSiteBg}
           onChange={(v) => updateTheme("colorSiteBg", v)}
+          allowTransparent
         />
         <ColorField
           label="Header background"
           value={themeDraft.colorHeaderBg}
           onChange={(v) => updateTheme("colorHeaderBg", v)}
+          allowTransparent
         />
         <ColorField
           label="Footer background"
           value={themeDraft.colorFooterBg}
           onChange={(v) => updateTheme("colorFooterBg", v)}
+          allowTransparent
         />
         <ColorField
           label="Footer text"
@@ -536,27 +539,45 @@ function ColorField({
   label,
   value,
   onChange,
+  allowTransparent,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
+  allowTransparent?: boolean;
 }) {
+  const isTransparent = value === "transparent";
   return (
     <Field label={label} inline>
       <div className="flex items-center gap-2">
         <input
           type="color"
-          value={value}
+          value={isTransparent ? "#ffffff" : value}
           onChange={(e) => onChange(e.target.value)}
-          className="h-9 w-10 cursor-pointer rounded-md border border-admin-border-strong"
+          disabled={isTransparent}
+          className="h-9 w-10 cursor-pointer rounded-md border border-admin-border-strong disabled:cursor-not-allowed disabled:opacity-50"
         />
         <Input
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          disabled={isTransparent}
           className="w-32"
-          maxLength={7}
+          maxLength={11}
         />
+        {allowTransparent && (
+          <label className="flex items-center gap-1.5 text-[13px] text-admin-ink cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isTransparent}
+              onChange={(e) =>
+                onChange(e.target.checked ? "transparent" : "#ffffff")
+              }
+              className="accent-admin-accent"
+            />
+            Transparent
+          </label>
+        )}
       </div>
     </Field>
   );

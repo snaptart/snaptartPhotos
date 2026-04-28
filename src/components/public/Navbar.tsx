@@ -100,7 +100,7 @@ export async function Navbar() {
 
   return (
     <header
-      className="relative border-b border-neutral-200"
+      className="relative"
       style={{ backgroundColor: "var(--theme-color-header-bg)" }}
     >
       {/* Desktop nav */}

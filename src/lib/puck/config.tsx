@@ -16,6 +16,7 @@ import { Indent } from "@/lib/tiptap/indent";
 import type { JSONContent } from "@tiptap/react";
 import TiptapEditor from "@/components/admin/TiptapEditor";
 import ImagePicker from "@/components/admin/ImagePicker";
+import GalleryPhotoMultiPicker from "@/components/admin/GalleryPhotoMultiPicker";
 import { parseLinks } from "@/lib/parseLinks";
 import siteConfig from "@/lib/site.config";
 import { fontRole } from "@/lib/theme/role-style";
@@ -115,6 +116,7 @@ type ImageBlockProps = {
 
 type SpacerProps = {
   height: number;
+  unit: "px" | "%";
 };
 
 type ContainerProps = {
@@ -186,6 +188,7 @@ type FieldMapBlockProps = {
   mapStyle: MapStyle;
   height: string;
   showBrand: boolean;
+  backgroundColor: string;
 };
 
 export type FieldMapBlockData = {
@@ -196,10 +199,13 @@ export type FieldMapBlockData = {
 };
 
 type CarouselProps = {
+  sourceMode: "manual" | "gallery";
+  gallerySlug: string;
+  maxPhotos: number;
   slides: CarouselSlide[];
   slidesPerView: number;
   gap: number;
-  aspectRatio: "none" | "16:9" | "3:2" | "4:3" | "1:1";
+  aspectRatio: "none" | "16:9" | "3:2" | "4:3" | "1:1" | "3:4" | "2:3" | "9:16";
   height: string;
   transition: "slide" | "fade";
   transitionDuration: number;
@@ -1728,11 +1734,22 @@ export const puckConfig: Config<Components> = {
     Spacer: {
       label: "Spacer",
       fields: {
-        height: { type: "number", label: "Height (px)", min: 8, max: 200 },
+        unit: {
+          type: "radio",
+          label: "Unit",
+          options: [
+            { label: "px", value: "px" },
+            { label: "% of viewport", value: "%" },
+          ],
+        },
+        height: { type: "number", label: "Height", min: 0, max: 1000 },
       },
-      defaultProps: { height: 48 },
-      render: ({ height }) => (
-        <div style={{ height }} className="w-full" />
+      defaultProps: { height: 48, unit: "px" },
+      render: ({ height, unit }) => (
+        <div
+          style={{ height: unit === "%" ? `${height}vh` : `${height}px` }}
+          className="w-full"
+        />
       ),
     },
 
@@ -2009,9 +2026,31 @@ export const puckConfig: Config<Components> = {
     Carousel: {
       label: "Carousel",
       fields: {
+        sourceMode: {
+          type: "radio",
+          label: "Slide Source",
+          options: [
+            { label: "Manual slides", value: "manual" },
+            { label: `From ${siteConfig.labels.gallery.toLowerCase()}`, value: "gallery" },
+          ],
+        },
+        gallerySlug: {
+          type: "custom",
+          label: `${siteConfig.labels.gallery} (when source is gallery)`,
+          render: ({ value, onChange }) => (
+            <GalleryPicker value={value} onChange={onChange} />
+          ),
+        },
+        maxPhotos: {
+          type: "custom",
+          label: "Max Photos (gallery source)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={1} max={50} step={1} unit="" label="Max Photos" />
+          ),
+        },
         slides: {
           type: "custom",
-          label: "Slides",
+          label: "Slides (manual source)",
           render: ({ value, onChange }) => (
             <CarouselSlideEditor value={value} onChange={onChange} />
           ),
@@ -2035,20 +2074,27 @@ export const puckConfig: Config<Components> = {
           label: "Aspect Ratio",
           options: [
             { label: "None (use height)", value: "none" },
-            { label: "16:9", value: "16:9" },
-            { label: "3:2", value: "3:2" },
-            { label: "4:3", value: "4:3" },
+            { label: "16:9 (landscape)", value: "16:9" },
+            { label: "3:2 (landscape)", value: "3:2" },
+            { label: "4:3 (landscape)", value: "4:3" },
             { label: "1:1 (square)", value: "1:1" },
+            { label: "3:4 (portrait)", value: "3:4" },
+            { label: "2:3 (portrait)", value: "2:3" },
+            { label: "9:16 (portrait)", value: "9:16" },
           ],
         },
         height: {
           type: "select",
-          label: "Height (when no aspect ratio)",
+          label: "Height",
           options: [
             { label: "200px", value: "200px" },
             { label: "300px", value: "300px" },
             { label: "400px", value: "400px" },
             { label: "500px", value: "500px" },
+            { label: "30% of viewport", value: "30vh" },
+            { label: "50% of viewport", value: "50vh" },
+            { label: "70% of viewport", value: "70vh" },
+            { label: "90% of viewport", value: "90vh" },
           ],
         },
         transition: {
@@ -2122,6 +2168,9 @@ export const puckConfig: Config<Components> = {
         },
       },
       defaultProps: {
+        sourceMode: "manual",
+        gallerySlug: "",
+        maxPhotos: 12,
         slides: [],
         slidesPerView: 3,
         gap: 16,
@@ -2137,7 +2186,29 @@ export const puckConfig: Config<Components> = {
         objectFit: "cover",
         borderRadius: 8,
       },
-      render: (props) => <CarouselClient {...props} />,
+      render: ({ puck, ...props }) => {
+        if (props.sourceMode === "gallery") {
+          if (!props.gallerySlug) {
+            return (
+              <div className="rounded border-2 border-dashed border-neutral-300 p-8 text-center text-neutral-400">
+                Select a {siteConfig.labels.gallery.toLowerCase()} to use as the carousel source
+              </div>
+            );
+          }
+          const serverPhotos = (puck?.metadata as Record<string, unknown>)?.galleryPhotos as
+            | Record<string, EmbedPhoto[]>
+            | undefined;
+          return (
+            <CarouselGallerySource
+              slug={props.gallerySlug}
+              maxPhotos={props.maxPhotos}
+              serverPhotos={serverPhotos?.[props.gallerySlug]}
+              carouselProps={props}
+            />
+          );
+        }
+        return <CarouselClient {...props} />;
+      },
     },
 
     GalleryEmbed: {
@@ -2372,13 +2443,21 @@ export const puckConfig: Config<Components> = {
             { label: "No", value: false },
           ],
         },
+        backgroundColor: {
+          type: "custom",
+          label: "Background color",
+          render: ({ value, onChange }) => (
+            <ColorField value={value} onChange={onChange} allowTransparent />
+          ),
+        },
       },
       defaultProps: {
         mapStyle: "modern",
         height: "fill",
         showBrand: false,
+        backgroundColor: "#ffffff",
       },
-      render: ({ mapStyle, height, showBrand, puck }) => {
+      render: ({ mapStyle, height, showBrand, backgroundColor, puck }) => {
         const injected = (puck?.metadata as Record<string, unknown>)?.fieldMap as
           | FieldMapBlockData
           | undefined
@@ -2408,7 +2487,7 @@ export const puckConfig: Config<Components> = {
               rel="stylesheet"
               href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
             />
-            <div className="relative w-full bg-white" style={fillStyle}>
+            <div className="relative w-full" style={{ ...fillStyle, backgroundColor }}>
               <FieldMap
                 regions={injected.regions}
                 yearBounds={injected.yearBounds}
@@ -2416,6 +2495,7 @@ export const puckConfig: Config<Components> = {
                 mapStyle={mapStyle}
                 siteTitle={injected.siteTitle}
                 showBrand={showBrand}
+                backgroundColor={backgroundColor}
               />
             </div>
           </>
@@ -2592,7 +2672,7 @@ export const puckConfig: Config<Components> = {
 
 // ----- Gallery picker (custom Puck field) -----
 
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 // Image priority context — tracks how many images have rendered so the first N load eagerly
 const ImageCounterContext = createContext<{ next: () => number }>({ next: () => Infinity });
@@ -2657,22 +2737,45 @@ function SliderField({ value, onChange, min, max, step, unit, label }: { value: 
 
 // ----- Color field -----
 
-function ColorField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function ColorField({
+  value,
+  onChange,
+  allowTransparent,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  allowTransparent?: boolean;
+}) {
+  const isTransparent = value === "transparent";
   return (
     <div className="flex items-center gap-3">
       <input
         type="color"
-        value={value}
+        value={isTransparent ? "#ffffff" : value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-8 w-10 cursor-pointer rounded border border-neutral-300"
+        disabled={isTransparent}
+        className="h-8 w-10 cursor-pointer rounded border border-neutral-300 disabled:cursor-not-allowed disabled:opacity-50"
       />
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="flex-1 rounded border border-neutral-300 px-2 py-1 text-sm font-mono"
+        disabled={isTransparent}
+        className="flex-1 rounded border border-neutral-300 px-2 py-1 text-sm font-mono disabled:bg-neutral-50 disabled:text-neutral-400"
         placeholder="#000000"
       />
+      {allowTransparent && (
+        <label className="flex items-center gap-1 text-xs text-neutral-700 cursor-pointer whitespace-nowrap">
+          <input
+            type="checkbox"
+            checked={isTransparent}
+            onChange={(e) =>
+              onChange(e.target.checked ? "transparent" : "#ffffff")
+            }
+          />
+          Transparent
+        </label>
+      )}
     </div>
   );
 }
@@ -3823,6 +3926,7 @@ function HeroSlideshowClient({
 function CarouselSlideEditor({ value, onChange }: { value: CarouselSlide[]; onChange: (v: CarouselSlide[]) => void }) {
   const slides = value ?? [];
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const addSlide = (type: CarouselSlide["type"]) => {
     const newSlide: CarouselSlide = {
@@ -3836,6 +3940,19 @@ function CarouselSlideEditor({ value, onChange }: { value: CarouselSlide[]; onCh
     };
     onChange([...slides, newSlide]);
     setExpandedId(newSlide.id);
+  };
+
+  const addFromGallery = (photos: { url: string; title: string }[]) => {
+    const newSlides: CarouselSlide[] = photos.map((p) => ({
+      id: crypto.randomUUID(),
+      type: "image",
+      imageUrl: p.url,
+      title: p.title,
+      subtitle: "",
+      bgColor: "#f5f5f5",
+      textColor: "#171717",
+    }));
+    onChange([...slides, ...newSlides]);
   };
 
   const updateSlide = (id: string, patch: Partial<CarouselSlide>) => {
@@ -3920,6 +4037,19 @@ function CarouselSlideEditor({ value, onChange }: { value: CarouselSlide[]; onCh
         <button onClick={() => addSlide("text")} className="flex-1 rounded border border-dashed border-neutral-300 px-2 py-1.5 text-xs text-neutral-500 hover:border-neutral-400 hover:text-neutral-700">+ Text</button>
         <button onClick={() => addSlide("mixed")} className="flex-1 rounded border border-dashed border-neutral-300 px-2 py-1.5 text-xs text-neutral-500 hover:border-neutral-400 hover:text-neutral-700">+ Mixed</button>
       </div>
+      <button
+        onClick={() => setPickerOpen(true)}
+        className="w-full rounded border border-dashed border-neutral-300 px-2 py-1.5 text-xs text-neutral-500 hover:border-neutral-400 hover:text-neutral-700"
+      >
+        + From Gallery (bulk)
+      </button>
+      <GalleryPhotoMultiPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onConfirm={addFromGallery}
+        title="Add slides from gallery"
+        confirmLabel={(n) => (n === 1 ? "Add 1 slide" : `Add ${n} slides`)}
+      />
     </div>
   );
 }
@@ -3944,60 +4074,376 @@ function CarouselClient({
 }: CarouselProps) {
   const [current, setCurrent] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
-  const [isTransitioning, setIsTransitioning] = useState(true);
-  const trackRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const currentRef = useRef(0);
+  // Bumped whenever the user navigates (wheel, drag, swipe, arrow, dot). Autoplay
+  // skips ticks within USER_INTERACTION_PAUSE_MS of the last interaction so it
+  // doesn't fight the user.
+  const lastInteractionRef = useRef(0);
+  const fadeDragRef = useRef({
+    active: false,
+    startX: 0,
+    startY: 0,
+    startTime: 0,
+    pointerId: 0,
+    axis: null as null | "h" | "v",
+  });
+
+  useEffect(() => { currentRef.current = current; }, [current]);
+  const markInteraction = useCallback(() => { lastInteractionRef.current = Date.now(); }, []);
 
   const totalSlides = slides.length;
-  const canLoop = transition === "slide" && totalSlides > slidesPerView;
-
-  // For fade mode, maxIndex is simple; for slide mode we loop infinitely
   const fadeMaxIndex = totalSlides - 1;
+  // Infinite scroll: only viable when slide mode has more slides than fit on
+  // screen. We render three back-to-back copies and silently teleport between
+  // them once scrolling settles, so the user always perceives an endless reel.
+  const loopEnabled = transition === "slide" && totalSlides > slidesPerView;
 
+  const aspectFraction = (() => {
+    if (aspectRatio === "none") return null;
+    const [w, h] = aspectRatio.split(":").map(Number);
+    if (!w || !h) return null;
+    return { num: w, den: h };
+  })();
+  const aspectSlideWidth = aspectFraction
+    ? `calc(${height} * ${aspectFraction.num} / ${aspectFraction.den})`
+    : null;
+
+  // ---- Slide-mode transform engine ----
+  // Reel positioned via translate3d(-x, 0, 0), bypassing scrollLeft's integer
+  // pixel quantization. All inputs (wheel, drag, arrow, autoplay, dot) write
+  // into targetX; a single rAF loop lerps currentX toward targetX. Drag-during
+  // writes both directly for 1:1 cursor follow. For infinite loop we render two
+  // copies of the slide list and apply the transform modulo loopWidth — pixel
+  // content at x and x+loopWidth is identical, so the wrap is invisible.
+  const reelRef = useRef<HTMLDivElement>(null);
+  const currentXRef = useRef(0);
+  const targetXRef = useRef(0);
+  const rafRef = useRef(0);
+  const dragRef = useRef({
+    active: false,
+    pointerId: -1,
+    startCursorX: 0,
+    startX: 0,
+    startTime: 0,
+  });
+  const dragSamplesRef = useRef<{ t: number; x: number }[]>([]);
+  const dimsRef = useRef({ slotWidth: 0, slotPitch: 0, loopWidth: 0, viewportW: 0, maxX: 0 });
+  const [slotWidthPx, setSlotWidthPx] = useState(0);
+
+  const applyTransform = useCallback(() => {
+    const reel = reelRef.current;
+    const dims = dimsRef.current;
+    if (!reel) return;
+    const x = currentXRef.current;
+    let displayX = x;
+    if (loopEnabled && dims.loopWidth > 0) {
+      displayX = ((x % dims.loopWidth) + dims.loopWidth) % dims.loopWidth;
+    }
+    reel.style.transform = `translate3d(${-displayX}px, 0, 0)`;
+    if (totalSlides > 0 && dims.slotPitch > 0) {
+      const raw = Math.round(displayX / dims.slotPitch);
+      const mod = ((raw % totalSlides) + totalSlides) % totalSlides;
+      if (mod !== currentRef.current) {
+        currentRef.current = mod;
+        setCurrent(mod);
+      }
+    }
+  }, [loopEnabled, totalSlides]);
+
+  const stepRaf = useCallback(() => {
+    rafRef.current = 0;
+    const dims = dimsRef.current;
+    if (dims.slotPitch <= 0) return;
+    const t = targetXRef.current;
+    let c = currentXRef.current;
+    const diff = t - c;
+    const LERP = 0.1;
+    const STOP = 0.05;
+    if (Math.abs(diff) < STOP) {
+      c = t;
+    } else {
+      c += diff * LERP;
+    }
+    if (!loopEnabled) {
+      if (c < 0) { c = 0; if (targetXRef.current < 0) targetXRef.current = 0; }
+      else if (c > dims.maxX) { c = dims.maxX; if (targetXRef.current > dims.maxX) targetXRef.current = dims.maxX; }
+    }
+    currentXRef.current = c;
+    applyTransform();
+    if (Math.abs(targetXRef.current - currentXRef.current) >= STOP) {
+      rafRef.current = requestAnimationFrame(stepRaf);
+    }
+  }, [loopEnabled, applyTransform]);
+
+  const requestStep = useCallback(() => {
+    if (!rafRef.current) rafRef.current = requestAnimationFrame(stepRaf);
+  }, [stepRaf]);
+
+  const cancelStep = useCallback(() => {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+    }
+  }, []);
+
+  // Compute slot/loop dimensions from the current viewport size; rerun on resize.
   useEffect(() => {
-    if (!autoPlay || totalSlides <= (transition === "fade" ? 1 : slidesPerView)) return;
+    if (transition !== "slide") return;
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+    const recompute = () => {
+      const containerW = wrapper.clientWidth;
+      const containerH = wrapper.clientHeight;
+      let slotWidth: number;
+      if (aspectFraction) {
+        slotWidth = containerH * (aspectFraction.num / aspectFraction.den);
+      } else {
+        slotWidth = (containerW - (slidesPerView - 1) * gap) / slidesPerView;
+      }
+      if (!Number.isFinite(slotWidth) || slotWidth <= 0) return;
+      const slotPitch = slotWidth + gap;
+      const loopWidth = totalSlides * slotPitch;
+      const maxX = Math.max(0, totalSlides * slotPitch - gap - containerW);
+      dimsRef.current = { slotWidth, slotPitch, loopWidth, viewportW: containerW, maxX };
+      setSlotWidthPx(slotWidth);
+      applyTransform();
+    };
+    recompute();
+    const ro = new ResizeObserver(recompute);
+    ro.observe(wrapper);
+    return () => ro.disconnect();
+    // aspectFraction is recomputed each render but determined by aspectRatio + height.
+  }, [transition, totalSlides, slidesPerView, gap, aspectRatio, height, applyTransform, aspectFraction]);
+
+  // Slide-mode wheel: vertical wheels translate to horizontal target motion.
+  // Continuous wheeling keeps adding to target; current lerps toward it. Stop
+  // wheeling = the lerp coasts to a smooth stop with no abrupt cutoff.
+  useEffect(() => {
+    if (transition !== "slide") return;
+    const el = wrapperRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (Math.abs(delta) < 1) return;
+      e.preventDefault();
+      // GAIN: target-px per wheel-px. Tuned so a single notch (~100px delta)
+      // displaces ~half a viewport — matches the prior inertia model's feel.
+      const GAIN = 5;
+      targetXRef.current += delta * GAIN;
+      lastInteractionRef.current = Date.now();
+      requestStep();
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [transition, requestStep]);
+
+  // Slide-mode pointer drag (mouse + touch via Pointer Events). With
+  // touch-action: pan-y on the viewport, the browser handles vertical-scroll
+  // touches natively — we only see pointer events for horizontal drags, so no
+  // axis detection is needed here. Drag-during is 1:1 cursor follow; release
+  // computes velocity from a recent sample window and projects it onto a
+  // target-X offset that the lerp loop coasts toward.
+  const onSlidePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (transition !== "slide") return;
+    if ((e.target as HTMLElement).closest("button")) return;
+    const now = Date.now();
+    cancelStep();
+    dragRef.current = {
+      active: true,
+      pointerId: e.pointerId,
+      startCursorX: e.clientX,
+      startX: currentXRef.current,
+      startTime: now,
+    };
+    dragSamplesRef.current = [{ t: now, x: e.clientX }];
+    lastInteractionRef.current = now;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+    if (e.pointerType === "mouse") e.currentTarget.style.cursor = "grabbing";
+  };
+
+  const onSlidePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const ds = dragRef.current;
+    if (!ds.active || e.pointerId !== ds.pointerId) return;
+    const dx = e.clientX - ds.startCursorX;
+    // Cursor right (dx > 0) → content right → x decreases.
+    const newX = ds.startX - dx;
+    currentXRef.current = newX;
+    targetXRef.current = newX;
+    applyTransform();
+    const now = Date.now();
+    const samples = dragSamplesRef.current;
+    samples.push({ t: now, x: e.clientX });
+    while (samples.length > 1 && samples[0].t < now - 80) samples.shift();
+  };
+
+  const onSlidePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const ds = dragRef.current;
+    if (e.pointerId !== ds.pointerId) return;
+    const wasActive = ds.active;
+    ds.active = false;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+    if (e.pointerType === "mouse") e.currentTarget.style.cursor = "";
+    if (!wasActive) return;
+    const samples = dragSamplesRef.current;
+    if (samples.length >= 2) {
+      const newest = samples[samples.length - 1];
+      const oldest = samples[0];
+      const dt = newest.t - oldest.t;
+      if (dt > 5) {
+        const cursorVel = (newest.x - oldest.x) / dt; // px/ms, positive = right
+        const scrollVel = -cursorVel;
+        // Project release velocity onto a target offset matching the prior
+        // inertia distance: dist ≈ v / (1 - friction) * frameTime.
+        const INERTIA_FACTOR = 250;
+        targetXRef.current += scrollVel * INERTIA_FACTOR;
+        requestStep();
+      }
+    }
+    dragSamplesRef.current = [];
+  };
+
+  // Fade mode: any wheel direction navigates prev/next, throttled.
+  useEffect(() => {
+    if (transition !== "fade") return;
+    const el = wrapperRef.current;
+    if (!el) return;
+    let lastNav = 0;
+    const onWheel = (e: WheelEvent) => {
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (Math.abs(delta) < 1) return;
+      e.preventDefault();
+      const now = Date.now();
+      if (now - lastNav < 350) return;
+      lastNav = now;
+      lastInteractionRef.current = now;
+      if (delta > 0) setCurrent((c) => (c >= fadeMaxIndex ? 0 : c + 1));
+      else setCurrent((c) => (c <= 0 ? fadeMaxIndex : c - 1));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [transition, fadeMaxIndex]);
+
+  // Autoplay: scroll-snap step in slide mode; index increment in fade mode.
+  // `current` deliberately not in deps — reading it from currentRef avoids
+  // tearing down/recreating the interval on every navigation. User interactions
+  // bump lastInteractionRef and the tick skips while the user is active.
+  useEffect(() => {
+    if (!autoPlay) return;
     if (pauseOnHover && isHovered) return;
-    const timer = setInterval(() => {
-      setCurrent((prev) => {
-        if (transition === "fade") return prev >= fadeMaxIndex ? 0 : prev + 1;
-        return prev + 1;
-      });
-    }, interval * 1000);
+    if (transition === "slide" && totalSlides <= slidesPerView) return;
+    if (transition === "fade" && totalSlides <= 1) return;
+    const USER_INTERACTION_PAUSE_MS = 5000;
+    const tick = () => {
+      if (Date.now() - lastInteractionRef.current < USER_INTERACTION_PAUSE_MS) return;
+      if (transition === "slide") {
+        const dims = dimsRef.current;
+        if (dims.slotPitch <= 0) return;
+        if (loopEnabled) {
+          targetXRef.current += dims.slotPitch;
+        } else {
+          const next = targetXRef.current + dims.slotPitch;
+          targetXRef.current = next > dims.maxX ? 0 : next;
+        }
+        requestStep();
+      } else {
+        setCurrent((c) => (c >= fadeMaxIndex ? 0 : c + 1));
+      }
+    };
+    const timer = setInterval(tick, interval * 1000);
     return () => clearInterval(timer);
-  }, [autoPlay, interval, pauseOnHover, isHovered, totalSlides, slidesPerView, fadeMaxIndex, transition]);
+  }, [autoPlay, interval, pauseOnHover, isHovered, transition, totalSlides, slidesPerView, fadeMaxIndex, loopEnabled, requestStep]);
 
-  // After sliding to a clone, silently snap to the real slide
-  useEffect(() => {
-    if (transition !== "slide" || !canLoop) return;
-    if (current >= totalSlides || current < 0) {
-      const timeout = setTimeout(() => {
-        setIsTransitioning(false);
-        // Wrap index into the real range
-        setCurrent(((current % totalSlides) + totalSlides) % totalSlides);
-        // Re-enable transitions on the next frame
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => setIsTransitioning(true));
-        });
-      }, transitionDuration);
-      return () => clearTimeout(timeout);
-    }
-  }, [current, totalSlides, transition, canLoop, transitionDuration]);
-
-  const prev = () => {
-    if (transition === "fade") {
-      setCurrent((c) => (c <= 0 ? fadeMaxIndex : c - 1));
-    } else {
-      setCurrent((c) => c - 1);
+  // Fade mode pointer-based swipe: direction detection only (no live drag offset)
+  const onFadePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (transition !== "fade") return;
+    if (totalSlides <= 1) return;
+    if ((e.target as HTMLElement).closest("button")) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const now = Date.now();
+    fadeDragRef.current = {
+      active: true,
+      startX: e.clientX,
+      startY: e.clientY,
+      startTime: now,
+      pointerId: e.pointerId,
+      axis: null,
+    };
+    lastInteractionRef.current = now;
+  };
+  const onFadePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const ds = fadeDragRef.current;
+    if (!ds.active || e.pointerId !== ds.pointerId) return;
+    const dx = e.clientX - ds.startX;
+    const dy = e.clientY - ds.startY;
+    if (ds.axis === null && (Math.abs(dx) >= 5 || Math.abs(dy) >= 5)) {
+      ds.axis = Math.abs(dx) > Math.abs(dy) ? "h" : "v";
+      if (ds.axis === "v") ds.active = false;
     }
   };
-  const next = () => {
-    if (transition === "fade") {
-      setCurrent((c) => (c >= fadeMaxIndex ? 0 : c + 1));
-    } else {
-      setCurrent((c) => c + 1);
+  const onFadePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const ds = fadeDragRef.current;
+    if (e.pointerId !== ds.pointerId) return;
+    if (!ds.active || ds.axis !== "h") {
+      ds.active = false;
+      try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+      return;
     }
+    const delta = e.clientX - ds.startX;
+    const elapsed = Date.now() - ds.startTime;
+    ds.active = false;
+    const containerWidth = e.currentTarget.offsetWidth || 1;
+    if (Math.abs(delta) > containerWidth * 0.15 || (elapsed < 250 && Math.abs(delta) > 30)) {
+      if (delta < 0) setCurrent((c) => (c >= fadeMaxIndex ? 0 : c + 1));
+      else setCurrent((c) => (c <= 0 ? fadeMaxIndex : c - 1));
+    }
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
   };
 
-  const arMap: Record<string, string> = { "16:9": "16/9", "3:2": "3/2", "4:3": "4/3", "1:1": "1/1" };
+  // Navigation helpers (mode-aware). Slide mode shifts targetX by one slot
+  // pitch; the engine lerps current to target with a smooth ease-out.
+  const stepSlide = (dir: -1 | 1) => {
+    const dims = dimsRef.current;
+    if (dims.slotPitch <= 0) return;
+    targetXRef.current += dir * dims.slotPitch;
+    requestStep();
+  };
+  // Dot click in slide mode: pick the nearest copy of slide N relative to the
+  // current position so the lerp never has to chase across a wrap boundary.
+  const scrollToSlideIndex = (modIdx: number) => {
+    const dims = dimsRef.current;
+    if (dims.slotPitch <= 0 || totalSlides <= 0) return;
+    if (!loopEnabled) {
+      targetXRef.current = modIdx * dims.slotPitch;
+      requestStep();
+      return;
+    }
+    const lw = dims.loopWidth;
+    const baseCopy = Math.floor(currentXRef.current / lw);
+    const candidates = [
+      (baseCopy * totalSlides + modIdx) * dims.slotPitch,
+      ((baseCopy + 1) * totalSlides + modIdx) * dims.slotPitch,
+      ((baseCopy - 1) * totalSlides + modIdx) * dims.slotPitch,
+    ];
+    let best = candidates[0];
+    let bestDist = Math.abs(best - currentXRef.current);
+    for (let i = 1; i < candidates.length; i++) {
+      const d = Math.abs(candidates[i] - currentXRef.current);
+      if (d < bestDist) { best = candidates[i]; bestDist = d; }
+    }
+    targetXRef.current = best;
+    requestStep();
+  };
+  const handlePrev = () => {
+    markInteraction();
+    if (transition === "slide") stepSlide(-1);
+    else setCurrent((c) => (c <= 0 ? fadeMaxIndex : c - 1));
+  };
+  const handleNext = () => {
+    markInteraction();
+    if (transition === "slide") stepSlide(1);
+    else setCurrent((c) => (c >= fadeMaxIndex ? 0 : c + 1));
+  };
 
   if (totalSlides === 0) {
     return (
@@ -4012,7 +4458,7 @@ function CarouselClient({
       borderRadius: `${borderRadius}px`,
       overflow: "hidden",
       height: "100%",
-      ...(aspectRatio !== "none" ? { aspectRatio: arMap[aspectRatio] } : { height }),
+      width: "100%",
     };
 
     if (slide.type === "image") {
@@ -4025,6 +4471,7 @@ function CarouselClient({
               className="h-full w-full opacity-0 transition-opacity duration-300"
               style={{ objectFit, borderRadius: `${borderRadius}px` }}
               loading={index < slidesPerView ? "eager" : "lazy"}
+              draggable={false}
               ref={(el) => { if (el?.complete) el.classList.remove("opacity-0"); }}
               onLoad={(e) => { (e.target as HTMLImageElement).classList.remove("opacity-0"); }}
             />
@@ -4057,6 +4504,7 @@ function CarouselClient({
             className="h-full w-full opacity-0 transition-opacity duration-300"
             style={{ objectFit, borderRadius: `${borderRadius}px` }}
             loading={index < slidesPerView ? "eager" : "lazy"}
+            draggable={false}
             ref={(el) => { if (el?.complete) el.classList.remove("opacity-0"); }}
             onLoad={(e) => { (e.target as HTMLImageElement).classList.remove("opacity-0"); }}
           />
@@ -4072,14 +4520,26 @@ function CarouselClient({
     );
   };
 
-  // Fade mode: stack all slides, show one at a time
+  // Fade mode: cross-fade slides
   if (transition === "fade") {
     return (
       <div
+        ref={wrapperRef}
         className="relative overflow-hidden"
-        style={{ ...(aspectRatio !== "none" ? { aspectRatio: arMap[aspectRatio] } : { height }), borderRadius: `${borderRadius}px` }}
+        style={{
+          height,
+          width: aspectSlideWidth ?? "100%",
+          marginInline: aspectSlideWidth ? "auto" : undefined,
+          borderRadius: `${borderRadius}px`,
+          touchAction: totalSlides > 1 ? "pan-y" : undefined,
+          userSelect: totalSlides > 1 ? "none" : undefined,
+        }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        onPointerDown={onFadePointerDown}
+        onPointerMove={onFadePointerMove}
+        onPointerUp={onFadePointerUp}
+        onPointerCancel={onFadePointerUp}
       >
         {slides.map((slide, i) => (
           <div
@@ -4096,14 +4556,14 @@ function CarouselClient({
         ))}
         {showArrows && totalSlides > 1 && (
           <>
-            <button onClick={prev} aria-label="Previous slide" className="absolute left-4 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/30 text-white hover:bg-black/50 transition-colors" style={{ zIndex: 3 }}>&#8249;</button>
-            <button onClick={next} aria-label="Next slide" className="absolute right-4 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/30 text-white hover:bg-black/50 transition-colors" style={{ zIndex: 3 }}>&#8250;</button>
+            <button onClick={handlePrev} aria-label="Previous slide" className="absolute left-4 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/30 text-white hover:bg-black/50 transition-colors" style={{ zIndex: 3 }}>&#8249;</button>
+            <button onClick={handleNext} aria-label="Next slide" className="absolute right-4 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/30 text-white hover:bg-black/50 transition-colors" style={{ zIndex: 3 }}>&#8250;</button>
           </>
         )}
         {showDots && totalSlides > 1 && (
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2" style={{ zIndex: 3 }}>
             {slides.map((_, i) => (
-              <button key={i} onClick={() => setCurrent(i)} aria-label={`Go to slide ${i + 1}`} className="h-2 w-2 rounded-full transition-colors" style={{ backgroundColor: i === current ? "white" : "rgba(255,255,255,0.45)" }} />
+              <button key={i} onClick={() => { markInteraction(); setCurrent(i); }} aria-label={`Go to slide ${i + 1}`} className="h-2 w-2 rounded-full transition-colors" style={{ backgroundColor: i === current ? "white" : "rgba(255,255,255,0.45)" }} />
             ))}
           </div>
         )}
@@ -4111,68 +4571,116 @@ function CarouselClient({
     );
   }
 
-  // Slide mode: infinite loop with cloned slides
-  // Each slide width = (container - total gaps) / slidesPerView
-  // We use a CSS variable on the container so translateX can reference it
-  const gapTotal = (slidesPerView - 1) * gap;
-  const slideWidth = `calc((100% - ${gapTotal}px) / ${slidesPerView})`;
-
-  // Build extended slide array: [clones of last N] + [real slides] + [clones of first N]
-  const cloneCount = slidesPerView;
-  const extendedSlides = canLoop
-    ? [
-        ...slides.slice(-cloneCount).map((s, i) => ({ ...s, _key: `clone-end-${i}` })),
-        ...slides.map((s) => ({ ...s, _key: s.id })),
-        ...slides.slice(0, cloneCount).map((s, i) => ({ ...s, _key: `clone-start-${i}` })),
-      ]
-    : slides.map((s) => ({ ...s, _key: s.id }));
-
-  // Offset current index to account for prepended clones
-  const trackIndex = canLoop ? current + cloneCount : Math.max(0, Math.min(current, totalSlides - slidesPerView));
-
-  // Map current to a real index for dot highlighting
-  const realIndex = ((current % totalSlides) + totalSlides) % totalSlides;
+  // Slide mode: overflow-hidden viewport with a transform-driven reel. Two
+  // copies of the slide list when looping (visual wrap is seamless via
+  // modular transform). All slot widths are explicit pixel values from the
+  // ResizeObserver-driven dimension state.
+  const renderedSlides = loopEnabled ? [...slides, ...slides] : slides;
 
   return (
-    <div
-      className="relative overflow-hidden"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
+    <div className="relative w-full">
       <div
-        ref={trackRef}
-        className="flex"
+        ref={wrapperRef}
+        className="relative overflow-hidden w-full"
         style={{
-          gap: `${gap}px`,
-          transform: `translateX(calc(-${trackIndex} * (${slideWidth} + ${gap}px)))`,
-          transition: isTransitioning ? `transform ${transitionDuration}ms ease-in-out` : "none",
+          height,
+          cursor: "grab",
+          userSelect: "none",
+          touchAction: "pan-y",
         }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onPointerDown={onSlidePointerDown}
+        onPointerMove={onSlidePointerMove}
+        onPointerUp={onSlidePointerUp}
+        onPointerCancel={onSlidePointerUp}
       >
-        {extendedSlides.map((slide, i) => (
-          <div
-            key={slide._key}
-            className="flex-shrink-0"
-            style={{ width: slideWidth }}
-          >
-            {renderSlideContent(slide, i)}
-          </div>
-        ))}
+        <div
+          ref={reelRef}
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            gap: `${gap}px`,
+            height: "100%",
+            willChange: "transform",
+            transform: "translate3d(0,0,0)",
+          }}
+        >
+          {renderedSlides.map((slide, i) => (
+            <div
+              key={`${slide.id}-${i}`}
+              className="carousel-slot"
+              style={{
+                flexShrink: 0,
+                flexGrow: 0,
+                height: "100%",
+                width: slotWidthPx > 0 ? `${slotWidthPx}px` : 0,
+              }}
+            >
+              {renderSlideContent(slide, i % totalSlides)}
+            </div>
+          ))}
+        </div>
+        {showArrows && totalSlides > slidesPerView && (
+          <>
+            <button onClick={handlePrev} aria-label="Previous slide" className="absolute left-4 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/30 text-white hover:bg-black/50 transition-colors" style={{ zIndex: 3 }}>&#8249;</button>
+            <button onClick={handleNext} aria-label="Next slide" className="absolute right-4 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/30 text-white hover:bg-black/50 transition-colors" style={{ zIndex: 3 }}>&#8250;</button>
+          </>
+        )}
       </div>
-      {showArrows && totalSlides > slidesPerView && (
-        <>
-          <button onClick={prev} aria-label="Previous slide" className="absolute left-4 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/30 text-white hover:bg-black/50 transition-colors" style={{ zIndex: 3 }}>&#8249;</button>
-          <button onClick={next} aria-label="Next slide" className="absolute right-4 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/30 text-white hover:bg-black/50 transition-colors" style={{ zIndex: 3 }}>&#8250;</button>
-        </>
-      )}
       {showDots && totalSlides > slidesPerView && (
         <div className="flex justify-center gap-2 mt-4">
           {Array.from({ length: totalSlides }).map((_, i) => (
-            <button key={i} onClick={() => setCurrent(i)} aria-label={`Go to slide ${i + 1}`} className="h-2 w-2 rounded-full transition-colors" style={{ backgroundColor: i === realIndex ? "#171717" : "#d4d4d4" }} />
+            <button key={i} onClick={() => { markInteraction(); scrollToSlideIndex(i); }} aria-label={`Go to slide ${i + 1}`} className="h-2 w-2 rounded-full transition-colors" style={{ backgroundColor: i === current ? "#171717" : "#d4d4d4" }} />
           ))}
         </div>
       )}
     </div>
   );
+}
+
+// ----- Carousel gallery source wrapper -----
+
+function CarouselGallerySource({
+  slug,
+  maxPhotos,
+  serverPhotos,
+  carouselProps,
+}: {
+  slug: string;
+  maxPhotos: number;
+  serverPhotos?: EmbedPhoto[];
+  carouselProps: CarouselProps;
+}) {
+  const [fetched, setFetched] = useState<EmbedPhoto[]>([]);
+
+  useEffect(() => {
+    if (serverPhotos) return;
+    let cancelled = false;
+    fetch(`/api/photos?gallerySlug=${slug}`)
+      .then((r) => r.json())
+      .then((data: EmbedPhoto[]) => {
+        if (!cancelled) setFetched(data.slice(0, maxPhotos));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, maxPhotos, serverPhotos]);
+
+  const photos = (serverPhotos ?? fetched).slice(0, maxPhotos);
+
+  const slides: CarouselSlide[] = photos.map((p) => ({
+    id: p.id,
+    type: "image",
+    imageUrl: p.url,
+    title: p.title ?? "",
+    subtitle: "",
+    bgColor: "#f5f5f5",
+    textColor: "#171717",
+  }));
+
+  return <CarouselClient {...carouselProps} slides={slides} />;
 }
 
 // ----- Gallery embed renderer -----

@@ -154,6 +154,7 @@ export default function FieldMap({
   showBrand = false,
   showFilters = false,
   showYearScrubber = false,
+  backgroundColor,
 }: FieldMapProps) {
   const isBackground = mode === "background";
   const chromeBrand = !isBackground && showBrand;
@@ -572,7 +573,7 @@ export default function FieldMap({
         inset: 0,
         overflow: "hidden",
         cursor: isBackground ? "default" : dragRef.current ? "grabbing" : "grab",
-        background: palette.bg,
+        background: backgroundColor ?? palette.bg,
         userSelect: "none",
         pointerEvents: isBackground ? "none" : undefined,
         // Stop the browser from using touch gestures for page scroll/zoom so

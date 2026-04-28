@@ -42,4 +42,6 @@ export type FieldMapProps = {
   showFilters?: boolean;
   /** Show the bottom dual-handle year scrubber. Default false. */
   showYearScrubber?: boolean;
+  /** Override the viewport background (area outside the globe). Defaults to palette.bg. */
+  backgroundColor?: string;
 };
