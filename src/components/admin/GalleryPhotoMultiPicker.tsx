@@ -21,6 +21,7 @@ interface Photo {
 export interface PickedPhoto {
   url: string;
   title: string;
+  gallerySlug: string;
 }
 
 interface GalleryPhotoMultiPickerProps {
@@ -108,9 +109,10 @@ export default function GalleryPhotoMultiPicker({
     photos.length > 0 && photos.every((p) => selected[p.id]);
 
   function handleConfirm() {
+    const slug = galleries.find((g) => g.id === selectedGallery)?.slug ?? "";
     const ordered = photos
       .filter((p) => selected[p.id])
-      .map((p) => ({ url: p.url, title: p.title ?? "" }));
+      .map((p) => ({ url: p.url, title: p.title ?? "", gallerySlug: slug }));
     if (ordered.length === 0) return;
     onConfirm(ordered);
     onClose();

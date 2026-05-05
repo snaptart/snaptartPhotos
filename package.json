@@ -14,7 +14,8 @@
     "db:seed": "npx tsx src/lib/db/seed.ts",
     "db:thumbnails": "npx tsx src/lib/db/regenerate-thumbnails.ts",
     "db:backfill-dates": "npx tsx src/lib/db/backfill-photo-dates.ts",
-    "db:backfill-gallery-photos": "npx tsx src/lib/db/backfill-gallery-photos.ts"
+    "db:backfill-gallery-photos": "npx tsx src/lib/db/backfill-gallery-photos.ts",
+    "db:backfill-exif": "npx tsx src/lib/db/backfill-exif.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.1",
@@ -40,6 +41,7 @@
     "d3-geo": "^3.1.1",
     "d3-geo-projection": "^4.0.0",
     "drizzle-orm": "^0.45.1",
+    "exifr": "^7.1.3",
     "lucide-react": "^1.8.0",
     "next": "^16.2.1",
     "next-auth": "^5.0.0-beta.30",

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { put } from "@vercel/blob";
 import sharp from "sharp";
+import { extractPhotoMetadata } from "@/lib/photo-exif";
 
 const THUMBNAIL_WIDTH = 800;
 
@@ -28,12 +29,17 @@ export async function POST(req: Request) {
     const timestamp = Date.now();
     const filename = `${folder}/${timestamp}-${safeName}`;
 
+    const buffer = Buffer.from(await file.arrayBuffer());
+
     // Upload full-res image
-    const blob = await put(filename, file, { access: "public" });
+    const blob = await put(filename, buffer, { access: "public", contentType: file.type });
+
+    // Extract EXIF / IPTC / XMP metadata + dimensions
+    const metadata = await extractPhotoMetadata(buffer);
 
     // Generate and upload thumbnail
-    const buffer = Buffer.from(await file.arrayBuffer());
     const thumbnailBuffer = await sharp(buffer)
+      .rotate() // honor EXIF orientation so thumbs aren't sideways
       .resize({ width: THUMBNAIL_WIDTH, withoutEnlargement: true })
       .jpeg({ quality: 80 })
       .toBuffer();
@@ -48,6 +54,15 @@ export async function POST(req: Request) {
       blobUrl: blob.url,
       url: blob.url,
       thumbnailUrl: thumbBlob.url,
+      width: metadata.width,
+      height: metadata.height,
+      takenAt: metadata.takenAt?.toISOString() ?? null,
+      latitude: metadata.latitude,
+      longitude: metadata.longitude,
+      location: metadata.location,
+      description: metadata.description,
+      tags: metadata.tags,
+      cameraSettings: metadata.cameraSettings,
     });
   } catch {
     return NextResponse.json({ error: "Upload failed" }, { status: 500 });

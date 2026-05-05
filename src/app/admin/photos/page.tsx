@@ -203,17 +203,6 @@ export default function PhotosPage() {
     let uploaded = 0;
 
     for (const file of files) {
-      const dimensions = await new Promise<{ width: number; height: number }>(
-        (resolve) => {
-          const img = new window.Image();
-          img.onload = () => {
-            resolve({ width: img.naturalWidth, height: img.naturalHeight });
-            URL.revokeObjectURL(img.src);
-          };
-          img.src = URL.createObjectURL(file);
-        },
-      );
-
       const formData = new FormData();
       formData.append("file", file);
       formData.append("folder", "galleries");
@@ -226,21 +215,32 @@ export default function PhotosPage() {
         showError(`Failed to upload ${file.name}`);
         continue;
       }
-      const { blobUrl, url, thumbnailUrl } = await uploadRes.json();
+      const uploaded_ = await uploadRes.json();
 
-      const takenAt = parseFilenameForTakenAt(file.name);
+      // Server-side EXIF wins; fall back to filename for takenAt when missing.
+      const takenAt =
+        uploaded_.takenAt ??
+        parseFilenameForTakenAt(file.name)?.toISOString() ??
+        null;
+
       const photoRes = await fetch("/api/photos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           galleryId: selectedGallery,
-          blobUrl,
-          url,
-          thumbnailUrl,
-          width: dimensions.width,
-          height: dimensions.height,
+          blobUrl: uploaded_.blobUrl,
+          url: uploaded_.url,
+          thumbnailUrl: uploaded_.thumbnailUrl,
+          width: uploaded_.width,
+          height: uploaded_.height,
           filename: file.name,
-          takenAt: takenAt?.toISOString() ?? null,
+          takenAt,
+          latitude: uploaded_.latitude,
+          longitude: uploaded_.longitude,
+          location: uploaded_.location,
+          description: uploaded_.description,
+          tags: uploaded_.tags,
+          cameraSettings: uploaded_.cameraSettings,
           position: photos.length + uploaded,
         }),
       });

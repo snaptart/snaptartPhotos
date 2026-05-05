@@ -1,7 +1,7 @@
 "use client";
 
 import type { Config } from "@puckeditor/core";
-import { DropZone } from "@puckeditor/core";
+import { DropZone, usePuck } from "@puckeditor/core";
 import { generateHTML } from "@tiptap/html";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
@@ -17,6 +17,7 @@ import type { JSONContent } from "@tiptap/react";
 import TiptapEditor from "@/components/admin/TiptapEditor";
 import ImagePicker from "@/components/admin/ImagePicker";
 import GalleryPhotoMultiPicker from "@/components/admin/GalleryPhotoMultiPicker";
+import NextLink from "next/link";
 import { parseLinks } from "@/lib/parseLinks";
 import siteConfig from "@/lib/site.config";
 import { fontRole } from "@/lib/theme/role-style";
@@ -176,6 +177,7 @@ type CarouselSlide = {
   subtitle: string;
   bgColor: string;
   textColor: string;
+  linkUrl?: string;
 };
 
 type StoriesIndexBlockProps = {
@@ -216,6 +218,8 @@ type CarouselProps = {
   showDots: boolean;
   objectFit: "cover" | "contain";
   borderRadius: number;
+  initialSlide: number;
+  slideLinkOverrides: Record<string, string>;
 };
 
 type GalleriesIndexProps = {
@@ -2166,6 +2170,20 @@ export const puckConfig: Config<Components> = {
             { label: "No", value: false },
           ],
         },
+        initialSlide: {
+          type: "custom",
+          label: "Initial Slide (centered on load)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={1} max={50} step={1} unit="" label="Initial Slide" />
+          ),
+        },
+        slideLinkOverrides: {
+          type: "custom",
+          label: "Per-photo links (gallery source)",
+          render: ({ value, onChange }) => (
+            <CarouselGalleryLinkOverridesEditor value={value} onChange={onChange} />
+          ),
+        },
       },
       defaultProps: {
         sourceMode: "manual",
@@ -2185,6 +2203,8 @@ export const puckConfig: Config<Components> = {
         showDots: true,
         objectFit: "cover",
         borderRadius: 8,
+        initialSlide: 1,
+        slideLinkOverrides: {},
       },
       render: ({ puck, ...props }) => {
         if (props.sourceMode === "gallery") {
@@ -3937,12 +3957,13 @@ function CarouselSlideEditor({ value, onChange }: { value: CarouselSlide[]; onCh
       subtitle: "",
       bgColor: "#f5f5f5",
       textColor: "#171717",
+      linkUrl: "",
     };
     onChange([...slides, newSlide]);
     setExpandedId(newSlide.id);
   };
 
-  const addFromGallery = (photos: { url: string; title: string }[]) => {
+  const addFromGallery = (photos: { url: string; title: string; gallerySlug: string }[]) => {
     const newSlides: CarouselSlide[] = photos.map((p) => ({
       id: crypto.randomUUID(),
       type: "image",
@@ -3951,6 +3972,7 @@ function CarouselSlideEditor({ value, onChange }: { value: CarouselSlide[]; onCh
       subtitle: "",
       bgColor: "#f5f5f5",
       textColor: "#171717",
+      linkUrl: p.gallerySlug ? `/gallery/${p.gallerySlug}` : "",
     }));
     onChange([...slides, ...newSlides]);
   };
@@ -4006,6 +4028,21 @@ function CarouselSlideEditor({ value, onChange }: { value: CarouselSlide[]; onCh
                   <ImagePicker value={slide.imageUrl} onChange={(url) => updateSlide(slide.id, { imageUrl: url })} />
                 </div>
               )}
+              {(slide.type === "image" || slide.type === "mixed") && (
+                <div>
+                  <label className="text-xs font-medium text-neutral-500">Link on click</label>
+                  <input
+                    type="text"
+                    value={slide.linkUrl ?? ""}
+                    onChange={(e) => updateSlide(slide.id, { linkUrl: e.target.value })}
+                    placeholder="/gallery/some-slug or https://…"
+                    className="mt-0.5 w-full rounded border border-neutral-200 px-2 py-1 text-sm"
+                  />
+                  <div className="mt-1">
+                    <CarouselLinkGalleryHelper onPick={(slug) => updateSlide(slide.id, { linkUrl: `/gallery/${slug}` })} />
+                  </div>
+                </div>
+              )}
               {(slide.type === "text" || slide.type === "mixed") && (
                 <>
                   <div>
@@ -4054,6 +4091,28 @@ function CarouselSlideEditor({ value, onChange }: { value: CarouselSlide[]; onCh
   );
 }
 
+function CarouselLinkGalleryHelper({ onPick }: { onPick: (slug: string) => void }) {
+  const [galleries, setGalleries] = useState<GalleryOption[]>([]);
+  useEffect(() => {
+    fetch("/api/galleries")
+      .then((r) => r.json())
+      .then((data: GalleryOption[]) => setGalleries(data))
+      .catch(() => setGalleries([]));
+  }, []);
+  return (
+    <select
+      value=""
+      onChange={(e) => { if (e.target.value) onPick(e.target.value); }}
+      className="w-full rounded border border-neutral-200 px-2 py-1 text-xs text-neutral-500"
+    >
+      <option value="">Pick a gallery…</option>
+      {galleries.map((g) => (
+        <option key={g.id} value={g.slug}>{g.title}</option>
+      ))}
+    </select>
+  );
+}
+
 // ----- Carousel client renderer -----
 
 function CarouselClient({
@@ -4071,8 +4130,10 @@ function CarouselClient({
   showDots,
   objectFit,
   borderRadius,
+  initialSlide,
 }: CarouselProps) {
-  const [current, setCurrent] = useState(0);
+  const initialIndex = Math.max(0, Math.min(slides.length - 1, (initialSlide ?? 1) - 1));
+  const [current, setCurrent] = useState(initialIndex);
   const [isHovered, setIsHovered] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const currentRef = useRef(0);
@@ -4087,6 +4148,7 @@ function CarouselClient({
     startTime: 0,
     pointerId: 0,
     axis: null as null | "h" | "v",
+    captured: false,
   });
 
   useEffect(() => { currentRef.current = current; }, [current]);
@@ -4126,10 +4188,20 @@ function CarouselClient({
     startCursorX: 0,
     startX: 0,
     startTime: 0,
+    captured: false,
   });
   const dragSamplesRef = useRef<{ t: number; x: number }[]>([]);
   const dimsRef = useRef({ slotWidth: 0, slotPitch: 0, loopWidth: 0, viewportW: 0, maxX: 0 });
   const [slotWidthPx, setSlotWidthPx] = useState(0);
+  // Set true once a pointer drag exceeds CLICK_SLOP px so the synthetic click
+  // that fires after pointerup can be suppressed (otherwise every swipe on a
+  // linked slide would also navigate). Reset on each pointerdown.
+  const dragMovedRef = useRef(false);
+  const CLICK_SLOP = 5;
+  // One-shot: center on initialSlide the first time dimensions resolve. We
+  // skip on later recomputes so resizing the window doesn't yank the user
+  // back to the configured starting slide.
+  const initialCenteredRef = useRef(false);
 
   const applyTransform = useCallback(() => {
     const reel = reelRef.current;
@@ -4207,6 +4279,15 @@ function CarouselClient({
       const maxX = Math.max(0, totalSlides * slotPitch - gap - containerW);
       dimsRef.current = { slotWidth, slotPitch, loopWidth, viewportW: containerW, maxX };
       setSlotWidthPx(slotWidth);
+      if (!initialCenteredRef.current && totalSlides > 0) {
+        // Center the configured initial slide in the viewport. For non-loop
+        // we clamp so the reel never starts past its rightmost valid offset.
+        let x = initialIndex * slotPitch + slotWidth / 2 - containerW / 2;
+        if (!loopEnabled) x = Math.max(0, Math.min(maxX, x));
+        currentXRef.current = x;
+        targetXRef.current = x;
+        initialCenteredRef.current = true;
+      }
       applyTransform();
     };
     recompute();
@@ -4214,7 +4295,7 @@ function CarouselClient({
     ro.observe(wrapper);
     return () => ro.disconnect();
     // aspectFraction is recomputed each render but determined by aspectRatio + height.
-  }, [transition, totalSlides, slidesPerView, gap, aspectRatio, height, applyTransform, aspectFraction]);
+  }, [transition, totalSlides, slidesPerView, gap, aspectRatio, height, applyTransform, aspectFraction, initialIndex, loopEnabled]);
 
   // Slide-mode wheel: vertical wheels translate to horizontal target motion.
   // Continuous wheeling keeps adding to target; current lerps toward it. Stop
@@ -4255,17 +4336,26 @@ function CarouselClient({
       startCursorX: e.clientX,
       startX: currentXRef.current,
       startTime: now,
+      captured: false,
     };
     dragSamplesRef.current = [{ t: now, x: e.clientX }];
+    dragMovedRef.current = false;
     lastInteractionRef.current = now;
-    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
-    if (e.pointerType === "mouse") e.currentTarget.style.cursor = "grabbing";
+    // Capture is deferred to first significant move so plain clicks aren't
+    // retargeted to the wrapper (which would swallow anchor navigation).
   };
 
   const onSlidePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const ds = dragRef.current;
     if (!ds.active || e.pointerId !== ds.pointerId) return;
     const dx = e.clientX - ds.startCursorX;
+    if (Math.abs(dx) > CLICK_SLOP) {
+      dragMovedRef.current = true;
+      if (!ds.captured) {
+        try { e.currentTarget.setPointerCapture(e.pointerId); ds.captured = true; } catch {}
+        if (e.pointerType === "mouse") e.currentTarget.style.cursor = "grabbing";
+      }
+    }
     // Cursor right (dx > 0) → content right → x decreases.
     const newX = ds.startX - dx;
     currentXRef.current = newX;
@@ -4359,7 +4449,6 @@ function CarouselClient({
     if (transition !== "fade") return;
     if (totalSlides <= 1) return;
     if ((e.target as HTMLElement).closest("button")) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
     const now = Date.now();
     fadeDragRef.current = {
       active: true,
@@ -4368,14 +4457,23 @@ function CarouselClient({
       startTime: now,
       pointerId: e.pointerId,
       axis: null,
+      captured: false,
     };
+    dragMovedRef.current = false;
     lastInteractionRef.current = now;
+    // Capture deferred to first significant move (see slide-mode rationale).
   };
   const onFadePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const ds = fadeDragRef.current;
     if (!ds.active || e.pointerId !== ds.pointerId) return;
     const dx = e.clientX - ds.startX;
     const dy = e.clientY - ds.startY;
+    if (Math.abs(dx) > CLICK_SLOP || Math.abs(dy) > CLICK_SLOP) {
+      dragMovedRef.current = true;
+      if (!ds.captured) {
+        try { e.currentTarget.setPointerCapture(e.pointerId); ds.captured = true; } catch {}
+      }
+    }
     if (ds.axis === null && (Math.abs(dx) >= 5 || Math.abs(dy) >= 5)) {
       ds.axis = Math.abs(dx) > Math.abs(dy) ? "h" : "v";
       if (ds.axis === "v") ds.active = false;
@@ -4453,6 +4551,32 @@ function CarouselClient({
     );
   }
 
+  const wrapWithLink = (slide: CarouselSlide, content: React.ReactNode) => {
+    const href = slide.linkUrl?.trim();
+    if (!href) return content;
+    const isExternal = /^https?:\/\//i.test(href);
+    const onClick = (e: React.MouseEvent) => {
+      // Suppress nav if the click was the tail end of a swipe/drag.
+      if (dragMovedRef.current) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    const className = "block h-full w-full";
+    if (isExternal) {
+      return (
+        <a href={href} target="_blank" rel="noopener noreferrer" onClick={onClick} className={className} draggable={false}>
+          {content}
+        </a>
+      );
+    }
+    return (
+      <NextLink href={href} onClick={onClick} className={className} draggable={false}>
+        {content}
+      </NextLink>
+    );
+  };
+
   const renderSlideContent = (slide: CarouselSlide, index: number) => {
     const slideStyle: React.CSSProperties = {
       borderRadius: `${borderRadius}px`,
@@ -4462,7 +4586,7 @@ function CarouselClient({
     };
 
     if (slide.type === "image") {
-      return (
+      return wrapWithLink(slide, (
         <div className="relative" style={slideStyle}>
           {slide.imageUrl ? (
             <img
@@ -4479,7 +4603,7 @@ function CarouselClient({
             <div className="flex h-full items-center justify-center bg-neutral-100 text-neutral-400 text-sm">No image</div>
           )}
         </div>
-      );
+      ));
     }
 
     if (slide.type === "text") {
@@ -4495,7 +4619,7 @@ function CarouselClient({
     }
 
     // mixed
-    return (
+    return wrapWithLink(slide, (
       <div className="relative" style={slideStyle}>
         {slide.imageUrl ? (
           <img
@@ -4517,7 +4641,7 @@ function CarouselClient({
           {slide.subtitle && <p className="text-sm opacity-90">{slide.subtitle}</p>}
         </div>
       </div>
-    );
+    ));
   };
 
   // Fade mode: cross-fade slides
@@ -4670,6 +4794,7 @@ function CarouselGallerySource({
 
   const photos = (serverPhotos ?? fetched).slice(0, maxPhotos);
 
+  const overrides = carouselProps.slideLinkOverrides ?? {};
   const slides: CarouselSlide[] = photos.map((p) => ({
     id: p.id,
     type: "image",
@@ -4678,9 +4803,74 @@ function CarouselGallerySource({
     subtitle: "",
     bgColor: "#f5f5f5",
     textColor: "#171717",
+    linkUrl: overrides[p.id]?.trim() || `/gallery/${slug}`,
   }));
 
   return <CarouselClient {...carouselProps} slides={slides} />;
+}
+
+// ----- Per-photo link overrides editor (gallery-source carousels) -----
+
+function CarouselGalleryLinkOverridesEditor({
+  value,
+  onChange,
+}: {
+  value: Record<string, string>;
+  onChange: (v: Record<string, string>) => void;
+}) {
+  const puck = usePuck();
+  const props = (puck.selectedItem?.props ?? {}) as Partial<CarouselProps>;
+  const gallerySlug = props.gallerySlug ?? "";
+  const sourceMode = props.sourceMode ?? "manual";
+  const maxPhotos = props.maxPhotos ?? 0;
+  const [photos, setPhotos] = useState<{ id: string; url: string; thumbnailUrl: string; title: string | null }[]>([]);
+  const overrides = value ?? {};
+
+  useEffect(() => {
+    if (sourceMode !== "gallery" || !gallerySlug) { setPhotos([]); return; }
+    let cancelled = false;
+    fetch(`/api/photos?gallerySlug=${gallerySlug}`)
+      .then((r) => r.json())
+      .then((data) => { if (!cancelled) setPhotos(data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [gallerySlug, sourceMode]);
+
+  if (sourceMode !== "gallery") {
+    return <p className="text-xs text-neutral-400">Only used in gallery-source mode. Switch sources or set links per slide in the manual editor above.</p>;
+  }
+  if (!gallerySlug) {
+    return <p className="text-xs text-neutral-400">Pick a gallery first.</p>;
+  }
+
+  const display = maxPhotos > 0 ? photos.slice(0, maxPhotos) : photos;
+  const setOverride = (id: string, url: string) => {
+    const next = { ...overrides };
+    if (url.trim()) next[id] = url;
+    else delete next[id];
+    onChange(next);
+  };
+
+  return (
+    <div className="space-y-1.5 max-h-96 overflow-y-auto pr-1">
+      {display.length === 0 && <p className="text-xs text-neutral-400">Loading photos…</p>}
+      {display.map((p) => (
+        <div key={p.id} className="flex items-center gap-2">
+          <img src={p.thumbnailUrl} alt="" className="h-9 w-9 flex-shrink-0 rounded object-cover" />
+          <div className="flex flex-1 flex-col gap-1">
+            <input
+              type="text"
+              value={overrides[p.id] ?? ""}
+              onChange={(e) => setOverride(p.id, e.target.value)}
+              placeholder={`Default: /gallery/${gallerySlug}`}
+              className="w-full rounded border border-neutral-200 px-2 py-1 text-xs"
+            />
+            <CarouselLinkGalleryHelper onPick={(s) => setOverride(p.id, `/gallery/${s}`)} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // ----- Gallery embed renderer -----
