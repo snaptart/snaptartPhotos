@@ -1,16 +1,40 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { photos, galleries } from "@/lib/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { photos, galleries, galleryPhotos } from "@/lib/db/schema";
+import { eq, asc, inArray, and, sql } from "drizzle-orm";
 import { del } from "@vercel/blob";
+import {
+  selectPhotosForGallery,
+  setPhotoGalleries,
+  addPhotoToGallery,
+  selectGalleryIdsForPhoto,
+} from "@/lib/db/photo-queries";
+import { corsPreflight, withCors } from "@/lib/cors";
+
+// Readable cross-origin so the trip journal can fetch its photographs — see @/lib/cors.
+export const OPTIONS = corsPreflight;
 
 export async function GET(req: Request) {
+  return withCors(await handleGet(req));
+}
+
+async function handleGet(req: Request) {
   try {
     const session = await auth();
     const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
     const galleryId = searchParams.get("galleryId");
     const gallerySlug = searchParams.get("gallerySlug");
+
+    // Single-photo lookup with all gallery memberships — admin convenience.
+    if (id) {
+      if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      const [photo] = await db.select().from(photos).where(eq(photos.id, id));
+      if (!photo) return NextResponse.json(null);
+      const memberships = await selectGalleryIdsForPhoto(id);
+      return NextResponse.json({ ...photo, galleryIds: memberships });
+    }
 
     if (galleryId) {
       if (!session) {
@@ -20,11 +44,7 @@ export async function GET(req: Request) {
           .where(eq(galleries.id, galleryId));
         if (!gallery?.isPublished) return NextResponse.json([]);
       }
-      const items = await db
-        .select()
-        .from(photos)
-        .where(eq(photos.galleryId, galleryId))
-        .orderBy(asc(photos.position));
+      const items = await selectPhotosForGallery(galleryId);
       return NextResponse.json(items);
     }
 
@@ -34,15 +54,11 @@ export async function GET(req: Request) {
         .from(galleries)
         .where(eq(galleries.slug, gallerySlug));
       if (!gallery || (!session && !gallery.isPublished)) return NextResponse.json([]);
-      const items = await db
-        .select()
-        .from(photos)
-        .where(eq(photos.galleryId, gallery.id))
-        .orderBy(asc(photos.position));
+      const items = await selectPhotosForGallery(gallery.id);
       return NextResponse.json(items);
     }
 
-    const items = await db.select().from(photos).orderBy(asc(photos.position));
+    const items = await db.select().from(photos).orderBy(asc(photos.createdAt));
     return NextResponse.json(items);
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -55,8 +71,27 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const [item] = await db.insert(photos).values(body).returning();
-    return NextResponse.json(item);
+    if (Object.prototype.hasOwnProperty.call(body, "takenAt")) {
+      body.takenAt = body.takenAt ? new Date(body.takenAt) : null;
+    }
+
+    // Accept galleryIds: string[] or legacy galleryId: string
+    const galleryIds: string[] = Array.isArray(body.galleryIds)
+      ? body.galleryIds.filter(Boolean)
+      : body.galleryId
+        ? [body.galleryId]
+        : [];
+
+    // Strip junction-related fields off the photo insert
+    const { galleryIds: _g1, galleryId: _g2, position: _p, ...photoFields } = body;
+
+    const [item] = await db.insert(photos).values(photoFields).returning();
+
+    for (const gid of galleryIds) {
+      await addPhotoToGallery(item.id, gid);
+    }
+
+    return NextResponse.json({ ...item, galleryIds });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
@@ -69,25 +104,84 @@ export async function PUT(req: Request) {
   try {
     const body = await req.json();
 
-    // Bulk reorder
+    // Bulk reorder within a gallery — updates gallery_photos.position
     if (body.items && Array.isArray(body.items)) {
-      for (const item of body.items) {
-        await db.update(photos).set({ position: item.position }).where(eq(photos.id, item.id));
+      const galleryId: string | undefined = body.galleryId;
+      if (!galleryId) {
+        return NextResponse.json({ error: "Missing galleryId for reorder" }, { status: 400 });
       }
-      const galleryId = body.galleryId;
-      const updated = galleryId
-        ? await db.select().from(photos).where(eq(photos.galleryId, galleryId)).orderBy(asc(photos.position))
-        : await db.select().from(photos).orderBy(asc(photos.position));
+      for (const item of body.items) {
+        await db
+          .update(galleryPhotos)
+          .set({ position: item.position })
+          .where(
+            and(
+              eq(galleryPhotos.galleryId, galleryId),
+              eq(galleryPhotos.photoId, item.id)
+            )
+          );
+      }
+      const updated = await selectPhotosForGallery(galleryId);
       return NextResponse.json(updated);
+    }
+
+    // Bulk metadata update — body: { bulk: { ids: string[], patch: { ... } } }
+    // patch.galleryId means "move to this single gallery" (replace memberships).
+    // patch.addToGalleryId means "add this gallery to existing memberships."
+    if (body.bulk && Array.isArray(body.bulk.ids) && body.bulk.ids.length > 0) {
+      const allowed = ["title", "description", "location", "tags"] as const;
+      const patch: Record<string, unknown> = {};
+      for (const key of allowed) {
+        if (Object.prototype.hasOwnProperty.call(body.bulk.patch ?? {}, key)) {
+          patch[key] = body.bulk.patch[key];
+        }
+      }
+
+      const moveToGalleryId: string | undefined = body.bulk.patch?.galleryId;
+      const addToGalleryId: string | undefined = body.bulk.patch?.addToGalleryId;
+
+      if (Object.keys(patch).length === 0 && !moveToGalleryId && !addToGalleryId) {
+        return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+      }
+
+      if (Object.keys(patch).length > 0) {
+        patch.updatedAt = new Date();
+        await db.update(photos).set(patch).where(inArray(photos.id, body.bulk.ids));
+      }
+
+      if (moveToGalleryId) {
+        for (const id of body.bulk.ids) {
+          await setPhotoGalleries(id, [moveToGalleryId]);
+        }
+      } else if (addToGalleryId) {
+        for (const id of body.bulk.ids) {
+          await addPhotoToGallery(id, addToGalleryId);
+        }
+      }
+
+      return NextResponse.json({ success: true, updated: body.bulk.ids.length });
     }
 
     // Single update
     if (!body.id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
-    const { id, ...data } = body;
+    const { id, galleryIds, galleryId, position: _pos, ...data } = body;
+    if (Object.prototype.hasOwnProperty.call(data, "takenAt")) {
+      data.takenAt = data.takenAt ? new Date(data.takenAt) : null;
+    }
     data.updatedAt = new Date();
 
     const [updated] = await db.update(photos).set(data).where(eq(photos.id, id)).returning();
-    return NextResponse.json(updated);
+
+    // Replace gallery memberships if explicitly provided.
+    if (Array.isArray(galleryIds)) {
+      await setPhotoGalleries(id, galleryIds.filter(Boolean));
+    } else if (typeof galleryId === "string" && galleryId) {
+      // Legacy single-gallery move.
+      await setPhotoGalleries(id, [galleryId]);
+    }
+
+    const memberships = await selectGalleryIdsForPhoto(id);
+    return NextResponse.json({ ...updated, galleryIds: memberships });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
@@ -100,7 +194,58 @@ export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
+    const idsParam = searchParams.get("ids");
+    const galleryIdParam = searchParams.get("galleryId");
+
+    // Bulk delete: ?ids=a,b,c
+    // If galleryId is also provided, only remove from that one gallery instead of deleting the photo.
+    if (idsParam) {
+      const ids = idsParam.split(",").filter(Boolean);
+      if (ids.length === 0) {
+        return NextResponse.json({ error: "Missing ids" }, { status: 400 });
+      }
+      if (galleryIdParam) {
+        await db
+          .delete(galleryPhotos)
+          .where(
+            and(
+              eq(galleryPhotos.galleryId, galleryIdParam),
+              inArray(galleryPhotos.photoId, ids)
+            )
+          );
+        // Optionally garbage-collect photos that now belong to no galleries.
+        await db.execute(sql`
+          DELETE FROM photos
+          WHERE id = ANY(${ids}::uuid[])
+            AND NOT EXISTS (SELECT 1 FROM gallery_photos WHERE photo_id = photos.id)
+        `);
+        return NextResponse.json({ success: true, removed: ids.length });
+      }
+      const rows = await db.select().from(photos).where(inArray(photos.id, ids));
+      await Promise.allSettled(rows.map((r) => del(r.blobUrl)));
+      await db.delete(photos).where(inArray(photos.id, ids));
+      return NextResponse.json({ success: true, deleted: ids.length });
+    }
+
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+
+    if (galleryIdParam) {
+      await db
+        .delete(galleryPhotos)
+        .where(
+          and(
+            eq(galleryPhotos.galleryId, galleryIdParam),
+            eq(galleryPhotos.photoId, id)
+          )
+        );
+      const stillMember = await selectGalleryIdsForPhoto(id);
+      if (stillMember.length === 0) {
+        const [photo] = await db.select().from(photos).where(eq(photos.id, id));
+        if (photo) await del(photo.blobUrl);
+        await db.delete(photos).where(eq(photos.id, id));
+      }
+      return NextResponse.json({ success: true });
+    }
 
     const [photo] = await db.select().from(photos).where(eq(photos.id, id));
     if (photo) await del(photo.blobUrl);

@@ -4,6 +4,10 @@ import { db } from "@/lib/db";
 import { galleries } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { generateSlug } from "@/lib/utils";
+import { corsPreflight, withCors } from "@/lib/cors";
+
+// Readable cross-origin so the trip journal can read each station gallery's cover — see @/lib/cors.
+export const OPTIONS = corsPreflight;
 
 export async function GET() {
   try {
@@ -11,9 +15,9 @@ export async function GET() {
     const items = session
       ? await db.select().from(galleries).orderBy(asc(galleries.position))
       : await db.select().from(galleries).where(eq(galleries.isPublished, true)).orderBy(asc(galleries.position));
-    return NextResponse.json(items);
+    return withCors(NextResponse.json(items));
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return withCors(NextResponse.json({ error: "Internal server error" }, { status: 500 }));
   }
 }
 

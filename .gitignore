@@ -45,5 +45,8 @@ drizzle/meta
 # old site assets
 /_old
 
+# design handoff reference (not source)
+/_design_handoff
+
 .vercel
 .env*.local

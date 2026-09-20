@@ -1,0 +1,56 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders
+/ios
+/android
+
+# Trip photographs stay out of git: they carry GPS coordinates and capture times, and
+# can't easily be removed from history once committed. Only the placeholders are tracked.
+assets/photos/*
+!assets/photos/README.md
+!assets/photos/cucuron.jpg
+!assets/photos/eze.jpg
+!assets/photos/noli.jpg
+!assets/photos/marseille.jpg
+!assets/photos/lyon.jpg
+# Smaller copies of the photographs, remade by `npm run photos` (safe to delete)
+assets/photo-cache/
+
+# Regenerated from assets/photos before start/web/typecheck (it names the local photos)
+src/data/photos.generated.ts

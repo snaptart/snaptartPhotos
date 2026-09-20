@@ -1,0 +1,43 @@
+{
+  "name": "trip-map",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "dependencies": {
+    "@expo-google-fonts/cinzel": "^0.4.2",
+    "@expo-google-fonts/eb-garamond": "^0.4.3",
+    "@expo/metro-runtime": "~57.0.15",
+    "d3-geo": "^3.1.1",
+    "expo": "~57.0.22",
+    "expo-font": "~57.0.4",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-gesture-handler": "~2.32.0",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-svg": "15.15.4",
+    "react-native-web": "^0.21.2"
+  },
+  "devDependencies": {
+    "@types/d3-geo": "^3.1.1",
+    "@types/geojson": "^7946.0.16",
+    "@types/react": "~19.2.2",
+    "topojson-client": "^3.1.0",
+    "topojson-server": "^3.0.1",
+    "topojson-simplify": "^3.0.3",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "build:site": "node scripts/build-site.mjs",
+    "build:geometry": "node scripts/build-geometry.mjs",
+    "build:divisions": "node scripts/build-divisions.mjs",
+    "build:rivers": "node scripts/build-rivers.mjs",
+    "build:texture": "node scripts/build-paper-texture.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "private": true
+}
