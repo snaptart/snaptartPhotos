@@ -10,8 +10,10 @@ import TextAlign from "@tiptap/extension-text-align";
 import Underline from "@tiptap/extension-underline";
 import PuckRenderer from "@/components/public/PuckRenderer";
 import type { Data } from "@puckeditor/core";
-import type { EmbedPhoto, GlobalLightboxSettings } from "@/lib/puck/config";
+import type { EmbedPhoto, FieldMapBlockData, GlobalLightboxSettings } from "@/lib/puck/config";
 import siteConfig from "@/lib/site.config";
+import { fontRole } from "@/lib/theme/role-style";
+import { getFieldMapData } from "@/lib/fieldmap/query";
 
 const tiptapExtensions = [
   StarterKit,
@@ -100,17 +102,50 @@ export default async function HomePage() {
         }));
     }
 
+    const hasFieldMap = (page.content.content ?? []).some(
+      (item: { type: string }) => item.type === "FieldMap"
+    );
+    const fieldMap: FieldMapBlockData | null = hasFieldMap
+      ? {
+          ...(await getFieldMapData()),
+          siteTitle: settingsRow?.siteTitle ?? siteConfig.siteName,
+        }
+      : null;
+
     const firstItem = (page.content.content ?? [])[0] as { type: string } | undefined;
     const heroFirst = firstItem?.type === "HeroSlideshow";
 
+    if (page.isFullBleed) {
+      return (
+        <div className="fullbleed-puck-host flex flex-1 flex-col">
+          {page.showTitle && (
+            <h1 className="px-4 pt-12 pb-8 text-center text-4xl tracking-tight" style={fontRole("headings")}>
+              {page.title}
+            </h1>
+          )}
+          <PuckRenderer
+            data={page.content}
+            galleryPhotos={galleryPhotos}
+            globalLightbox={globalLightbox}
+            fieldMap={fieldMap}
+          />
+        </div>
+      );
+    }
+
     return (
-      <div className={`mx-auto max-w-5xl px-4 ${heroFirst ? "pt-0 pb-12" : "py-12"}`}>
+      <div className={`mx-auto w-full max-w-5xl px-4 ${heroFirst ? "pt-0 pb-12" : "py-12"}`}>
         {page.showTitle && (
-          <h1 className="mb-8 text-center text-4xl font-semibold tracking-tight" style={{ fontFamily: "var(--theme-font-headings)" }}>
+          <h1 className="mb-8 text-center text-4xl tracking-tight" style={fontRole("headings")}>
             {page.title}
           </h1>
         )}
-        <PuckRenderer data={page.content} galleryPhotos={galleryPhotos} globalLightbox={globalLightbox} />
+        <PuckRenderer
+          data={page.content}
+          galleryPhotos={galleryPhotos}
+          globalLightbox={globalLightbox}
+          fieldMap={fieldMap}
+        />
       </div>
     );
   }
@@ -122,7 +157,7 @@ export default async function HomePage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
       {page.showTitle && (
-        <h1 className="mb-8 text-center text-4xl font-semibold tracking-tight">
+        <h1 className="mb-8 text-center text-4xl tracking-tight" style={fontRole("headings")}>
           {page.title}
         </h1>
       )}

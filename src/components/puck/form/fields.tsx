@@ -1,12 +1,13 @@
 "use client";
 
 import { useFormField } from "@/lib/hooks/useFormField";
+import { fontRole } from "@/lib/theme/role-style";
 
 // ---------- Shared label ----------
 
 function FieldLabel({ label, required }: { label: string; required?: boolean }) {
   return (
-    <label className="mb-1 block font-medium text-neutral-700">
+    <label className="mb-1 block text-neutral-700" style={fontRole("body")}>
       {label}
       {required && <span className="ml-0.5 text-red-500">*</span>}
     </label>
@@ -139,7 +140,7 @@ export function RadioGroupRender({ label, name, required, options }: RadioGroupP
         {optList.map((opt) => {
           const [val, lbl] = opt.includes("|") ? opt.split("|", 2) : [opt, opt];
           return (
-            <label key={val} className="flex items-center gap-2 text-sm text-neutral-700">
+            <label key={val} className="flex items-center gap-2 text-sm text-neutral-700" style={fontRole("body")}>
               <input
                 type="radio"
                 name={name}
@@ -189,7 +190,7 @@ export function CheckboxGroupRender({ label, name, options }: CheckboxGroupProps
         {optList.map((opt) => {
           const [val, lbl] = opt.includes("|") ? opt.split("|", 2) : [opt, opt];
           return (
-            <label key={val} className="flex items-center gap-2 text-sm text-neutral-700">
+            <label key={val} className="flex items-center gap-2 text-sm text-neutral-700" style={fontRole("body")}>
               <input
                 type="checkbox"
                 name={name}
@@ -218,7 +219,7 @@ export function CheckboxRender({ label, name }: CheckboxProps) {
   const { value, update } = useFormField(name, "false");
 
   return (
-    <label className="flex items-center gap-2 py-2 text-sm text-neutral-700">
+    <label className="flex items-center gap-2 py-2 text-sm text-neutral-700" style={fontRole("body")}>
       <input
         type="checkbox"
         name={name}

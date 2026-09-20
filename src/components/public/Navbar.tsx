@@ -59,7 +59,7 @@ export async function Navbar() {
   const menuEl = (
     <div
       className="hidden md:flex items-center gap-8 tracking-wide"
-      style={{ fontSize: `${theme.menuFontSize}px`, fontFamily: "var(--theme-font-nav-menu)" }}
+      style={{ fontSize: `var(--theme-font-nav-menu-size, ${theme.menuFontSize}px)`, fontFamily: "var(--theme-font-nav-menu-family, var(--theme-font-nav-menu))" }}
     >
       {items.map((item) => (
         <Link
@@ -100,7 +100,7 @@ export async function Navbar() {
 
   return (
     <header
-      className="relative border-b border-neutral-200"
+      className="relative"
       style={{ backgroundColor: "var(--theme-color-header-bg)" }}
     >
       {/* Desktop nav */}

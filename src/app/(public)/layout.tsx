@@ -42,6 +42,7 @@ export default async function PublicLayout({
     theme.fontFooter,
     theme.fontCaptions,
     theme.fontOverlay,
+    theme.fontLabels,
   ]);
   const cssVars = buildThemeCssVars(theme);
 
@@ -59,7 +60,7 @@ export default async function PublicLayout({
         }}
       >
         <Navbar />
-        <main className="flex-1">{children}</main>
+        <main className="flex flex-1 flex-col">{children}</main>
         <Footer />
       </div>
     </>

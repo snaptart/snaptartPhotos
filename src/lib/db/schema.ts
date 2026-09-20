@@ -21,6 +21,10 @@ export const adminUsers = pgTable("admin_users", {
 export const siteSettings = pgTable("site_settings", {
   id: uuid("id").defaultRandom().primaryKey(),
   siteTitle: text("site_title").notNull().default("My Site"),
+  tagline: text("tagline"),
+  ownerName: text("owner_name"),
+  bio: text("bio"),
+  location: text("location"),
   logoUrl: text("logo_url"),
   instagramUrl: text("instagram_url"),
   footerText: text("footer_text"),
@@ -72,7 +76,16 @@ export const pages = pgTable("pages", {
     fontBody?: string;
     bodyFontSize?: "small" | "medium" | "large";
   }>(),
+  storyMeta: jsonb("story_meta").$type<{
+    dek?: string;
+    kind?: string;
+    year?: string | number;
+    readTime?: string;
+    wordCount?: number;
+    frontispieceUrl?: string;
+  }>(),
   showTitle: boolean("show_title").notNull().default(true),
+  isFullBleed: boolean("is_full_bleed").notNull().default(false),
   isPublished: boolean("is_published").notNull().default(false),
   position: integer("position").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -84,6 +97,19 @@ export const galleries = pgTable("galleries", {
   title: text("title").notNull(),
   slug: text("slug").notNull().unique(),
   description: text("description"),
+  tagline: text("tagline"),
+  accentColor: text("accent_color"),
+  latitude: real("latitude"),
+  longitude: real("longitude"),
+  floorX: real("floor_x"),
+  floorY: real("floor_y"),
+  floorW: real("floor_w"),
+  floorH: real("floor_h"),
+  previewPhotoIds: text("preview_photo_ids").array(),
+  roomCaptionFields: text("room_caption_fields").array(),
+  filmStamp: text("film_stamp"),
+  handwritingFont: text("handwriting_font"),
+  stampFont: text("stamp_font"),
   coverImageUrl: text("cover_image_url"),
   parentId: uuid("parent_id"),
   position: integer("position").notNull().default(0),
@@ -101,6 +127,8 @@ export const photos = pgTable("photos", {
   title: text("title"),
   description: text("description"),
   location: text("location"), // optional — photography/portfolio metadata
+  latitude: real("latitude"),
+  longitude: real("longitude"),
   cameraSettings: jsonb("camera_settings"), // optional — { camera, lens, iso, aperture, shutter }
   tags: text("tags").array(),
   width: integer("width").notNull(),
@@ -109,8 +137,6 @@ export const photos = pgTable("photos", {
   focalY: real("focal_y").notNull().default(50),
   // Per-gallery ordering moved to gallery_photos.position when a photo gained the ability
   // to belong to more than one gallery.
-  latitude: real("latitude"),
-  longitude: real("longitude"),
   takenAt: timestamp("taken_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

@@ -1,17 +1,10 @@
 import { db } from "@/lib/db";
 import { siteSettings } from "@/lib/db/schema";
-import { parseLinks } from "@/lib/parseLinks";
-
-const alignClass: Record<string, string> = {
-  left: "text-left",
-  center: "text-center",
-  right: "text-right",
-};
+import { FooterShell } from "./FooterShell";
 
 export async function Footer() {
   let settings: {
     footerText: string | null;
-    footerAlignment: string;
     contactEmail: string | null;
   } | null = null;
 
@@ -24,30 +17,10 @@ export async function Footer() {
 
   if (!settings) return null;
 
-  const alignment = alignClass[settings.footerAlignment] ?? "text-center";
-
   return (
-    <footer
-      className={`border-t border-neutral-200 px-4 py-4 md:px-6 md:py-8 ${alignment}`}
-      style={{
-        backgroundColor: "var(--theme-color-footer-bg)",
-        fontFamily: "var(--theme-font-footer)",
-        fontSize: "var(--theme-footer-font-size)",
-        color: "var(--theme-color-footer-text)",
-      }}
-    >
-      {settings.footerText && <p className="break-words">{parseLinks(settings.footerText)}</p>}
-      {settings.contactEmail && (
-        <p className="mt-1">
-          <a
-            href={`mailto:${settings.contactEmail}`}
-            className="transition-colors hover:opacity-80"
-            style={{ color: "var(--theme-color-accent)" }}
-          >
-            {settings.contactEmail}
-          </a>
-        </p>
-      )}
-    </footer>
+    <FooterShell
+      footerText={settings.footerText}
+      contactEmail={settings.contactEmail}
+    />
   );
 }

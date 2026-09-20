@@ -8,8 +8,28 @@ import type { Metadata } from "next";
 import PuckRenderer from "@/components/public/PuckRenderer";
 import type { Data } from "@puckeditor/core";
 import type { EmbedPhoto, GlobalLightboxSettings } from "@/lib/puck/config";
-import { buildGoogleFontsUrl, getFontFallback } from "@/lib/theme/fonts";
 import StoryPasswordForm from "./StoryPasswordForm";
+import StoryReadingView from "@/components/public/stories/StoryReadingView";
+
+type StoryMeta = {
+  dek?: string;
+  kind?: string;
+  year?: string | number;
+  readTime?: string;
+  wordCount?: number;
+  frontispieceUrl?: string;
+  accentColor?: string;
+  paperColor?: string;
+  inkColor?: string;
+  frontispieceAspect?: string;
+  dropCap?: boolean;
+  showEndMark?: boolean;
+  endMark?: string;
+  showProgressBar?: boolean;
+  showNextStory?: boolean;
+  bodyMaxWidth?: number;
+  paginate?: boolean;
+};
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -50,12 +70,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-const FONT_SIZE_CLASSES = {
-  small: "text-base",
-  medium: "text-lg",
-  large: "text-xl",
-} as const;
-
 export default async function StoryPage({ params }: Props) {
   const { slug } = await params;
 
@@ -81,44 +95,60 @@ export default async function StoryPage({ params }: Props) {
     }
   }
 
-  // Build typography styles
-  const typography = story.typography as {
-    fontHeadings?: string;
-    fontBody?: string;
-    bodyFontSize?: "small" | "medium" | "large";
-  } | null;
+  // Pull ordered story list so we can show № and the Next card
+  const allStories = await db
+    .select({ slug: pages.slug, title: pages.title, metaDescription: pages.metaDescription, storyMeta: pages.storyMeta })
+    .from(pages)
+    .where(and(eq(pages.pageType, "story"), eq(pages.isPublished, true)))
+    .orderBy(asc(pages.position));
+  const storyIndex = allStories.findIndex((s) => s.slug === slug);
+  const nextEntry = storyIndex >= 0 && storyIndex < allStories.length - 1 ? allStories[storyIndex + 1] : null;
+  const nextStory = nextEntry
+    ? {
+        title: nextEntry.title,
+        slug: nextEntry.slug,
+        dek: (nextEntry.storyMeta as StoryMeta | null)?.dek ?? nextEntry.metaDescription ?? "",
+      }
+    : null;
 
-  const fontsToLoad: string[] = [];
-  if (typography?.fontHeadings) fontsToLoad.push(typography.fontHeadings);
-  if (typography?.fontBody) fontsToLoad.push(typography.fontBody);
-  const googleFontsUrl = buildGoogleFontsUrl(fontsToLoad);
+  const meta = (story.storyMeta ?? {}) as StoryMeta;
+  const yearStr =
+    meta.year != null ? String(meta.year) : new Date(story.createdAt).getFullYear().toString();
+  const readTime = meta.readTime ??
+    (meta.wordCount ? `${Math.max(1, Math.round(meta.wordCount / 220))} min read` : "");
 
-  const headingStyle = typography?.fontHeadings
-    ? { fontFamily: getFontFallback(typography.fontHeadings) }
-    : { fontFamily: "var(--theme-font-headings)" };
-
-  const bodyStyle = typography?.fontBody
-    ? { fontFamily: getFontFallback(typography.fontBody) }
-    : {};
-
-  const fontSizeClass = FONT_SIZE_CLASSES[typography?.bodyFontSize ?? "medium"];
+  const chrome = {
+    accentColor: meta.accentColor,
+    paperColor: meta.paperColor,
+    inkColor: meta.inkColor,
+    frontispieceAspect: meta.frontispieceAspect,
+    dropCap: meta.dropCap,
+    showEndMark: meta.showEndMark,
+    endMark: meta.endMark,
+    showProgressBar: meta.showProgressBar,
+    showNextStory: meta.showNextStory,
+    bodyMaxWidth: meta.bodyMaxWidth,
+    paginate: meta.paginate,
+  };
 
   if (!isPuckData(story.content)) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-12">
-        {googleFontsUrl && (
-          <link rel="stylesheet" href={googleFontsUrl} />
-        )}
-        {story.showTitle && (
-          <h1
-            className="mb-8 text-center text-4xl font-semibold tracking-tight"
-            style={headingStyle}
-          >
-            {story.title}
-          </h1>
-        )}
-        <p className="text-center text-neutral-500">This story has no content yet.</p>
-      </div>
+      <StoryReadingView
+        number={storyIndex + 1}
+        title={story.title}
+        dek={meta.dek ?? story.metaDescription ?? ""}
+        kind={meta.kind ?? "Short"}
+        year={yearStr}
+        wordCount={meta.wordCount ?? null}
+        readTime={readTime}
+        frontispiece={meta.frontispieceUrl ?? story.ogImageUrl ?? null}
+        nextStory={nextStory}
+        chrome={chrome}
+      >
+        <p style={{ textAlign: "center", fontStyle: "italic", color: "var(--st-ink-soft)" }}>
+          This story has no content yet.
+        </p>
+      </StoryReadingView>
     );
   }
 
@@ -165,19 +195,19 @@ export default async function StoryPage({ params }: Props) {
   }
 
   return (
-    <div className={`mx-auto max-w-3xl px-4 py-12 ${fontSizeClass}`} style={bodyStyle}>
-      {googleFontsUrl && (
-        <link rel="stylesheet" href={googleFontsUrl} />
-      )}
-      {story.showTitle && (
-        <h1
-          className="mb-8 text-center text-4xl font-semibold tracking-tight"
-          style={headingStyle}
-        >
-          {story.title}
-        </h1>
-      )}
+    <StoryReadingView
+      number={storyIndex + 1}
+      title={story.title}
+      dek={meta.dek ?? story.metaDescription ?? ""}
+      kind={meta.kind ?? "Short"}
+      year={yearStr}
+      wordCount={meta.wordCount ?? null}
+      readTime={readTime}
+      frontispiece={meta.frontispieceUrl ?? story.ogImageUrl ?? null}
+      nextStory={nextStory}
+      chrome={chrome}
+    >
       <PuckRenderer data={story.content} galleryPhotos={galleryPhotos} globalLightbox={globalLightbox} />
-    </div>
+    </StoryReadingView>
   );
 }

@@ -5,10 +5,20 @@
       "Read(//c/Users/Dad/Documents/Web/**)",
       "Bash(npx create-next-app@latest snaptart-new --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm --no-turbopack)",
       "Skill(update-config)",
-      "Skill(update-config:*)"
+      "Skill(update-config:*)",
+      "PowerShell",
+      "Read(//tmp/design_extract/unpacked/snaptart-photos-ideas/project/**)",
+      "Read(//c/tmp/design_extract/unpacked/snaptart-photos-ideas/project/**)",
+      "WebFetch(domain:api.anthropic.com)",
+      "WebFetch(domain:snaptart.squarespace.com)",
+      "WebFetch(domain:www.snaptart.com)",
+      "Bash(cp \"/c/Users/Dad/.claude/projects/c--Users-Dad-Documents-Web-snaptart-com/7a5b6a51-28ac-4454-bdfd-4f3f6bf11880/tool-results/webfetch-1776809756735-q8mtjb.bin\" /tmp/field-map-handoff.tar.gz)",
+      "Bash(tar -xzf /tmp/field-map-handoff.tar.gz -C /tmp/field-map-handoff)",
+      "Read(//tmp/**)"
     ],
     "additionalDirectories": [
-      "C:\\Users\\Dad\\.claude"
+      "C:\\Users\\Dad\\.claude",
+      "c:\\Users\\Dad\\Documents\\Web\\gardensalacarte.com\\src\\lib"
     ]
   }
 }

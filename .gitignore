@@ -50,3 +50,6 @@ drizzle/meta
 
 .vercel
 .env*.local
+
+# claude code local runtime state
+.claude/scheduled_tasks.lock
