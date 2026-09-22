@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Puck } from "@puckeditor/core";
 import type { Data } from "@puckeditor/core";
 import { puckConfig } from "@/lib/puck/config";
+import PuckThemeStyles from "@/components/admin/PuckThemeStyles";
 import { draggableOutlinePlugin } from "@/components/puck/DraggableOutline";
 import { STORIES_INDEX_DEFAULTS } from "@/components/public/stories/StoriesIndex";
 import "@puckeditor/core/puck.css";
@@ -66,6 +67,7 @@ export default function StoriesIndexEditorPage() {
 
   return (
     <div className="-m-8">
+      <PuckThemeStyles />
       <Puck
         config={puckConfig}
         data={initialData}

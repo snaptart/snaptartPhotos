@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Puck } from "@puckeditor/core";
 import type { Data } from "@puckeditor/core";
 import { puckConfig } from "@/lib/puck/config";
+import PuckThemeStyles from "@/components/admin/PuckThemeStyles";
 import { draggableOutlinePlugin } from "@/components/puck/DraggableOutline";
 import "@puckeditor/core/puck.css";
 
@@ -91,6 +92,7 @@ export default function StoryEditorPage() {
 
   return (
     <div className="-m-8">
+      <PuckThemeStyles />
       <Puck
         config={puckConfig}
         data={initialData}

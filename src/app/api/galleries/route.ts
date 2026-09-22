@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { galleries } from "@/lib/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { galleries, galleryPhotos } from "@/lib/db/schema";
+import { eq, asc, sql, getTableColumns } from "drizzle-orm";
 import { generateSlug } from "@/lib/utils";
 import { corsPreflight, withCors } from "@/lib/cors";
 
@@ -12,9 +12,21 @@ export const OPTIONS = corsPreflight;
 export async function GET() {
   try {
     const session = await auth();
-    const items = session
-      ? await db.select().from(galleries).orderBy(asc(galleries.position))
-      : await db.select().from(galleries).where(eq(galleries.isPublished, true)).orderBy(asc(galleries.position));
+
+    // photoCount comes from the junction table so the Galleries Index block can show
+    // a live count without a second round trip. ::int because Postgres count() is a
+    // bigint, which the driver would otherwise hand back as a string.
+    const items = await db
+      .select({
+        ...getTableColumns(galleries),
+        photoCount: sql<number>`count(${galleryPhotos.photoId})::int`,
+      })
+      .from(galleries)
+      .leftJoin(galleryPhotos, eq(galleryPhotos.galleryId, galleries.id))
+      .where(session ? undefined : eq(galleries.isPublished, true))
+      .groupBy(galleries.id)
+      .orderBy(asc(galleries.position));
+
     return withCors(NextResponse.json(items));
   } catch {
     return withCors(NextResponse.json({ error: "Internal server error" }, { status: 500 }));

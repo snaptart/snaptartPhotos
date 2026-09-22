@@ -26,8 +26,6 @@ import {
   type GalleryAspect,
 } from "@/lib/theme/aspect";
 import { fontRole } from "@/lib/theme/role-style";
-import { CURATED_FONTS, FONT_GROUPS, getFontFallback } from "@/lib/theme/fonts";
-import { useCuratedFonts } from "@/lib/theme/use-curated-fonts";
 import Lightbox from "@/components/public/Lightbox";
 import type { LightboxPhoto, LightboxSettings } from "@/components/public/Lightbox";
 import StoriesIndex, { STORIES_INDEX_DEFAULTS } from "@/components/public/stories/StoriesIndex";
@@ -125,6 +123,13 @@ type ImageBlockProps = {
 type SpacerProps = {
   height: number;
   unit: "px" | "%";
+  /** Draws a rule centred in the spacer's height, so `height` becomes the space around it. */
+  line: boolean;
+  lineWidth: number;
+  lineLength: number;
+  lineAlign: "left" | "center" | "right";
+  /** Blank falls back to the theme hairline. */
+  lineColor: string;
 };
 
 type ContainerProps = {
@@ -234,8 +239,21 @@ type GalleriesIndexProps = {
   selectedSlugs: string[];
   maxItems: number;
   sortOrder: "manual" | "position" | "newest" | "oldest" | "title-asc" | "title-desc";
+  layout: "grid" | "list";
   columns: "1" | "2" | "3" | "4" | "5" | "6";
   gap: number;
+  showCount: boolean;
+  dividerColor: string;
+  // Index List gets its own type controls — a row of titles wants different
+  // settings from a caption under a cover. Each falls back to the grid's value
+  // when unset, so blocks saved before these existed look unchanged.
+  listTitleFontRole: "headings" | "body" | "navMenu" | "labels";
+  listTitleSize: number;
+  listTitleWeight: "300" | "400" | "500" | "600" | "700" | "800";
+  listTitleColor: string;
+  listTitleTransform: "none" | "uppercase" | "lowercase" | "capitalize";
+  listTitleTracking: number;
+  listTitleItalic: boolean;
   fullBleed: boolean;
   maxWidth: number;
   aspectRatio: GalleryAspect;
@@ -246,14 +264,10 @@ type GalleriesIndexProps = {
   titlePosition: "below" | "overlay-bottom" | "overlay-top" | "overlay-center";
   textAlignment: "left" | "center" | "right";
   titleFontRole: "headings" | "body" | "navMenu" | "labels";
-  /** A curated font name overriding the role's family; "" = use the role's. */
-  titleFontFamily: string;
   titleSize: number;
   titleColor: string;
   titleWeight: "300" | "400" | "500" | "600" | "700" | "800";
   titleTransform: "none" | "uppercase" | "lowercase" | "capitalize";
-  /** A curated font name; "" = inherit the page's body font. */
-  descriptionFontFamily: string;
   descriptionSize: number;
   descriptionColor: string;
   textPaddingX: number;
@@ -270,6 +284,8 @@ type LinkListItem = {
   id: string;
   label: string;
   description: string;
+  /** Short trailing value pinned to the far edge of the row — a count, a year, a price. */
+  meta: string;
   link: string;
   linkTarget: "_self" | "_blank";
   imageUrl: string;
@@ -436,10 +452,10 @@ export const puckConfig: Config<Components> = {
               .richtext-render h1 { font-size: 2em; }
               .richtext-render h2 { font-size: 1.5em; }
               .richtext-render h3 { font-size: 1.25em; }
-              .richtext-render blockquote { border-left: 3px solid #d4d4d4; padding-left: 1em; margin: 0.5em 0; font-style: italic; }
+              .richtext-render blockquote { border-left: 3px solid var(--theme-color-rule, #d4d4d4); padding-left: 1em; margin: 0.5em 0; font-style: italic; }
               .richtext-render ul, .richtext-render ol { padding-left: 1.5em; margin: 0.25em 0; }
               .richtext-render a { text-decoration: underline; }
-              .richtext-render hr { border-top: 1px solid #d4d4d4; margin: 1em 0; }
+              .richtext-render hr { border-top: 1px solid var(--theme-color-rule, #d4d4d4); margin: 1em 0; }
             `}</style>
             <div
               className="richtext-render mx-auto max-w-none"
@@ -799,9 +815,17 @@ export const puckConfig: Config<Components> = {
             <SliderField value={value} onChange={onChange} min={0} max={48} step={1} unit="" label="Max Items" />
           ),
         },
+        layout: {
+          type: "select",
+          label: "Layout",
+          options: [
+            { label: "Cover Grid", value: "grid" },
+            { label: "Index List", value: "list" },
+          ],
+        },
         columns: {
           type: "select",
-          label: "Columns",
+          label: "Columns (Cover Grid)",
           options: [
             { label: "1", value: "1" },
             { label: "2", value: "2" },
@@ -810,6 +834,82 @@ export const puckConfig: Config<Components> = {
             { label: "5", value: "5" },
             { label: "6", value: "6" },
           ],
+        },
+        showCount: {
+          type: "radio",
+          label: "Show Photo Count (Index List)",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        dividerColor: {
+          type: "custom",
+          label: "Divider Color (Index List)",
+          render: ({ value, onChange }) => (
+            <ColorField value={value} onChange={onChange} />
+          ),
+        },
+        listTitleFontRole: {
+          type: "select",
+          label: "List Title Font",
+          options: [
+            { label: "Headings", value: "headings" },
+            { label: "Body", value: "body" },
+            { label: "Nav / Menu", value: "navMenu" },
+            { label: "Labels", value: "labels" },
+          ],
+        },
+        listTitleSize: {
+          type: "custom",
+          label: "List Title Size (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={12} max={72} step={1} unit="px" label="List Title Size" />
+          ),
+        },
+        listTitleWeight: {
+          type: "select",
+          label: "List Title Weight",
+          options: [
+            { label: "Light (300)", value: "300" },
+            { label: "Regular (400)", value: "400" },
+            { label: "Medium (500)", value: "500" },
+            { label: "Semibold (600)", value: "600" },
+            { label: "Bold (700)", value: "700" },
+            { label: "Extra Bold (800)", value: "800" },
+          ],
+        },
+        listTitleTracking: {
+          type: "custom",
+          label: "List Title Letter Spacing (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={-2} max={10} step={0.5} unit="px" label="Letter Spacing" />
+          ),
+        },
+        listTitleTransform: {
+          type: "select",
+          label: "List Title Transform",
+          options: [
+            { label: "None", value: "none" },
+            { label: "UPPERCASE", value: "uppercase" },
+            { label: "lowercase", value: "lowercase" },
+            { label: "Capitalize", value: "capitalize" },
+          ],
+        },
+        listTitleItalic: {
+          type: "radio",
+          label: "List Title Italic",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        listTitleColor: {
+          type: "custom",
+          label: "List Title Color",
+          render: ({ value, onChange }) => (
+            <ColorField value={value} onChange={onChange} />
+          ),
         },
         gap: {
           type: "custom",
@@ -901,13 +1001,6 @@ export const puckConfig: Config<Components> = {
             { label: "Labels", value: "labels" },
           ],
         },
-        titleFontFamily: {
-          type: "custom",
-          label: "Title Font",
-          render: ({ value, onChange }) => (
-            <FontFamilyField value={value} onChange={onChange} />
-          ),
-        },
         titleSize: {
           type: "custom",
           label: "Title Size (px)",
@@ -943,13 +1036,6 @@ export const puckConfig: Config<Components> = {
             { label: "lowercase", value: "lowercase" },
             { label: "Capitalize", value: "capitalize" },
           ],
-        },
-        descriptionFontFamily: {
-          type: "custom",
-          label: "Description Font",
-          render: ({ value, onChange }) => (
-            <FontFamilyField value={value} onChange={onChange} defaultLabel="Page body font" />
-          ),
         },
         descriptionSize: {
           type: "custom",
@@ -1027,8 +1113,18 @@ export const puckConfig: Config<Components> = {
         selectedSlugs: [],
         maxItems: 0,
         sortOrder: "position",
+        layout: "grid",
         columns: "3",
         gap: 16,
+        showCount: true,
+        dividerColor: "#e5e5e5",
+        listTitleFontRole: "headings",
+        listTitleSize: 20,
+        listTitleWeight: "300",
+        listTitleColor: "#171717",
+        listTitleTransform: "none",
+        listTitleTracking: 0,
+        listTitleItalic: false,
         fullBleed: false,
         maxWidth: 100,
         aspectRatio: "4:5",
@@ -1039,12 +1135,10 @@ export const puckConfig: Config<Components> = {
         titlePosition: "below",
         textAlignment: "center",
         titleFontRole: "headings",
-        titleFontFamily: "",
         titleSize: 18,
         titleColor: "#171717",
         titleWeight: "500",
         titleTransform: "none",
-        descriptionFontFamily: "",
         descriptionSize: 13,
         descriptionColor: "#737373",
         textPaddingX: 8,
@@ -1757,7 +1851,7 @@ export const puckConfig: Config<Components> = {
     },
 
     Spacer: {
-      label: "Spacer",
+      label: "Spacer / Rule",
       fields: {
         unit: {
           type: "radio",
@@ -1768,13 +1862,74 @@ export const puckConfig: Config<Components> = {
           ],
         },
         height: { type: "number", label: "Height", min: 0, max: 1000 },
+        line: {
+          type: "radio",
+          label: "Horizontal Rule",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        lineWidth: {
+          type: "custom",
+          label: "Rule Thickness (px)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={1} max={8} step={1} unit="px" label="Thickness" />
+          ),
+        },
+        lineLength: {
+          type: "custom",
+          label: "Rule Width (%)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={10} max={100} step={5} unit="%" label="Width" />
+          ),
+        },
+        lineAlign: {
+          type: "radio",
+          label: "Rule Alignment",
+          options: [
+            { label: "Left", value: "left" },
+            { label: "Center", value: "center" },
+            { label: "Right", value: "right" },
+          ],
+        },
+        lineColor: {
+          type: "custom",
+          label: "Rule Color (blank = theme hairline)",
+          render: ({ value, onChange }) => (
+            <ColorField value={value} onChange={onChange} />
+          ),
+        },
       },
-      defaultProps: { height: 48, unit: "px" },
-      render: ({ height, unit }) => (
+      defaultProps: {
+        height: 48,
+        unit: "px",
+        line: false,
+        lineWidth: 1,
+        lineLength: 100,
+        lineAlign: "center",
+        lineColor: "",
+      },
+      render: ({ height, unit, line, lineWidth, lineLength, lineAlign, lineColor }) => (
         <div
-          style={{ height: unit === "%" ? `${height}vh` : `${height}px` }}
+          style={{
+            height: unit === "%" ? `${height}vh` : `${height}px`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent:
+              lineAlign === "left" ? "flex-start" : lineAlign === "right" ? "flex-end" : "center",
+          }}
           className="w-full"
-        />
+        >
+          {line && (
+            <div
+              style={{
+                width: `${lineLength ?? 100}%`,
+                borderTop: `${lineWidth ?? 1}px solid ${lineColor || "var(--theme-color-rule, #e5e5e5)"}`,
+              }}
+            />
+          )}
+        </div>
       ),
     },
 
@@ -2771,40 +2926,6 @@ function SliderField({ value, onChange, min, max, step, unit, label }: { value: 
   );
 }
 
-// ----- Font family field -----
-
-function FontFamilyField({
-  value,
-  onChange,
-  defaultLabel = "Use font role",
-}: {
-  value: string | undefined;
-  onChange: (v: string) => void;
-  /** What the empty option means for this field. */
-  defaultLabel?: string;
-}) {
-  useCuratedFonts();
-  return (
-    <select
-      value={value ?? ""}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded border border-neutral-300 bg-white px-2 py-1 text-sm"
-      style={value ? { fontFamily: getFontFallback(value) } : undefined}
-    >
-      <option value="">{defaultLabel}</option>
-      {FONT_GROUPS.map((group) => (
-        <optgroup key={group.category} label={group.label}>
-          {CURATED_FONTS.filter((f) => f.category === group.category).map((f) => (
-            <option key={f.name} value={f.name} style={{ fontFamily: getFontFallback(f.name) }}>
-              {f.name}
-            </option>
-          ))}
-        </optgroup>
-      ))}
-    </select>
-  );
-}
-
 // ----- Color field -----
 
 function ColorField({
@@ -3098,6 +3219,8 @@ type GalleryRow = {
   position: number;
   isPublished: boolean;
   createdAt?: string;
+  /** Added by GET /api/galleries — number of photographs in the gallery. */
+  photoCount?: number;
 };
 
 function GalleriesMultiSelect({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
@@ -3181,8 +3304,18 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
     selectedSlugs,
     maxItems,
     sortOrder,
+    layout,
     columns,
     gap,
+    showCount,
+    dividerColor,
+    listTitleFontRole,
+    listTitleSize,
+    listTitleWeight,
+    listTitleColor,
+    listTitleTransform,
+    listTitleTracking,
+    listTitleItalic,
     fullBleed,
     maxWidth,
     aspectRatio,
@@ -3193,12 +3326,10 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
     titlePosition,
     textAlignment,
     titleFontRole,
-    titleFontFamily,
     titleSize,
     titleColor,
     titleWeight,
     titleTransform,
-    descriptionFontFamily,
     descriptionSize,
     descriptionColor,
     textPaddingX,
@@ -3270,6 +3401,81 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
     );
   }
 
+  if (layout === "list") {
+    return (
+      <div style={wrapperStyle}>
+        {limited.map((g, i) => {
+          const hovered = hoveredId === g.id;
+          const href = `/${siteConfig.labels.gallerySlug}/${g.slug}`;
+          return (
+            <a
+              key={g.id}
+              href={href}
+              onMouseEnter={() => setHoveredId(g.id)}
+              onMouseLeave={() => setHoveredId(null)}
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                justifyContent: "space-between",
+                gap: 24,
+                textDecoration: "none",
+                padding: `${textPaddingY}px 0`,
+                borderTop: `1px solid ${dividerColor}`,
+                borderBottom: i === limited.length - 1 ? `1px solid ${dividerColor}` : undefined,
+                transition: `opacity ${transitionMs}ms ease`,
+                opacity: hovered ? 0.7 : 1,
+              }}
+            >
+              <span style={{ minWidth: 0 }}>
+                <span
+                  style={{
+                    ...fontRole(listTitleFontRole ?? titleFontRole),
+                    fontSize: `${listTitleSize ?? titleSize}px`,
+                    fontWeight: listTitleWeight ?? titleWeight,
+                    color: listTitleColor || titleColor,
+                    textTransform: listTitleTransform ?? titleTransform,
+                    // Only set when asked, so an unset control leaves the theme
+                    // role's own tracking and slant alone rather than forcing them.
+                    ...(listTitleTracking ? { letterSpacing: `${listTitleTracking}px` } : {}),
+                    ...(listTitleItalic ? { fontStyle: "italic" as const } : {}),
+                    lineHeight: 1.25,
+                  }}
+                >
+                  {g.title}
+                </span>
+                {showDescription && g.description && (
+                  <span
+                    style={{
+                      display: "block",
+                      marginTop: `${textGap}px`,
+                      fontSize: `${descriptionSize}px`,
+                      color: descriptionColor,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {g.description}
+                  </span>
+                )}
+              </span>
+              {showCount && typeof g.photoCount === "number" && (
+                <span
+                  style={{
+                    flexShrink: 0,
+                    fontSize: `${descriptionSize}px`,
+                    color: descriptionColor,
+                    letterSpacing: "0.1em",
+                  }}
+                >
+                  {g.photoCount < 10 ? `0${g.photoCount}` : g.photoCount}
+                </span>
+              )}
+            </a>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <div style={wrapperStyle}>
       <div style={gridStyle}>
@@ -3288,7 +3494,6 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
             <div
               style={{
                 ...fontRole(titleFontRole),
-                ...(titleFontFamily ? { fontFamily: getFontFallback(titleFontFamily) } : {}),
                 fontSize: `${titleSize}px`,
                 fontWeight: titleWeight,
                 color: titleColor,
@@ -3304,7 +3509,6 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
           const descEl = showDescription && g.description && (
             <div
               style={{
-                ...(descriptionFontFamily ? { fontFamily: getFontFallback(descriptionFontFamily) } : {}),
                 fontSize: `${descriptionSize}px`,
                 color: descriptionColor,
                 textAlign: textAlignment,
@@ -3401,6 +3605,7 @@ function LinkListItemEditor({ value, onChange }: { value: LinkListItem[]; onChan
       id: crypto.randomUUID(),
       label: "New item",
       description: "",
+      meta: "",
       link: "",
       linkTarget: "_self",
       imageUrl: "",
@@ -3456,6 +3661,15 @@ function LinkListItemEditor({ value, onChange }: { value: LinkListItem[]; onChan
                   type="text"
                   value={item.description}
                   onChange={(e) => updateItem(item.id, { description: e.target.value })}
+                  className="mt-0.5 w-full rounded border border-neutral-200 px-2 py-1 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-neutral-500">Meta (optional) &mdash; pinned right</label>
+                <input
+                  type="text"
+                  value={item.meta ?? ""}
+                  onChange={(e) => updateItem(item.id, { meta: e.target.value })}
                   className="mt-0.5 w-full rounded border border-neutral-200 px-2 py-1 text-sm"
                 />
               </div>
@@ -3744,11 +3958,31 @@ function LinkListRender(props: LinkListProps) {
           </div>
         );
 
+        const metaEl = item.meta ? (
+          <span
+            style={{
+              flexShrink: 0,
+              marginLeft: "auto",
+              paddingLeft: 16,
+              fontSize: `${descriptionSize}px`,
+              color: hovered ? hoverTextColor : descriptionColor,
+              fontWeight: 400,
+              textTransform: "none",
+              letterSpacing: 0,
+              fontStyle: "normal",
+              textDecoration: "none",
+            }}
+          >
+            {item.meta}
+          </span>
+        ) : null;
+
         const inner =
           imagePosition === "right" ? (
             <>
               {iconEl}
               {textEl}
+              {metaEl}
               {imageEl}
             </>
           ) : (
@@ -3756,6 +3990,7 @@ function LinkListRender(props: LinkListProps) {
               {imageEl}
               {iconEl}
               {textEl}
+              {metaEl}
             </>
           );
 
