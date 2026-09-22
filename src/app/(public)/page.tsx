@@ -13,6 +13,7 @@ import type { Data } from "@puckeditor/core";
 import type { EmbedPhoto, FieldMapBlockData, GlobalLightboxSettings } from "@/lib/puck/config";
 import siteConfig from "@/lib/site.config";
 import { fontRole } from "@/lib/theme/role-style";
+import { PAGE_CONTAINER, PROSE_CONTAINER } from "@/lib/theme/layout";
 import { getFieldMapData } from "@/lib/fieldmap/query";
 
 const tiptapExtensions = [
@@ -119,7 +120,7 @@ export default async function HomePage() {
       return (
         <div className="fullbleed-puck-host flex flex-1 flex-col">
           {page.showTitle && (
-            <h1 className="px-4 pt-12 pb-8 text-center text-4xl tracking-tight" style={fontRole("headings")}>
+            <h1 className="px-6 pt-16 pb-8 text-4xl md:px-24 md:text-5xl" style={fontRole("headings")}>
               {page.title}
             </h1>
           )}
@@ -134,9 +135,9 @@ export default async function HomePage() {
     }
 
     return (
-      <div className={`mx-auto w-full max-w-5xl px-4 ${heroFirst ? "pt-0 pb-12" : "py-12"}`}>
+      <div className={`${PAGE_CONTAINER} ${heroFirst ? "pt-0 pb-16" : "py-16"}`}>
         {page.showTitle && (
-          <h1 className="mb-8 text-center text-4xl tracking-tight" style={fontRole("headings")}>
+          <h1 className="mb-10 text-4xl md:text-5xl" style={fontRole("headings")}>
             {page.title}
           </h1>
         )}
@@ -155,9 +156,9 @@ export default async function HomePage() {
     : "";
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-12">
+    <div className={`${PROSE_CONTAINER} py-16`}>
       {page.showTitle && (
-        <h1 className="mb-8 text-center text-4xl tracking-tight" style={fontRole("headings")}>
+        <h1 className="mb-10 text-4xl md:text-5xl" style={fontRole("headings")}>
           {page.title}
         </h1>
       )}

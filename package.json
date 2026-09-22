@@ -15,7 +15,8 @@
     "db:thumbnails": "npx tsx src/lib/db/regenerate-thumbnails.ts",
     "db:backfill-dates": "npx tsx src/lib/db/backfill-photo-dates.ts",
     "db:backfill-gallery-photos": "npx tsx src/lib/db/backfill-gallery-photos.ts",
-    "db:backfill-exif": "npx tsx src/lib/db/backfill-exif.ts"
+    "db:backfill-exif": "npx tsx src/lib/db/backfill-exif.ts",
+    "theme:museum": "npx tsx src/lib/db/apply-museum-theme.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.1",

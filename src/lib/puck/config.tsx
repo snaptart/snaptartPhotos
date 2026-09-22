@@ -20,7 +20,14 @@ import GalleryPhotoMultiPicker from "@/components/admin/GalleryPhotoMultiPicker"
 import NextLink from "next/link";
 import { parseLinks } from "@/lib/parseLinks";
 import siteConfig from "@/lib/site.config";
+import {
+  GALLERY_ASPECT_CSS,
+  GALLERY_ASPECT_OPTIONS,
+  type GalleryAspect,
+} from "@/lib/theme/aspect";
 import { fontRole } from "@/lib/theme/role-style";
+import { CURATED_FONTS, FONT_GROUPS, getFontFallback } from "@/lib/theme/fonts";
+import { useCuratedFonts } from "@/lib/theme/use-curated-fonts";
 import Lightbox from "@/components/public/Lightbox";
 import type { LightboxPhoto, LightboxSettings } from "@/components/public/Lightbox";
 import StoriesIndex, { STORIES_INDEX_DEFAULTS } from "@/components/public/stories/StoriesIndex";
@@ -138,7 +145,7 @@ type GalleryEmbedProps = {
   maxPhotos: number;
   layout: "grid" | "masonry";
   columns: "2" | "3" | "4";
-  aspectRatio: "square" | "natural" | "4:3" | "16:9";
+  aspectRatio: GalleryAspect;
   gap: number;
   imageMaxWidth: number;
   borderRadius: number;
@@ -231,7 +238,7 @@ type GalleriesIndexProps = {
   gap: number;
   fullBleed: boolean;
   maxWidth: number;
-  aspectRatio: "natural" | "square" | "4:3" | "3:2" | "16:9";
+  aspectRatio: GalleryAspect;
   borderRadius: number;
   imageHoverEffect: "none" | "zoom" | "lift" | "fade" | "darken";
   showTitle: boolean;
@@ -239,10 +246,14 @@ type GalleriesIndexProps = {
   titlePosition: "below" | "overlay-bottom" | "overlay-top" | "overlay-center";
   textAlignment: "left" | "center" | "right";
   titleFontRole: "headings" | "body" | "navMenu" | "labels";
+  /** A curated font name overriding the role's family; "" = use the role's. */
+  titleFontFamily: string;
   titleSize: number;
   titleColor: string;
   titleWeight: "300" | "400" | "500" | "600" | "700" | "800";
   titleTransform: "none" | "uppercase" | "lowercase" | "capitalize";
+  /** A curated font name; "" = inherit the page's body font. */
+  descriptionFontFamily: string;
   descriptionSize: number;
   descriptionColor: string;
   textPaddingX: number;
@@ -825,13 +836,7 @@ export const puckConfig: Config<Components> = {
         aspectRatio: {
           type: "select",
           label: "Image Aspect Ratio",
-          options: [
-            { label: "Natural", value: "natural" },
-            { label: "Square (1:1)", value: "square" },
-            { label: "4:3", value: "4:3" },
-            { label: "3:2", value: "3:2" },
-            { label: "16:9", value: "16:9" },
-          ],
+          options: GALLERY_ASPECT_OPTIONS,
         },
         borderRadius: {
           type: "custom",
@@ -896,6 +901,13 @@ export const puckConfig: Config<Components> = {
             { label: "Labels", value: "labels" },
           ],
         },
+        titleFontFamily: {
+          type: "custom",
+          label: "Title Font",
+          render: ({ value, onChange }) => (
+            <FontFamilyField value={value} onChange={onChange} />
+          ),
+        },
         titleSize: {
           type: "custom",
           label: "Title Size (px)",
@@ -931,6 +943,13 @@ export const puckConfig: Config<Components> = {
             { label: "lowercase", value: "lowercase" },
             { label: "Capitalize", value: "capitalize" },
           ],
+        },
+        descriptionFontFamily: {
+          type: "custom",
+          label: "Description Font",
+          render: ({ value, onChange }) => (
+            <FontFamilyField value={value} onChange={onChange} defaultLabel="Page body font" />
+          ),
         },
         descriptionSize: {
           type: "custom",
@@ -1012,7 +1031,7 @@ export const puckConfig: Config<Components> = {
         gap: 16,
         fullBleed: false,
         maxWidth: 100,
-        aspectRatio: "4:3",
+        aspectRatio: "4:5",
         borderRadius: 4,
         imageHoverEffect: "zoom",
         showTitle: true,
@@ -1020,10 +1039,12 @@ export const puckConfig: Config<Components> = {
         titlePosition: "below",
         textAlignment: "center",
         titleFontRole: "headings",
+        titleFontFamily: "",
         titleSize: 18,
         titleColor: "#171717",
         titleWeight: "500",
         titleTransform: "none",
+        descriptionFontFamily: "",
         descriptionSize: 13,
         descriptionColor: "#737373",
         textPaddingX: 8,
@@ -2262,12 +2283,7 @@ export const puckConfig: Config<Components> = {
         aspectRatio: {
           type: "select",
           label: "Aspect Ratio",
-          options: [
-            { label: "Square (1:1)", value: "square" },
-            { label: "Natural", value: "natural" },
-            { label: "4:3", value: "4:3" },
-            { label: "16:9", value: "16:9" },
-          ],
+          options: GALLERY_ASPECT_OPTIONS,
         },
         gap: {
           type: "custom",
@@ -2361,7 +2377,7 @@ export const puckConfig: Config<Components> = {
         maxPhotos: 12,
         layout: "grid",
         columns: "3",
-        aspectRatio: "square",
+        aspectRatio: "4:5",
         gap: 8,
         imageMaxWidth: 800,
         borderRadius: 8,
@@ -2755,6 +2771,40 @@ function SliderField({ value, onChange, min, max, step, unit, label }: { value: 
   );
 }
 
+// ----- Font family field -----
+
+function FontFamilyField({
+  value,
+  onChange,
+  defaultLabel = "Use font role",
+}: {
+  value: string | undefined;
+  onChange: (v: string) => void;
+  /** What the empty option means for this field. */
+  defaultLabel?: string;
+}) {
+  useCuratedFonts();
+  return (
+    <select
+      value={value ?? ""}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full rounded border border-neutral-300 bg-white px-2 py-1 text-sm"
+      style={value ? { fontFamily: getFontFallback(value) } : undefined}
+    >
+      <option value="">{defaultLabel}</option>
+      {FONT_GROUPS.map((group) => (
+        <optgroup key={group.category} label={group.label}>
+          {CURATED_FONTS.filter((f) => f.category === group.category).map((f) => (
+            <option key={f.name} value={f.name} style={{ fontFamily: getFontFallback(f.name) }}>
+              {f.name}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </select>
+  );
+}
+
 // ----- Color field -----
 
 function ColorField({
@@ -3123,13 +3173,7 @@ function GalleriesMultiSelect({ value, onChange }: { value: string[]; onChange: 
 
 // ----- Galleries index render -----
 
-const GALLERY_AR_MAP: Record<string, string | undefined> = {
-  natural: undefined,
-  square: "1/1",
-  "4:3": "4/3",
-  "3:2": "3/2",
-  "16:9": "16/9",
-};
+const GALLERY_AR_MAP = GALLERY_ASPECT_CSS;
 
 function GalleriesIndexRender(props: GalleriesIndexProps) {
   const {
@@ -3149,10 +3193,12 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
     titlePosition,
     textAlignment,
     titleFontRole,
+    titleFontFamily,
     titleSize,
     titleColor,
     titleWeight,
     titleTransform,
+    descriptionFontFamily,
     descriptionSize,
     descriptionColor,
     textPaddingX,
@@ -3242,6 +3288,7 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
             <div
               style={{
                 ...fontRole(titleFontRole),
+                ...(titleFontFamily ? { fontFamily: getFontFallback(titleFontFamily) } : {}),
                 fontSize: `${titleSize}px`,
                 fontWeight: titleWeight,
                 color: titleColor,
@@ -3257,6 +3304,7 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
           const descEl = showDescription && g.description && (
             <div
               style={{
+                ...(descriptionFontFamily ? { fontFamily: getFontFallback(descriptionFontFamily) } : {}),
                 fontSize: `${descriptionSize}px`,
                 color: descriptionColor,
                 textAlign: textAlignment,
@@ -4904,7 +4952,7 @@ interface GalleryEmbedRendererProps {
   max: number;
   layout: "grid" | "masonry";
   columns: "2" | "3" | "4";
-  aspectRatio: "square" | "natural" | "4:3" | "16:9";
+  aspectRatio: GalleryAspect;
   gap: number;
   imageMaxWidth: number;
   borderRadius: number;
@@ -4920,7 +4968,7 @@ interface GalleryEmbedRendererProps {
   serverPhotos?: EmbedPhoto[];
 }
 
-const aspectRatioValues: Record<string, string | undefined> = { square: "1/1", natural: undefined, "4:3": "4/3", "16:9": "16/9" };
+const aspectRatioValues = GALLERY_ASPECT_CSS;
 const gridColClasses = { "2": "grid-cols-1 sm:grid-cols-2", "3": "grid-cols-1 sm:grid-cols-2 md:grid-cols-3", "4": "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4" };
 const masonryColClasses = { "2": "columns-1 sm:columns-2", "3": "columns-1 sm:columns-2 md:columns-3", "4": "columns-1 sm:columns-2 md:columns-3 lg:columns-4" };
 
@@ -4994,7 +5042,7 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
     );
   };
 
-  const arValue = aspectRatioValues[aspectRatio ?? "square"];
+  const arValue = aspectRatioValues[aspectRatio ?? "4:5"];
 
   const radius = borderRadius ?? 8;
 

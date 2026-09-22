@@ -12,17 +12,13 @@ import FontFamily from "@tiptap/extension-font-family";
 import { FontSize } from "@/lib/tiptap/font-size";
 import { Indent } from "@/lib/tiptap/indent";
 import type { JSONContent } from "@tiptap/react";
+import { CURATED_FONTS, FONT_GROUPS, getFontFallback, leadingFontFamily } from "@/lib/theme/fonts";
+import { useCuratedFonts } from "@/lib/theme/use-curated-fonts";
 
-const FONT_FAMILIES = [
-  { label: "Default", value: "" },
-  { label: "EB Garamond", value: "EB Garamond" },
-  { label: "Inter", value: "Inter" },
-  { label: "Georgia", value: "Georgia" },
-  { label: "Times New Roman", value: "Times New Roman" },
-  { label: "Arial", value: "Arial" },
-  { label: "Verdana", value: "Verdana" },
-  { label: "Courier New", value: "Courier New" },
-];
+/** Installed on every visitor's machine, so they need no web-font loading. */
+const SYSTEM_FONTS = ["Georgia", "Times New Roman", "Arial", "Verdana", "Courier New"];
+
+const CURATED_NAMES = new Set(CURATED_FONTS.map((f) => f.name));
 
 const FONT_SIZES = [
   { label: "Default", value: "" },
@@ -45,6 +41,9 @@ interface TiptapEditorProps {
 
 function MenuBar({ editor }: { editor: Editor | null }) {
   if (!editor) return null;
+
+  const storedFont: string | undefined = editor.getAttributes("textStyle").fontFamily;
+  const currentFont = storedFont ? leadingFontFamily(storedFont) : "";
 
   const btnClass = (active: boolean) =>
     `rounded px-2 py-1 text-sm ${
@@ -71,21 +70,41 @@ function MenuBar({ editor }: { editor: Editor | null }) {
       <span className="mx-1 border-l border-neutral-300" />
 
       <select
-        value={editor.getAttributes("textStyle").fontFamily || ""}
+        value={currentFont}
         onChange={(e) => {
-          if (e.target.value) {
-            editor.chain().focus().setFontFamily(e.target.value).run();
-          } else {
+          const name = e.target.value;
+          if (!name) {
             editor.chain().focus().unsetFontFamily().run();
+          } else if (CURATED_NAMES.has(name)) {
+            // Store the full stack so text still lands in the right kind of face
+            // if the web font ever fails to load.
+            editor.chain().focus().setFontFamily(getFontFallback(name)).run();
+          } else {
+            editor.chain().focus().setFontFamily(name).run();
           }
         }}
-        className="rounded border border-neutral-300 bg-white px-1.5 py-1 text-sm text-neutral-700"
+        className="max-w-[11rem] rounded border border-neutral-300 bg-white px-1.5 py-1 text-sm text-neutral-700"
       >
-        {FONT_FAMILIES.map((f) => (
-          <option key={f.value} value={f.value}>
-            {f.label}
-          </option>
+        <option value="">Default</option>
+        {FONT_GROUPS.map((group) => (
+          <optgroup key={group.category} label={group.label}>
+            {CURATED_FONTS.filter((f) => f.category === group.category).map((f) => (
+              <option key={f.name} value={f.name} style={{ fontFamily: getFontFallback(f.name) }}>
+                {f.name}
+              </option>
+            ))}
+          </optgroup>
         ))}
+        <optgroup label="System">
+          {SYSTEM_FONTS.map((name) => (
+            <option key={name} value={name} style={{ fontFamily: name }}>
+              {name}
+            </option>
+          ))}
+        </optgroup>
+        {currentFont && !CURATED_NAMES.has(currentFont) && !SYSTEM_FONTS.includes(currentFont) && (
+          <option value={currentFont}>{currentFont}</option>
+        )}
       </select>
 
       <select
@@ -218,6 +237,8 @@ function MenuBar({ editor }: { editor: Editor | null }) {
 }
 
 export default function TiptapEditor({ content, onChange }: TiptapEditorProps) {
+  useCuratedFonts();
+
   const editor = useEditor({
     extensions: [
       StarterKit,

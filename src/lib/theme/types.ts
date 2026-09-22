@@ -12,6 +12,8 @@ export interface FontRoleStyle {
   italic?: boolean;
   uppercase?: boolean;
   size?: number | null;
+  /** Letter-spacing in em, e.g. 0.18. null = the font's natural spacing. */
+  tracking?: number | null;
 }
 
 export type FontStylesMap = Partial<Record<FontRoleKey, FontRoleStyle>>;
@@ -40,16 +42,26 @@ export interface ThemeSettings {
   colorGalleryCaptions: string;
   colorLightboxText: string;
   colorHeroOverlay: string;
+  /** Hairline rules — captions dividers, header underline, table borders. */
+  colorRule: string;
+  /** Recessed surfaces — form panels, image mats, placeholder tiles. */
+  colorSurface: string;
 }
 
-export const ROLE_DEFAULTS: Record<FontRoleKey, Required<Omit<FontRoleStyle, "size">> & { size: number | null }> = {
-  headings: { weight: 300, italic: true, uppercase: false, size: null },
-  body: { weight: 400, italic: false, uppercase: false, size: null },
-  navMenu: { weight: 400, italic: false, uppercase: false, size: null },
-  footer: { weight: 400, italic: false, uppercase: false, size: null },
-  captions: { weight: 400, italic: false, uppercase: false, size: null },
-  overlay: { weight: 400, italic: false, uppercase: false, size: null },
-  labels: { weight: 400, italic: false, uppercase: true, size: null },
+export const ROLE_DEFAULTS: Record<
+  FontRoleKey,
+  Required<Omit<FontRoleStyle, "size" | "tracking">> & {
+    size: number | null;
+    tracking: number | null;
+  }
+> = {
+  headings: { weight: 300, italic: true, uppercase: false, size: null, tracking: null },
+  body: { weight: 400, italic: false, uppercase: false, size: null, tracking: null },
+  navMenu: { weight: 400, italic: false, uppercase: false, size: null, tracking: null },
+  footer: { weight: 400, italic: false, uppercase: false, size: null, tracking: null },
+  captions: { weight: 400, italic: false, uppercase: false, size: null, tracking: null },
+  overlay: { weight: 400, italic: false, uppercase: false, size: null, tracking: null },
+  labels: { weight: 400, italic: false, uppercase: true, size: null, tracking: null },
 };
 
 export const THEME_DEFAULTS: ThemeSettings = {
@@ -84,6 +96,8 @@ export const THEME_DEFAULTS: ThemeSettings = {
   colorGalleryCaptions: "#525252",
   colorLightboxText: "#ffffff",
   colorHeroOverlay: "#ffffff",
+  colorRule: "#e5e5e5",
+  colorSurface: "#fafafa",
 };
 
 export function resolveTheme(

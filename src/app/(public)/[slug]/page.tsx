@@ -15,6 +15,7 @@ import type { Data } from "@puckeditor/core";
 import type { EmbedPhoto, FieldMapBlockData, GlobalLightboxSettings } from "@/lib/puck/config";
 import siteConfig from "@/lib/site.config";
 import { fontRole } from "@/lib/theme/role-style";
+import { PAGE_CONTAINER, PROSE_CONTAINER } from "@/lib/theme/layout";
 import { getFieldMapData } from "@/lib/fieldmap/query";
 
 interface Props {
@@ -127,7 +128,7 @@ export default async function DynamicPage({ params }: Props) {
       return (
         <div className="fullbleed-puck-host flex flex-1 flex-col">
           {page.showTitle && (
-            <h1 className="px-4 pt-12 pb-8 text-center text-4xl tracking-tight" style={fontRole("headings")}>
+            <h1 className="px-6 pt-16 pb-8 text-4xl md:px-24 md:text-5xl" style={fontRole("headings")}>
               {page.title}
             </h1>
           )}
@@ -142,9 +143,9 @@ export default async function DynamicPage({ params }: Props) {
     }
 
     return (
-      <div className="mx-auto w-full max-w-5xl px-4 py-12">
+      <div className={`${PAGE_CONTAINER} py-16`}>
         {page.showTitle && (
-          <h1 className="mb-8 text-center text-4xl tracking-tight" style={fontRole("headings")}>
+          <h1 className="mb-10 text-4xl md:text-5xl" style={fontRole("headings")}>
             {page.title}
           </h1>
         )}
@@ -164,9 +165,9 @@ export default async function DynamicPage({ params }: Props) {
     : "";
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-12">
+    <div className={`${PROSE_CONTAINER} py-16`}>
       {page.showTitle && (
-        <h1 className="mb-8 text-center text-4xl tracking-tight" style={fontRole("headings")}>
+        <h1 className="mb-10 text-4xl md:text-5xl" style={fontRole("headings")}>
           {page.title}
         </h1>
       )}
@@ -176,7 +177,7 @@ export default async function DynamicPage({ params }: Props) {
           dangerouslySetInnerHTML={{ __html: html }}
         />
       ) : (
-        <p className="text-center text-neutral-500">This page has no content yet.</p>
+        <p style={{ color: "var(--theme-color-gallery-captions)" }}>This page has no content yet.</p>
       )}
     </div>
   );

@@ -387,6 +387,17 @@ export default function LookAndFeelPage() {
           onChange={(v) => updateTheme("colorGalleryCaptions", v)}
         />
         <ColorField
+          label="Hairlines / rules"
+          value={themeDraft.colorRule}
+          onChange={(v) => updateTheme("colorRule", v)}
+        />
+        <ColorField
+          label="Surface / mats"
+          value={themeDraft.colorSurface}
+          onChange={(v) => updateTheme("colorSurface", v)}
+          allowTransparent
+        />
+        <ColorField
           label="Lightbox text"
           value={themeDraft.colorLightboxText}
           onChange={(v) => updateTheme("colorLightboxText", v)}

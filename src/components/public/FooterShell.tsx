@@ -62,8 +62,9 @@ export function FooterShell({
         <div
           role="dialog"
           aria-label="Site info"
-          className="pointer-events-auto mb-2 max-w-xs rounded-lg border border-neutral-200 px-4 py-3 text-left shadow-lg"
+          className="pointer-events-auto mb-2 max-w-xs border px-4 py-3 text-left"
           style={{
+            borderColor: "var(--theme-color-rule)",
             backgroundColor: "var(--theme-color-footer-bg)",
             fontFamily: "var(--theme-font-footer-family, var(--theme-font-footer))",
             fontSize: "var(--theme-font-footer-size, var(--theme-footer-font-size))",
@@ -78,8 +79,10 @@ export function FooterShell({
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? "Close site info" : "Open site info"}
         aria-expanded={open}
-        className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full border border-neutral-300 bg-white/70 text-sm font-serif italic shadow-sm backdrop-blur transition-opacity hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400"
+        className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border text-sm font-serif italic backdrop-blur transition-opacity hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2"
         style={{
+          borderColor: "var(--theme-color-rule)",
+          backgroundColor: "var(--theme-color-surface)",
           color: "var(--theme-color-text)",
           opacity: open ? 1 : 0.55,
         }}

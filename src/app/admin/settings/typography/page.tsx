@@ -289,6 +289,7 @@ function FontRoleBlock({
     fontStyle: style.italic ? "italic" : "normal",
     textTransform: style.uppercase ? "uppercase" : "none",
     fontSize: style.size ?? 15,
+    letterSpacing: style.tracking != null ? `${style.tracking}em` : undefined,
   };
 
   return (
@@ -325,7 +326,7 @@ function FontRoleBlock({
           </optgroup>
         </Select>
 
-        <div className="grid grid-cols-[auto_auto_auto_auto] gap-3 items-center text-[12px] text-admin-ink-soft">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[12px] text-admin-ink-soft">
           {/* Weight slider */}
           <label className="flex items-center gap-2">
             <span className="whitespace-nowrap">Weight {style.weight ?? 400}</span>
@@ -372,6 +373,23 @@ function FontRoleBlock({
               className="w-14 bg-admin-surface border border-admin-border-strong rounded px-1.5 py-1 text-[12px]"
             />
             <span className="opacity-70">px</span>
+          </label>
+          <label className="flex items-center gap-1.5">
+            <span className="whitespace-nowrap">Tracking</span>
+            <input
+              type="number"
+              min={-0.05}
+              max={0.5}
+              step={0.01}
+              placeholder="0"
+              value={style.tracking ?? ""}
+              onChange={(e) => {
+                const v = e.target.value.trim();
+                onStyleChange({ tracking: v === "" ? null : Number(v) });
+              }}
+              className="w-16 bg-admin-surface border border-admin-border-strong rounded px-1.5 py-1 text-[12px]"
+            />
+            <span className="opacity-70">em</span>
           </label>
         </div>
 

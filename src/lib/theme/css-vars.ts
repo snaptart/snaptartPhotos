@@ -56,12 +56,18 @@ function roleVars(theme: ThemeSettings, key: FontRoleKey): string {
     style.size != null
       ? `  --theme-font-${slug}-size: ${style.size}px;\n`
       : "";
+  // Same deal as size: omit when unset so the font's natural spacing wins.
+  const trackingLine =
+    style.tracking != null
+      ? `  --theme-font-${slug}-tracking: ${style.tracking}em;\n`
+      : "";
   return (
     `  --theme-font-${slug}-family: ${family};\n` +
     `  --theme-font-${slug}-weight: ${weight};\n` +
     `  --theme-font-${slug}-style: ${italic};\n` +
     `  --theme-font-${slug}-transform: ${transform};\n` +
-    sizeLine
+    sizeLine +
+    trackingLine
   );
 }
 
@@ -73,6 +79,7 @@ function roleClass(key: FontRoleKey): string {
   font-style: var(--theme-font-${slug}-style);
   text-transform: var(--theme-font-${slug}-transform);
   font-size: var(--theme-font-${slug}-size, inherit);
+  letter-spacing: var(--theme-font-${slug}-tracking, normal);
 }`;
 }
 
@@ -105,6 +112,8 @@ ${perRoleVars}  --theme-body-font-size: ${theme.bodyFontSize}px;
   --theme-color-gallery-captions: ${theme.colorGalleryCaptions};
   --theme-color-lightbox-text: ${theme.colorLightboxText};
   --theme-color-hero-overlay: ${theme.colorHeroOverlay};
+  --theme-color-rule: ${theme.colorRule};
+  --theme-color-surface: ${theme.colorSurface};
 }
 ${perRoleClasses}`;
 }

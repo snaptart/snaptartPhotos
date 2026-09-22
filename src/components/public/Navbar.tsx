@@ -6,6 +6,7 @@ import { resolveTheme } from "@/lib/theme/types";
 import type { ThemeSettings } from "@/lib/theme/types";
 import { MobileMenu } from "./MobileMenu";
 import siteConfig from "@/lib/site.config";
+import { PAGE_CONTAINER } from "@/lib/theme/layout";
 
 export async function Navbar() {
   let items: { id: string; label: string; url: string; targetType: string }[] = [];
@@ -100,11 +101,14 @@ export async function Navbar() {
 
   return (
     <header
-      className="relative"
-      style={{ backgroundColor: "var(--theme-color-header-bg)" }}
+      className="relative border-b"
+      style={{
+        backgroundColor: "var(--theme-color-header-bg)",
+        borderColor: "var(--theme-color-rule)",
+      }}
     >
       {/* Desktop nav */}
-      <nav className="mx-auto hidden md:grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-6 py-4">
+      <nav className={`${PAGE_CONTAINER} hidden md:grid grid-cols-[1fr_auto_1fr] items-center py-5`}>
         <div className="flex items-center gap-4 justify-self-start">
           {slots.left}
         </div>
