@@ -7,17 +7,19 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Plus, X } from "lucide-react";
+import { Copy, ExternalLink, Eye, EyeOff, Home, Plus, Trash2 } from "lucide-react";
 import { SortableItem } from "@/components/admin/SortableItem";
 import { useSortableList } from "@/lib/hooks/useSortableList";
 import { useMessage } from "@/lib/hooks/useMessage";
 import {
   Button,
   Card,
+  Drawer,
+  EmptyState,
   Field,
   Input,
   Pill,
-  SectionLabel,
+  RowMenu,
   Select,
   Textarea,
   Topbar,
@@ -36,12 +38,22 @@ interface Page {
   metaDescription: string | null;
 }
 
+const TYPE_OPTIONS = (
+  <>
+    <option value="custom">Custom</option>
+    <option value="about">About</option>
+    <option value="contact">Contact</option>
+  </>
+);
+
 export default function PagesPage() {
   const [pages, setPages] = useState<Page[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewForm, setShowNewForm] = useState(false);
   const [editMeta, setEditMeta] = useState<string | null>(null);
   const [homepageId, setHomepageId] = useState<string | null>(null);
+  // Pages that share a gallery's slug are that collection's page.
+  const [collectionSlugs, setCollectionSlugs] = useState<Set<string>>(new Set());
   const { message, showSuccess, showError, alertClass } = useMessage();
   const router = useRouter();
 
@@ -53,14 +65,17 @@ export default function PagesPage() {
   });
 
   const fetchPages = useCallback(async () => {
-    const [pagesRes, settingsRes] = await Promise.all([
+    const [pagesRes, settingsRes, galleriesRes] = await Promise.all([
       fetch("/api/pages"),
       fetch("/api/settings"),
+      fetch("/api/galleries"),
     ]);
     const data = await pagesRes.json();
     const settings = await settingsRes.json();
+    const galleries: { slug: string }[] = galleriesRes.ok ? await galleriesRes.json() : [];
     setPages(data);
     setHomepageId(settings?.homepageId ?? null);
+    setCollectionSlugs(new Set(galleries.map((g) => g.slug)));
     setLoading(false);
   }, []);
 
@@ -119,6 +134,8 @@ export default function PagesPage() {
       setEditMeta(null);
       showSuccess("Page updated.");
       fetchPages();
+    } else {
+      showError("Failed to save.");
     }
   }
 
@@ -136,9 +153,9 @@ export default function PagesPage() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this page?")) return;
-    const res = await fetch(`/api/pages?id=${id}`, { method: "DELETE" });
+  async function handleDelete(page: Page) {
+    if (!confirm(`Delete "${page.title}"? This can't be undone.`)) return;
+    const res = await fetch(`/api/pages?id=${page.id}`, { method: "DELETE" });
     if (res.ok) {
       showSuccess("Page deleted.");
       fetchPages();
@@ -158,6 +175,7 @@ export default function PagesPage() {
   }
 
   const editingPage = pages.find((p) => p.id === editMeta);
+  const publicPath = (page: Page) => (homepageId === page.id ? "/" : `/${page.slug}`);
 
   return (
     <div className="-m-8 min-h-[calc(100vh-0px)] bg-admin-bg">
@@ -181,147 +199,6 @@ export default function PagesPage() {
       <div className="p-7 space-y-4">
         {message && <div className={alertClass}>{message.text}</div>}
 
-        {showNewForm && (
-          <Card
-            header={
-              <>
-                <SectionLabel>New page</SectionLabel>
-                <button
-                  onClick={() => setShowNewForm(false)}
-                  className="p-1 text-admin-ink-soft hover:text-admin-ink"
-                  aria-label="Close"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </>
-            }
-          >
-            <form onSubmit={handleCreate} className="space-y-4">
-              <Field label="Title" htmlFor="np-title">
-                <Input
-                  id="np-title"
-                  name="title"
-                  placeholder="Page title"
-                  required
-                  autoFocus
-                />
-              </Field>
-              <Field label="Type" htmlFor="np-type">
-                <Select id="np-type" name="pageType" defaultValue="custom">
-                  <option value="custom">Custom</option>
-                  <option value="about">About</option>
-                  <option value="contact">Contact</option>
-                </Select>
-              </Field>
-              <div className="flex gap-2">
-                <Button type="submit" kind="primary">
-                  Create &amp; edit
-                </Button>
-                <Button
-                  type="button"
-                  kind="ghost"
-                  onClick={() => setShowNewForm(false)}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </Card>
-        )}
-
-        {editMeta && editingPage && (
-          <Card
-            header={
-              <>
-                <SectionLabel>Page settings</SectionLabel>
-                <button
-                  onClick={() => setEditMeta(null)}
-                  className="p-1 text-admin-ink-soft hover:text-admin-ink"
-                  aria-label="Close"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </>
-            }
-          >
-            <form onSubmit={handleUpdateMeta} className="space-y-4">
-              <Field label="Title" htmlFor="ep-title">
-                <Input
-                  id="ep-title"
-                  name="title"
-                  defaultValue={editingPage.title}
-                  required
-                />
-              </Field>
-              <Field label="Type" htmlFor="ep-type">
-                <Select
-                  id="ep-type"
-                  name="pageType"
-                  defaultValue={editingPage.pageType}
-                >
-                  <option value="custom">Custom</option>
-                  <option value="about">About</option>
-                  <option value="contact">Contact</option>
-                </Select>
-              </Field>
-              <label className="flex items-center gap-2 text-[13px] text-admin-ink cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="showTitle"
-                  defaultChecked={editingPage.showTitle}
-                  className="accent-admin-accent"
-                />
-                Show page title
-              </label>
-              <label className="flex items-center gap-2 text-[13px] text-admin-ink cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="isFullBleed"
-                  defaultChecked={editingPage.isFullBleed}
-                  className="accent-admin-accent"
-                />
-                Full bleed (drop the centered max-width wrapper — for big blocks like Field Map)
-              </label>
-              <details className="rounded-md border border-admin-border p-3">
-                <summary className="cursor-pointer text-[13px] font-medium text-admin-ink-soft">
-                  SEO settings
-                </summary>
-                <div className="mt-3 space-y-4">
-                  <Field label="Meta title" htmlFor="ep-meta-title">
-                    <Input
-                      id="ep-meta-title"
-                      name="metaTitle"
-                      defaultValue={editingPage.metaTitle ?? ""}
-                      placeholder="Optional"
-                    />
-                  </Field>
-                  <Field label="Meta description" htmlFor="ep-meta-desc">
-                    <Textarea
-                      id="ep-meta-desc"
-                      name="metaDescription"
-                      defaultValue={editingPage.metaDescription ?? ""}
-                      rows={2}
-                      placeholder="Optional"
-                    />
-                  </Field>
-                </div>
-              </details>
-              <div className="flex gap-2">
-                <Button type="submit" kind="primary">
-                  Save settings
-                </Button>
-                <Button
-                  type="button"
-                  kind="ghost"
-                  onClick={() => setEditMeta(null)}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </Card>
-        )}
-
         {loading ? (
           <div className="text-admin-ink-soft">Loading...</div>
         ) : pages.length === 0 ? (
@@ -344,45 +221,37 @@ export default function PagesPage() {
                   <SortableItem key={page.id} id={page.id}>
                     <div className="flex items-center justify-between gap-3 border-b border-admin-border px-4 py-3 last:border-0">
                       <div className="min-w-0 flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-admin-ink truncate">
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/admin/pages/${page.id}/edit`)}
+                          className="font-medium text-admin-ink truncate hover:underline"
+                        >
                           {page.title}
-                        </span>
-                        <span className="text-[12px] text-admin-ink-soft truncate">
-                          /{page.slug}
-                        </span>
-                        {page.pageType !== "custom" && (
-                          <Pill>{page.pageType}</Pill>
+                        </button>
+                        <a
+                          href={publicPath(page)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[12px] text-admin-ink-soft hover:text-admin-ink"
+                          title="Open the page on the site"
+                        >
+                          {publicPath(page)}
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                        {homepageId === page.id && <Pill tone="warn">Homepage</Pill>}
+                        {collectionSlugs.has(page.slug) && (
+                          <Pill tone="accent" title="This page is the collection's page">
+                            Collection
+                          </Pill>
                         )}
-                        <Pill tone={page.isPublished ? "success" : "neutral"}>
-                          {page.isPublished ? "Published" : "Draft"}
-                        </Pill>
-                        {homepageId === page.id && (
-                          <Pill tone="warn">Home</Pill>
-                        )}
+                        {page.pageType !== "custom" && <Pill>{page.pageType}</Pill>}
+                        {!page.isPublished && <Pill>Draft</Pill>}
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5">
                         <Button
-                          kind="subtle"
-                          size="sm"
-                          onClick={() => handleSetHomepage(page.id)}
-                        >
-                          {homepageId === page.id
-                            ? "Unset homepage"
-                            : "Set as homepage"}
-                        </Button>
-                        <Button
-                          kind="subtle"
-                          size="sm"
-                          onClick={() => togglePublish(page)}
-                        >
-                          {page.isPublished ? "Unpublish" : "Publish"}
-                        </Button>
-                        <Button
                           kind="ghost"
                           size="sm"
-                          onClick={() =>
-                            router.push(`/admin/pages/${page.id}/edit`)
-                          }
+                          onClick={() => router.push(`/admin/pages/${page.id}/edit`)}
                         >
                           Edit content
                         </Button>
@@ -396,20 +265,24 @@ export default function PagesPage() {
                         >
                           Settings
                         </Button>
-                        <Button
-                          kind="subtle"
-                          size="sm"
-                          onClick={() => handleDuplicate(page.id)}
-                        >
-                          Duplicate
-                        </Button>
-                        <Button
-                          kind="danger"
-                          size="sm"
-                          onClick={() => handleDelete(page.id)}
-                        >
-                          Delete
-                        </Button>
+                        <RowMenu
+                          items={[
+                            { label: "View on site", icon: <ExternalLink className="h-3.5 w-3.5" />, href: publicPath(page), external: true },
+                            { label: "Duplicate", icon: <Copy className="h-3.5 w-3.5" />, onSelect: () => handleDuplicate(page.id) },
+                            {
+                              label: homepageId === page.id ? "Stop using as homepage" : "Use as homepage",
+                              icon: <Home className="h-3.5 w-3.5" />,
+                              onSelect: () => handleSetHomepage(page.id),
+                            },
+                            {
+                              label: page.isPublished ? "Unpublish" : "Publish",
+                              icon: page.isPublished ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />,
+                              onSelect: () => togglePublish(page),
+                            },
+                            "divider",
+                            { label: "Delete…", icon: <Trash2 className="h-3.5 w-3.5" />, danger: true, onSelect: () => handleDelete(page) },
+                          ]}
+                        />
                       </div>
                     </div>
                   </SortableItem>
@@ -419,17 +292,111 @@ export default function PagesPage() {
           </Card>
         )}
       </div>
-    </div>
-  );
-}
 
-function EmptyState({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <div className="font-serif italic text-[22px] text-admin-ink mb-2">
-        {title}
-      </div>
-      <p className="text-[13px] text-admin-ink-soft max-w-sm">{body}</p>
+      <Drawer
+        open={showNewForm}
+        onClose={() => setShowNewForm(false)}
+        eyebrow="New page"
+        title="Create a page"
+        footer={
+          <>
+            <Button type="submit" form="new-page-form" kind="primary">
+              Create &amp; edit
+            </Button>
+            <Button type="button" kind="ghost" onClick={() => setShowNewForm(false)}>
+              Cancel
+            </Button>
+          </>
+        }
+      >
+        <form id="new-page-form" onSubmit={handleCreate} className="space-y-4">
+          <Field label="Title" htmlFor="np-title">
+            <Input id="np-title" name="title" placeholder="Page title" required />
+          </Field>
+          <Field label="Type" htmlFor="np-type">
+            <Select id="np-type" name="pageType" defaultValue="custom">
+              {TYPE_OPTIONS}
+            </Select>
+          </Field>
+          <p className="text-[12px] text-admin-ink-soft">
+            To make a collection&apos;s page, give the page the collection&apos;s name: its address then matches the
+            collection, and the site links there.
+          </p>
+        </form>
+      </Drawer>
+
+      <Drawer
+        open={!!editingPage}
+        onClose={() => setEditMeta(null)}
+        eyebrow="Page settings"
+        title={editingPage?.title ?? ""}
+        footer={
+          <>
+            <Button type="submit" form="page-settings-form" kind="primary">
+              Save settings
+            </Button>
+            <Button type="button" kind="ghost" onClick={() => setEditMeta(null)}>
+              Cancel
+            </Button>
+          </>
+        }
+      >
+        {editingPage && (
+          <form id="page-settings-form" key={editingPage.id} onSubmit={handleUpdateMeta} className="space-y-4">
+            <Field label="Title" htmlFor="ep-title">
+              <Input id="ep-title" name="title" defaultValue={editingPage.title} required />
+            </Field>
+            <Field label="Type" htmlFor="ep-type">
+              <Select id="ep-type" name="pageType" defaultValue={editingPage.pageType}>
+                {TYPE_OPTIONS}
+              </Select>
+            </Field>
+            <label className="flex items-center gap-2 text-[13px] text-admin-ink cursor-pointer">
+              <input
+                type="checkbox"
+                name="showTitle"
+                defaultChecked={editingPage.showTitle}
+                className="accent-admin-accent"
+              />
+              Show page title
+            </label>
+            <label className="flex items-start gap-2 text-[13px] text-admin-ink cursor-pointer">
+              <input
+                type="checkbox"
+                name="isFullBleed"
+                defaultChecked={editingPage.isFullBleed}
+                className="mt-0.5 accent-admin-accent"
+              />
+              <span>
+                Full bleed
+                <span className="block text-[12px] text-admin-ink-soft">
+                  Drops the centered max-width wrapper — for big blocks like Field Map.
+                </span>
+              </span>
+            </label>
+            <div className="space-y-4 border-t border-admin-border pt-4">
+              <div className="font-mono text-[10px] uppercase tracking-[2px] text-admin-ink-soft">Search engines</div>
+              <Field label="Meta title" htmlFor="ep-meta-title">
+                <Input
+                  id="ep-meta-title"
+                  name="metaTitle"
+                  defaultValue={editingPage.metaTitle ?? ""}
+                  placeholder={editingPage.title}
+                />
+              </Field>
+              <Field label="Meta description" htmlFor="ep-meta-desc">
+                <Textarea
+                  id="ep-meta-desc"
+                  name="metaDescription"
+                  defaultValue={editingPage.metaDescription ?? ""}
+                  rows={3}
+                  placeholder="Optional"
+                />
+              </Field>
+            </div>
+          </form>
+        )}
+      </Drawer>
     </div>
   );
 }

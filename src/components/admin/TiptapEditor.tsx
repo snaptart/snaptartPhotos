@@ -1,237 +1,367 @@
 "use client";
 
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import Image from "@tiptap/extension-image";
-import Link from "@tiptap/extension-link";
-import TextAlign from "@tiptap/extension-text-align";
-import Underline from "@tiptap/extension-underline";
-import { TextStyle } from "@tiptap/extension-text-style";
-import Color from "@tiptap/extension-color";
-import FontFamily from "@tiptap/extension-font-family";
-import { FontSize } from "@/lib/tiptap/font-size";
-import { Indent } from "@/lib/tiptap/indent";
 import type { JSONContent } from "@tiptap/react";
+import {
+  AlignCenter,
+  AlignJustify,
+  AlignLeft,
+  AlignRight,
+  Bold,
+  Image as ImageIcon,
+  IndentDecrease,
+  IndentIncrease,
+  Italic,
+  Link as LinkIcon,
+  List,
+  ListOrdered,
+  Minus,
+  Pilcrow,
+  Quote,
+  Redo2,
+  Strikethrough,
+  Underline as UnderlineIcon,
+  Undo2,
+} from "lucide-react";
 import { CURATED_FONTS, FONT_GROUPS, getFontFallback, leadingFontFamily } from "@/lib/theme/fonts";
 import { useCuratedFonts } from "@/lib/theme/use-curated-fonts";
+import { useActiveTheme } from "@/lib/theme/use-active-theme";
+import {
+  COLOR_TOKENS,
+  ROLE_FAMILY_FIELDS,
+  ROLE_LABELS,
+  TEXT_STYLE_KEYS,
+  TEXT_STYLE_LABELS,
+  type FontRoleKey,
+  type TextStyleKey,
+} from "@/lib/theme/types";
+import { ROLE_SLUGS } from "@/lib/theme/role-style";
+import { colorTokenOf, cssColor, isHexColor, tokenColor } from "@/lib/theme/color";
+import { richTextExtensions } from "@/lib/tiptap/extensions";
+import { richTextCss } from "@/lib/tiptap/rich-text-css";
+import { ColorControl } from "@/components/admin/controls";
+import { cn } from "@/lib/utils";
 
 /** Installed on every visitor's machine, so they need no web-font loading. */
 const SYSTEM_FONTS = ["Georgia", "Times New Roman", "Arial", "Verdana", "Courier New"];
 
 const CURATED_NAMES = new Set(CURATED_FONTS.map((f) => f.name));
 
-const FONT_SIZES = [
-  { label: "Default", value: "" },
-  { label: "12px", value: "12px" },
-  { label: "14px", value: "14px" },
-  { label: "16px", value: "16px" },
-  { label: "18px", value: "18px" },
-  { label: "20px", value: "20px" },
-  { label: "24px", value: "24px" },
-  { label: "28px", value: "28px" },
-  { label: "32px", value: "32px" },
-  { label: "36px", value: "36px" },
-  { label: "48px", value: "48px" },
-];
+/** Theme fonts offered first; picking one stores the role's variable, so it follows the preset. */
+const THEME_FONT_ROLES: FontRoleKey[] = ["headings", "body", "captions", "labels"];
+const roleFontVar = (role: FontRoleKey) => `var(--theme-font-${ROLE_SLUGS[role]}-family)`;
+
+const FONT_SIZES = ["12px", "14px", "16px", "18px", "20px", "24px", "28px", "32px", "36px", "48px"];
+
+/** What a paragraph or heading looks like before a style is picked for it. */
+const DEFAULT_STYLE: Record<string, TextStyleKey> = {
+  paragraph: "body",
+  h1: "display",
+  h2: "collectionTitle",
+  h3: "photoTitle",
+};
+
+// The editor shows text in its real styles, capped so a Display line still fits the panel.
+const EDITOR_CSS = richTextCss(".richtext-editor .ProseMirror", { maxSize: 30 });
+
+const SELECT =
+  "min-w-0 rounded-md border border-admin-border-strong bg-admin-surface px-2 py-1 text-[12px] text-admin-ink focus:border-admin-accent focus:outline-none";
 
 interface TiptapEditorProps {
   content: JSONContent | null;
   onChange: (content: JSONContent) => void;
 }
 
-function MenuBar({ editor }: { editor: Editor | null }) {
-  if (!editor) return null;
+function ToolButton({
+  active = false,
+  disabled = false,
+  title,
+  onClick,
+  children,
+}: {
+  active?: boolean;
+  disabled?: boolean;
+  title: string;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      aria-pressed={active}
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        "flex h-7 min-w-7 items-center justify-center rounded px-1.5 text-[12px] font-medium transition-colors disabled:opacity-30",
+        active ? "bg-admin-ink text-admin-surface" : "text-admin-ink-soft hover:bg-admin-surface-2 hover:text-admin-ink",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+const Divider = () => <span className="mx-0.5 h-5 w-px self-center bg-admin-border" />;
+
+/** The stored colour as the colour control's value: a theme variable back to its token. */
+function colorControlValue(stored: string | undefined): string {
+  if (!stored) return "";
+  const token = COLOR_TOKENS.find((t) => stored.replace(/\s/g, "") === `var(${t.cssVar})`);
+  return token ? tokenColor(token.key) : stored;
+}
+
+function TextColorButton({ editor }: { editor: Editor }) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<string | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  const stored: string | undefined = editor.getAttributes("textStyle").color;
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+
+  const apply = (v: string) => {
+    setDraft(v);
+    if (v === "") editor.chain().focus().unsetColor().run();
+    // Typed hex applies once it's a whole colour.
+    else if (colorTokenOf(v) || isHexColor(v)) editor.chain().focus().setColor(cssColor(v)).run();
+  };
+
+  // Not `relative`: the popover hangs from the toolbar, so it spans the panel's width.
+  return (
+    <div ref={ref}>
+      <ToolButton
+        title="Text color"
+        active={open}
+        onClick={() => {
+          setDraft(null);
+          setOpen((o) => !o);
+        }}
+      >
+        <span className="flex flex-col items-center leading-none">
+          <span className="text-[13px] font-semibold">A</span>
+          <span
+            className="mt-0.5 h-1 w-4 rounded-sm border border-admin-border"
+            style={{ background: stored ?? "transparent" }}
+          />
+        </span>
+      </ToolButton>
+      {open && (
+        <div className="absolute inset-x-2 top-full z-20 -mt-1 rounded-md border border-admin-border bg-admin-surface p-3 shadow-lg">
+          <ColorControl value={draft ?? colorControlValue(stored)} onChange={apply} emptyLabel="Text style's color" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function MenuBar({ editor }: { editor: Editor }) {
+  const theme = useActiveTheme();
+
+  // The block the cursor is in, and the style it has (or would have by default).
+  const headingLevel = ([1, 2, 3] as const).find((level) => editor.isActive("heading", { level }));
+  const blockKind = headingLevel ? `h${headingLevel}` : "paragraph";
+  const chosenStyle: TextStyleKey | null =
+    (headingLevel ? editor.getAttributes("heading").textStyle : editor.getAttributes("paragraph").textStyle) ?? null;
 
   const storedFont: string | undefined = editor.getAttributes("textStyle").fontFamily;
-  const currentFont = storedFont ? leadingFontFamily(storedFont) : "";
-
-  const btnClass = (active: boolean) =>
-    `rounded px-2 py-1 text-sm ${
-      active
-        ? "bg-neutral-900 text-white"
-        : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
-    }`;
+  const fontRole = THEME_FONT_ROLES.find((r) => storedFont?.replace(/\s/g, "") === roleFontVar(r));
+  const currentFont = fontRole ? `role:${fontRole}` : storedFont ? leadingFontFamily(storedFont) : "";
+  const currentSize: string = editor.getAttributes("textStyle").fontSize || "";
 
   return (
-    <div className="flex flex-wrap gap-1 border-b border-neutral-200 bg-neutral-50 p-2">
-      <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={btnClass(editor.isActive("bold"))}>
-        B
-      </button>
-      <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={btnClass(editor.isActive("italic"))}>
-        I
-      </button>
-      <button type="button" onClick={() => editor.chain().focus().toggleUnderline().run()} className={btnClass(editor.isActive("underline"))}>
-        U
-      </button>
-      <button type="button" onClick={() => editor.chain().focus().toggleStrike().run()} className={btnClass(editor.isActive("strike"))}>
-        S
-      </button>
-
-      <span className="mx-1 border-l border-neutral-300" />
-
+    <div className="relative flex flex-col gap-1.5 border-b border-admin-border bg-admin-surface-2 p-2">
       <select
-        value={currentFont}
-        onChange={(e) => {
-          const name = e.target.value;
-          if (!name) {
-            editor.chain().focus().unsetFontFamily().run();
-          } else if (CURATED_NAMES.has(name)) {
-            // Store the full stack so text still lands in the right kind of face
-            // if the web font ever fails to load.
-            editor.chain().focus().setFontFamily(getFontFallback(name)).run();
-          } else {
-            editor.chain().focus().setFontFamily(name).run();
-          }
-        }}
-        className="max-w-[11rem] rounded border border-neutral-300 bg-white px-1.5 py-1 text-sm text-neutral-700"
+        value={chosenStyle ?? ""}
+        onChange={(e) => editor.chain().focus().setBlockTextStyle((e.target.value || null) as TextStyleKey | null).run()}
+        className={cn(SELECT, "w-full text-[13px]")}
+        title="Text style for this paragraph"
+        aria-label="Text style"
       >
-        <option value="">Default</option>
-        {FONT_GROUPS.map((group) => (
-          <optgroup key={group.category} label={group.label}>
-            {CURATED_FONTS.filter((f) => f.category === group.category).map((f) => (
-              <option key={f.name} value={f.name} style={{ fontFamily: getFontFallback(f.name) }}>
-                {f.name}
-              </option>
-            ))}
-          </optgroup>
-        ))}
-        <optgroup label="System">
-          {SYSTEM_FONTS.map((name) => (
-            <option key={name} value={name} style={{ fontFamily: name }}>
-              {name}
-            </option>
-          ))}
-        </optgroup>
-        {currentFont && !CURATED_NAMES.has(currentFont) && !SYSTEM_FONTS.includes(currentFont) && (
-          <option value={currentFont}>{currentFont}</option>
-        )}
-      </select>
-
-      <select
-        value={editor.getAttributes("textStyle").fontSize || ""}
-        onChange={(e) => {
-          if (e.target.value) {
-            editor.chain().focus().setFontSize(e.target.value).run();
-          } else {
-            editor.chain().focus().unsetFontSize().run();
-          }
-        }}
-        className="rounded border border-neutral-300 bg-white px-1.5 py-1 text-sm text-neutral-700"
-      >
-        {FONT_SIZES.map((s) => (
-          <option key={s.value} value={s.value}>
-            {s.label}
+        <option value="">{TEXT_STYLE_LABELS[DEFAULT_STYLE[blockKind]]} (default)</option>
+        {TEXT_STYLE_KEYS.map((key) => (
+          <option key={key} value={key}>
+            {TEXT_STYLE_LABELS[key]}
           </option>
         ))}
       </select>
 
-      <label className="relative flex items-center gap-1 rounded px-1.5 py-1 text-sm bg-neutral-100 text-neutral-700 hover:bg-neutral-200 cursor-pointer">
-        <span
-          className="inline-block h-4 w-4 rounded border border-neutral-300"
-          style={{ backgroundColor: editor.getAttributes("textStyle").color || "#000000" }}
-        />
-        A
-        <input
-          type="color"
-          value={editor.getAttributes("textStyle").color || "#000000"}
-          onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
-          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-        />
-      </label>
-      <button
-        type="button"
-        onClick={() => editor.chain().focus().unsetColor().run()}
-        className={btnClass(false)}
-        title="Reset color"
-      >
-        ✕
-      </button>
+      <div className="flex gap-1.5">
+        <select
+          value={currentFont}
+          onChange={(e) => {
+            const name = e.target.value;
+            if (!name) editor.chain().focus().unsetFontFamily().run();
+            else if (name.startsWith("role:")) editor.chain().focus().setFontFamily(roleFontVar(name.slice(5) as FontRoleKey)).run();
+            // Store the full stack so text still lands in the right kind of face
+            // if the web font ever fails to load.
+            else if (CURATED_NAMES.has(name)) editor.chain().focus().setFontFamily(getFontFallback(name)).run();
+            else editor.chain().focus().setFontFamily(name).run();
+          }}
+          className={cn(SELECT, "flex-1")}
+          title="Font for the selected words"
+          aria-label="Font"
+        >
+          <option value="">Style font</option>
+          <optgroup label="Theme fonts">
+            {THEME_FONT_ROLES.map((role) => (
+              <option key={role} value={`role:${role}`}>
+                {ROLE_LABELS[role]}
+                {theme ? ` — ${theme[ROLE_FAMILY_FIELDS[role]] as string}` : ""}
+              </option>
+            ))}
+          </optgroup>
+          {FONT_GROUPS.map((group) => (
+            <optgroup key={group.category} label={group.label}>
+              {CURATED_FONTS.filter((f) => f.category === group.category).map((f) => (
+                <option key={f.name} value={f.name} style={{ fontFamily: getFontFallback(f.name) }}>
+                  {f.name}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+          <optgroup label="System">
+            {SYSTEM_FONTS.map((name) => (
+              <option key={name} value={name} style={{ fontFamily: name }}>
+                {name}
+              </option>
+            ))}
+          </optgroup>
+          {currentFont && !fontRole && !CURATED_NAMES.has(currentFont) && !SYSTEM_FONTS.includes(currentFont) && (
+            <option value={currentFont}>{currentFont}</option>
+          )}
+        </select>
 
-      <span className="mx-1 border-l border-neutral-300" />
+        <select
+          value={currentSize}
+          onChange={(e) =>
+            e.target.value
+              ? editor.chain().focus().setFontSize(e.target.value).run()
+              : editor.chain().focus().unsetFontSize().run()
+          }
+          className={cn(SELECT, "w-[6.25rem] shrink-0")}
+          title="Size for the selected words"
+          aria-label="Size"
+        >
+          <option value="">Style size</option>
+          {FONT_SIZES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+          {currentSize && !FONT_SIZES.includes(currentSize) && <option value={currentSize}>{currentSize}</option>}
+        </select>
+      </div>
 
-      <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} className={btnClass(editor.isActive("heading", { level: 1 }))}>
-        H1
-      </button>
-      <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className={btnClass(editor.isActive("heading", { level: 2 }))}>
-        H2
-      </button>
-      <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} className={btnClass(editor.isActive("heading", { level: 3 }))}>
-        H3
-      </button>
+      <div className="flex flex-wrap items-center gap-0.5">
+        <ToolButton title="Bold" active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()}>
+          <Bold size={14} />
+        </ToolButton>
+        <ToolButton title="Italic" active={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()}>
+          <Italic size={14} />
+        </ToolButton>
+        <ToolButton title="Underline" active={editor.isActive("underline")} onClick={() => editor.chain().focus().toggleUnderline().run()}>
+          <UnderlineIcon size={14} />
+        </ToolButton>
+        <ToolButton title="Strikethrough" active={editor.isActive("strike")} onClick={() => editor.chain().focus().toggleStrike().run()}>
+          <Strikethrough size={14} />
+        </ToolButton>
+        <TextColorButton editor={editor} />
 
-      <span className="mx-1 border-l border-neutral-300" />
+        <Divider />
+        {([1, 2, 3] as const).map((level) => (
+          <ToolButton
+            key={level}
+            title={`Heading ${level}`}
+            active={headingLevel === level}
+            onClick={() => editor.chain().focus().toggleHeading({ level }).run()}
+          >
+            H{level}
+          </ToolButton>
+        ))}
 
-      <button type="button" onClick={() => editor.chain().focus().setTextAlign("left").run()} className={btnClass(editor.isActive({ textAlign: "left" }))}>
-        Left
-      </button>
-      <button type="button" onClick={() => editor.chain().focus().setTextAlign("center").run()} className={btnClass(editor.isActive({ textAlign: "center" }))}>
-        Center
-      </button>
-      <button type="button" onClick={() => editor.chain().focus().setTextAlign("right").run()} className={btnClass(editor.isActive({ textAlign: "right" }))}>
-        Right
-      </button>
-      <button type="button" onClick={() => editor.chain().focus().setTextAlign("justify").run()} className={btnClass(editor.isActive({ textAlign: "justify" }))}>
-        Justify
-      </button>
+        <Divider />
+        <ToolButton title="Align left" active={editor.isActive({ textAlign: "left" })} onClick={() => editor.chain().focus().setTextAlign("left").run()}>
+          <AlignLeft size={14} />
+        </ToolButton>
+        <ToolButton title="Align center" active={editor.isActive({ textAlign: "center" })} onClick={() => editor.chain().focus().setTextAlign("center").run()}>
+          <AlignCenter size={14} />
+        </ToolButton>
+        <ToolButton title="Align right" active={editor.isActive({ textAlign: "right" })} onClick={() => editor.chain().focus().setTextAlign("right").run()}>
+          <AlignRight size={14} />
+        </ToolButton>
+        <ToolButton title="Justify" active={editor.isActive({ textAlign: "justify" })} onClick={() => editor.chain().focus().setTextAlign("justify").run()}>
+          <AlignJustify size={14} />
+        </ToolButton>
 
-      <span className="mx-1 border-l border-neutral-300" />
+        <Divider />
+        <ToolButton title="Bulleted list" active={editor.isActive("bulletList")} onClick={() => editor.chain().focus().toggleBulletList().run()}>
+          <List size={14} />
+        </ToolButton>
+        <ToolButton title="Numbered list" active={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
+          <ListOrdered size={14} />
+        </ToolButton>
+        <ToolButton title="Quote" active={editor.isActive("blockquote")} onClick={() => editor.chain().focus().toggleBlockquote().run()}>
+          <Quote size={14} />
+        </ToolButton>
 
-      <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} className={btnClass(editor.isActive("bulletList"))}>
-        List
-      </button>
-      <button type="button" onClick={() => editor.chain().focus().toggleOrderedList().run()} className={btnClass(editor.isActive("orderedList"))}>
-        Ordered
-      </button>
-      <button type="button" onClick={() => editor.chain().focus().toggleBlockquote().run()} className={btnClass(editor.isActive("blockquote"))}>
-        Quote
-      </button>
+        <Divider />
+        <ToolButton
+          title="Link"
+          active={editor.isActive("link")}
+          onClick={() => {
+            const url = window.prompt("Link URL:", editor.getAttributes("link").href ?? "");
+            if (url === null) return;
+            if (url === "") editor.chain().focus().unsetLink().run();
+            else editor.chain().focus().setLink({ href: url }).run();
+          }}
+        >
+          <LinkIcon size={14} />
+        </ToolButton>
+        <ToolButton
+          title="Image"
+          onClick={() => {
+            const url = window.prompt("Image URL:");
+            if (url) editor.chain().focus().setImage({ src: url }).run();
+          }}
+        >
+          <ImageIcon size={14} />
+        </ToolButton>
 
-      <span className="mx-1 border-l border-neutral-300" />
+        <Divider />
+        <ToolButton title="Indent" onClick={() => editor.chain().focus().indent().run()}>
+          <IndentIncrease size={14} />
+        </ToolButton>
+        <ToolButton title="Outdent" onClick={() => editor.chain().focus().outdent().run()}>
+          <IndentDecrease size={14} />
+        </ToolButton>
+        <ToolButton
+          title="First-line indent"
+          active={editor.isActive({ firstLineIndent: true })}
+          onClick={() => editor.chain().focus().toggleFirstLineIndent().run()}
+        >
+          <Pilcrow size={14} />
+        </ToolButton>
+        <ToolButton title="Horizontal rule" onClick={() => editor.chain().focus().setHorizontalRule().run()}>
+          <Minus size={14} />
+        </ToolButton>
 
-      <button
-        type="button"
-        onClick={() => {
-          const url = window.prompt("Link URL:");
-          if (url) editor.chain().focus().setLink({ href: url }).run();
-        }}
-        className={btnClass(editor.isActive("link"))}
-      >
-        Link
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          const url = window.prompt("Image URL:");
-          if (url) editor.chain().focus().setImage({ src: url }).run();
-        }}
-        className={btnClass(false)}
-      >
-        Image
-      </button>
-
-      <span className="mx-1 border-l border-neutral-300" />
-
-      <button type="button" onClick={() => editor.chain().focus().indent().run()} className={btnClass(false)}>
-        Indent
-      </button>
-      <button type="button" onClick={() => editor.chain().focus().outdent().run()} className={btnClass(false)}>
-        Outdent
-      </button>
-      <button type="button" onClick={() => editor.chain().focus().toggleFirstLineIndent().run()} className={btnClass(editor.isActive({ firstLineIndent: true }))}>
-        ¶ Indent
-      </button>
-
-      <span className="mx-1 border-l border-neutral-300" />
-
-      <button type="button" onClick={() => editor.chain().focus().setHorizontalRule().run()} className={btnClass(false)}>
-        HR
-      </button>
-      <button type="button" onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} className={`${btnClass(false)} disabled:opacity-30`}>
-        Undo
-      </button>
-      <button type="button" onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} className={`${btnClass(false)} disabled:opacity-30`}>
-        Redo
-      </button>
+        <Divider />
+        <ToolButton title="Undo" disabled={!editor.can().undo()} onClick={() => editor.chain().focus().undo().run()}>
+          <Undo2 size={14} />
+        </ToolButton>
+        <ToolButton title="Redo" disabled={!editor.can().redo()} onClick={() => editor.chain().focus().redo().run()}>
+          <Redo2 size={14} />
+        </ToolButton>
+      </div>
     </div>
   );
 }
@@ -240,31 +370,29 @@ export default function TiptapEditor({ content, onChange }: TiptapEditorProps) {
   useCuratedFonts();
 
   const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Underline,
-      TextStyle,
-      Color,
-      FontFamily,
-      FontSize,
-      Image,
-      Link.configure({ openOnClick: false }),
-      TextAlign.configure({ types: ["heading", "paragraph"] }),
-      Indent,
-    ],
+    extensions: richTextExtensions({ editing: true }),
     immediatelyRender: false,
+    // The toolbar reflects where the cursor is, so it redraws as it moves.
+    shouldRerenderOnTransaction: true,
     content: content ?? { type: "doc", content: [{ type: "paragraph" }] },
     onUpdate: ({ editor }) => {
       onChange(editor.getJSON());
     },
   });
 
+  // Text typed on the canvas arrives as a new value; take it in unless this editor is the one typing.
+  useEffect(() => {
+    if (!editor || editor.isFocused || !content) return;
+    if (JSON.stringify(content) !== JSON.stringify(editor.getJSON())) editor.commands.setContent(content, { emitUpdate: false });
+  }, [editor, content]);
+
   return (
-    <div className="rounded border border-neutral-300 overflow-hidden">
-      <MenuBar editor={editor} />
+    <div className="overflow-visible rounded-md border border-admin-border-strong bg-admin-surface">
+      <style>{EDITOR_CSS}</style>
+      {editor && <MenuBar editor={editor} />}
       <EditorContent
         editor={editor}
-        className="prose prose-sm prose-p:my-1 prose-headings:my-2 max-w-none p-4 min-h-[200px] focus:outline-none [&_.ProseMirror]:min-h-[200px] [&_.ProseMirror]:outline-none"
+        className="richtext-editor min-h-[200px] px-3 py-2 [&_.ProseMirror]:min-h-[184px] [&_.ProseMirror]:outline-none"
       />
     </div>
   );

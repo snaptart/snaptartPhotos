@@ -50,9 +50,9 @@ export async function extractPhotoMetadata(buffer: Buffer): Promise<ExtractedPho
     latitude: pickNumber(raw, "latitude"),
     longitude: pickNumber(raw, "longitude"),
     location: pickLocation(raw),
-    title: pickTitle(raw),
-    description: pickDescription(raw),
-    tags: pickTags(raw),
+    title: repairText(pickTitle(raw)),
+    description: repairText(pickDescription(raw)),
+    tags: pickTags(raw)?.map(repairUtf8) ?? null,
     cameraSettings: pickCameraSettings(raw),
   };
 }
@@ -124,11 +124,14 @@ function pickLocation(raw: Record<string, unknown> | undefined): string | null {
   for (const key of ["Sublocation", "Location", "City", "State", "Country"]) {
     const v = raw[key];
     if (typeof v === "string" && v.trim()) {
-      const trimmed = v.trim();
+      // Repaired first: IPTC's garbled copy of a place is otherwise kept beside XMP's clean one.
+      const trimmed = repairUtf8(v.trim());
       if (!parts.includes(trimmed)) parts.push(trimmed);
     }
   }
-  return parts.length ? parts.join(", ") : null;
+  // IPTC keeps only 32 bytes, so its copy of a place is often the start of XMP's.
+  const kept = parts.filter((p) => !parts.some((q) => q !== p && q.startsWith(p)));
+  return kept.length ? kept.join(", ") : null;
 }
 
 function pickTitle(raw: Record<string, unknown> | undefined): string | null {
@@ -216,7 +219,30 @@ function pickCameraSettings(raw: Record<string, unknown> | undefined): CameraSet
 }
 
 function strOf(v: unknown): string | undefined {
-  return typeof v === "string" && v.trim() ? v.trim() : undefined;
+  return typeof v === "string" && v.trim() ? repairUtf8(v.trim()) : undefined;
+}
+
+const UTF8 = new TextDecoder("utf-8", { fatal: true });
+
+const repairText = (s: string | null) => (s === null ? null : repairUtf8(s));
+
+/** A UTF-8 character's bytes read one by one as Latin-1: a lead byte and its continuation bytes. */
+const MISREAD_UTF8 = /[Â-ß][\u0080-¿]|[à-ï][\u0080-¿]{2}|[ð-ô][\u0080-¿]{3}/g;
+
+/**
+ * exifr reads IPTC and plain EXIF text byte by byte as Latin-1, so UTF-8 text
+ * — what Lightroom and phones write — comes out garbled: "Piétonne" becomes
+ * "PiÃ©tonne". Each garbled character re-reads cleanly as UTF-8; real
+ * accented letters ("café") don't match and are left as they are.
+ */
+export function repairUtf8(s: string): string {
+  return s.replace(MISREAD_UTF8, (bytes) => {
+    try {
+      return UTF8.decode(Buffer.from(bytes, "latin1"));
+    } catch {
+      return bytes;
+    }
+  });
 }
 
 function numOf(v: unknown): number | null {

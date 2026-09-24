@@ -1,14 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { resolveTheme, type ThemeSettings } from "@/lib/theme/types";
+import { useEffect } from "react";
 import { buildGoogleFontsUrl } from "@/lib/theme/fonts";
 import { buildThemeCssVars } from "@/lib/theme/css-vars";
-
-interface ThemeRecord {
-  id: string;
-  themeSettings: Partial<ThemeSettings>;
-}
+import { useActiveTheme } from "@/lib/theme/use-active-theme";
 
 /**
  * Puts the active theme's CSS variables and web fonts into the ADMIN document head
@@ -27,30 +22,7 @@ interface ThemeRecord {
  * loads inside the iframe normally instead of tripping a CORS read of its rules.
  */
 export default function PuckThemeStyles() {
-  const [theme, setTheme] = useState<ThemeSettings | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    Promise.all([fetch("/api/settings"), fetch("/api/themes")])
-      .then(async ([settingsRes, themesRes]) => {
-        const settings = await settingsRes.json();
-        const themes: ThemeRecord[] = await themesRes.json();
-        const active = settings?.activeThemeId
-          ? themes.find((t) => t.id === settings.activeThemeId)
-          : null;
-        if (!cancelled) setTheme(resolveTheme(active?.themeSettings ?? null));
-      })
-      // No theme row, or the request failed: fall back to the defaults rather than
-      // leaving the preview with no variables at all.
-      .catch(() => {
-        if (!cancelled) setTheme(resolveTheme(null));
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const theme = useActiveTheme();
 
   useEffect(() => {
     if (!theme) return;

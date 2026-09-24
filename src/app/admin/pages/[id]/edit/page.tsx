@@ -6,7 +6,8 @@ import { Puck } from "@puckeditor/core";
 import type { Data } from "@puckeditor/core";
 import { puckConfig } from "@/lib/puck/config";
 import PuckThemeStyles from "@/components/admin/PuckThemeStyles";
-import { draggableOutlinePlugin } from "@/components/puck/DraggableOutline";
+import { puckOverrides } from "@/components/puck/overrides";
+import { useEditorSave } from "@/components/puck/useEditorSave";
 import "@puckeditor/core/puck.css";
 
 const EMPTY_DATA: Data = {
@@ -31,7 +32,6 @@ export default function PuckEditorPage() {
   const router = useRouter();
   const [page, setPage] = useState<PageRecord | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
 
   const fetchPage = useCallback(async () => {
     const res = await fetch("/api/pages");
@@ -47,22 +47,23 @@ export default function PuckEditorPage() {
     fetchPage();
   }, [fetchPage]);
 
-  const handleSave = async (data: Data) => {
-    if (!page) return;
-    setSaving(true);
-    try {
-      await fetch("/api/pages", {
+  const pageId = page?.id;
+  const save = useCallback(
+    (data: Data) =>
+      fetch("/api/pages", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: page.id,
-          content: data,
-        }),
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
+        body: JSON.stringify({ id: pageId, content: data }),
+      }),
+    [pageId],
+  );
+  const editor = useEditorSave(save);
+  const { begin } = editor;
+
+  // What was loaded is the starting point for "unpublished changes".
+  useEffect(() => {
+    if (page) begin(page.content && "root" in page.content ? (page.content as Data) : EMPTY_DATA);
+  }, [page, begin]);
 
   if (loading) {
     return (
@@ -98,16 +99,13 @@ export default function PuckEditorPage() {
       <Puck
         config={puckConfig}
         data={initialData}
-        onPublish={handleSave}
+        onPublish={editor.onPublish}
+        onChange={editor.onChange}
         headerTitle={page.title}
         headerPath={`/${page.slug}`}
-        overrides={draggableOutlinePlugin().overrides}
+        overrides={puckOverrides}
       />
-      {saving && (
-        <div className="fixed bottom-4 right-4 z-50 rounded bg-neutral-900 px-4 py-2 text-sm text-white shadow-lg">
-          Saving...
-        </div>
-      )}
+      {editor.statusEl}
     </div>
   );
 }

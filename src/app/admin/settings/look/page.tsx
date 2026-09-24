@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DEFAULT_LIGHTBOX_SETTINGS } from "@/components/public/Lightbox";
+import { DEFAULT_LIGHTBOX_SETTINGS, type LightboxSettings } from "@/components/public/Lightbox";
 import { useMessage } from "@/lib/hooks/useMessage";
 import siteConfig from "@/lib/site.config";
 import { THEME_DEFAULTS, resolveTheme, type ThemeSettings } from "@/lib/theme/types";
-import {
+import { Textarea,
   Button,
   Field,
   Input,
@@ -13,6 +13,20 @@ import {
   SectionLabel,
 } from "@/components/admin/ui";
 import { SettingGroup } from "@/components/admin/settings/SettingGroup";
+import {
+  PreviewCard,
+  SettingsTabs,
+  SettingsWithPreview,
+  useSettingsTab,
+} from "@/components/admin/settings/SettingsPreview";
+
+const TABS = [
+  { key: "chrome", label: "Header & footer" },
+  { key: "colors", label: "Colours" },
+  { key: "lightbox", label: "Lightbox" },
+] as const;
+type Tab = (typeof TABS)[number]["key"];
+import { ColorControl } from "@/components/admin/controls";
 import ThemePreview from "@/components/admin/ThemePreview";
 import LightboxPreview from "@/components/admin/LightboxPreview";
 
@@ -52,6 +66,16 @@ export default function LookAndFeelPage() {
   const [themeName, setThemeName] = useState("Default");
   const [lightbox, setLightbox] = useState<LightboxDraft>(LIGHTBOX_DEFAULT);
   const [footerAlignment, setFooterAlignment] = useState<string>("center");
+  const [footerText, setFooterText] = useState<string>("");
+  const [tab, setTab] = useSettingsTab<Tab>("admin-look-tab", TABS.map((x) => x.key), "chrome");
+  // A link to #footer (from Navigation) opens the tab it's on.
+  useEffect(() => {
+    if (loaded && window.location.hash === "#footer") {
+      setTab("chrome");
+      requestAnimationFrame(() => document.getElementById("footer")?.scrollIntoView());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded]);
   const [siteTitle, setSiteTitle] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [saving, setSaving] = useState(false);
@@ -82,6 +106,7 @@ export default function LookAndFeelPage() {
               LIGHTBOX_DEFAULT.captionAlignment,
           });
           setFooterAlignment(settings.footerAlignment ?? "center");
+          setFooterText(settings.footerText ?? "");
         }
         setLoaded(true);
       })
@@ -160,6 +185,7 @@ export default function LookAndFeelPage() {
         body: JSON.stringify({
           activeThemeId,
           footerAlignment,
+          footerText: footerText || null,
           lightboxMetadataFields: lightbox.metadataFields,
           lightboxCornerRadius: lightbox.cornerRadius,
           lightboxCaptionPosition: lightbox.captionPosition,
@@ -168,7 +194,7 @@ export default function LookAndFeelPage() {
         }),
       });
       if (!lbRes.ok) {
-        showError("Failed to save lightbox settings.");
+        showError("Failed to save the footer and lightbox settings.");
         setSaving(false);
         return;
       }
@@ -194,12 +220,13 @@ export default function LookAndFeelPage() {
       setThemeList((list) => [...list, created]);
       setActiveThemeId(created.id);
       setThemeName(created.name);
-      await fetch("/api/settings", {
+      const activated = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ activeThemeId: created.id }),
       });
-      showSuccess("Theme duplicated and activated.");
+      if (activated.ok) showSuccess("Theme duplicated and activated.");
+      else showError("Theme duplicated, but couldn't make it the site's preset.");
     } else {
       showError("Failed to duplicate theme.");
     }
@@ -221,23 +248,38 @@ export default function LookAndFeelPage() {
         body: JSON.stringify({ activeThemeId: null }),
       });
       showSuccess("Theme deleted.");
+    } else {
+      showError("Failed to delete the theme.");
     }
+  }
+
+  // Edits to the preset that aren't saved yet; switching presets would drop them.
+  const savedPreset = themeList.find((t) => t.id === activeThemeId);
+  const presetDirty =
+    JSON.stringify(themeDraft) !== JSON.stringify(resolveTheme(savedPreset?.themeSettings ?? null)) ||
+    (!!savedPreset && themeName !== savedPreset.name);
+
+  function confirmDiscard(): boolean {
+    return (
+      !presetDirty ||
+      confirm(`You have unsaved changes to "${themeName}". Switching presets throws them away. Switch anyway?`)
+    );
   }
 
   async function handleSwitch(id: string) {
     setActiveThemeId(id);
-    await fetch("/api/settings", {
+    const res = await fetch("/api/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ activeThemeId: id }),
     });
+    if (!res.ok) showError("Couldn't switch the site to that preset.");
   }
 
   if (!loaded) return <div className="text-admin-ink-soft">Loading...</div>;
 
-  return (
-    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,640px)_minmax(0,1fr)] xl:gap-10 gap-6">
-      <div>
+  const settings = (
+    <>
       {message && <div className={`${alertClass} mb-4`}>{message.text}</div>}
 
       {/* Theme preset */}
@@ -250,6 +292,7 @@ export default function LookAndFeelPage() {
             <Select
               value={activeThemeId ?? ""}
               onChange={(e) => {
+                if (!confirmDiscard()) return;
                 if (e.target.value) handleSwitch(e.target.value);
                 else setActiveThemeId(null);
               }}
@@ -295,6 +338,10 @@ export default function LookAndFeelPage() {
         </Field>
       </SettingGroup>
 
+      <SettingsTabs tabs={TABS} value={tab} onChange={setTab} />
+
+      {tab === "chrome" && (
+      <>
       {/* Logo */}
       <SettingGroup
         title="Logo"
@@ -320,6 +367,66 @@ export default function LookAndFeelPage() {
             className="w-full accent-admin-accent"
           />
         </Field>
+        <Field
+          label="Wordmark"
+          inline
+          hint="How the site title is set when there's no logo image. Leave size blank to follow the logo size."
+        >
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] text-admin-ink-soft">
+            <label className="flex items-center gap-1.5">
+              Size
+              <Input
+                type="number"
+                min={10}
+                max={80}
+                placeholder="auto"
+                value={themeDraft.wordmarkSize ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value.trim();
+                  updateTheme("wordmarkSize", v === "" ? null : Number(v));
+                }}
+                className="w-20"
+              />
+              px
+            </label>
+            <label className="flex items-center gap-1.5">
+              Weight
+              <Select
+                value={themeDraft.wordmarkWeight}
+                onChange={(e) => updateTheme("wordmarkWeight", Number(e.target.value))}
+                className="w-24"
+              >
+                {[300, 400, 500, 600, 700, 800].map((w) => (
+                  <option key={w} value={w}>
+                    {w}
+                  </option>
+                ))}
+              </Select>
+            </label>
+            <label className="flex items-center gap-1.5">
+              Tracking
+              <Input
+                type="number"
+                min={-0.05}
+                max={0.5}
+                step={0.01}
+                value={themeDraft.wordmarkTracking}
+                onChange={(e) => updateTheme("wordmarkTracking", Number(e.target.value) || 0)}
+                className="w-20"
+              />
+              em
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={themeDraft.wordmarkUppercase}
+                onChange={(e) => updateTheme("wordmarkUppercase", e.target.checked)}
+                className="accent-admin-accent"
+              />
+              <span style={{ textTransform: "uppercase", letterSpacing: "1px" }}>Caps</span>
+            </label>
+          </div>
+        </Field>
       </SettingGroup>
 
       {/* Menu layout */}
@@ -336,17 +443,48 @@ export default function LookAndFeelPage() {
       </SettingGroup>
 
       {/* Footer */}
-      <SettingGroup title="Footer" desc="Footer alignment on the public site. Size is set in Typography.">
-        <Field label="Position" inline>
+      <div id="footer" className="scroll-mt-8" />
+      <SettingGroup
+        title="Footer"
+        desc="A bar across the foot of every page, or a small info button in a corner. Its links are your menu (Navigation); its type size is in Typography."
+      >
+        <Field label="Text" htmlFor="footerText" inline>
+          <div className="space-y-1">
+            <Textarea
+              id="footerText"
+              rows={2}
+              value={footerText}
+              onChange={(e) => setFooterText(e.target.value)}
+              placeholder="© 2026 Your Name"
+            />
+            <p className="text-[11px] text-admin-ink-soft">
+              Links: [text](address). With a tagline set in Identity, this is the © line at the right of the bar.
+            </p>
+          </div>
+        </Field>
+        <Field label="Style" inline>
           <RadioGroup
-            options={["left", "center", "right"]}
-            value={footerAlignment}
-            onChange={(v) => setFooterAlignment(v)}
+            options={["bar", "floating"]}
+            value={themeDraft.footerStyle}
+            onChange={(v) => updateTheme("footerStyle", v as ThemeSettings["footerStyle"])}
           />
         </Field>
+        {themeDraft.footerStyle === "floating" && (
+          <Field label="Corner" inline>
+            <RadioGroup
+              options={["left", "center", "right"]}
+              value={footerAlignment}
+              onChange={(v) => setFooterAlignment(v)}
+            />
+          </Field>
+        )}
       </SettingGroup>
 
+      </>
+      )}
+
       {/* Colors */}
+      {tab === "colors" && (
       <SettingGroup title="Colors" desc="Palette for the public site.">
         <ColorField
           label="Site background"
@@ -377,6 +515,16 @@ export default function LookAndFeelPage() {
           onChange={(v) => updateTheme("colorText", v)}
         />
         <ColorField
+          label="Secondary text"
+          value={themeDraft.colorTextSoft}
+          onChange={(v) => updateTheme("colorTextSoft", v)}
+        />
+        <ColorField
+          label="Muted (captions, meta)"
+          value={themeDraft.colorMuted}
+          onChange={(v) => updateTheme("colorMuted", v)}
+        />
+        <ColorField
           label="Accent / link"
           value={themeDraft.colorAccent}
           onChange={(v) => updateTheme("colorAccent", v)}
@@ -398,6 +546,11 @@ export default function LookAndFeelPage() {
           allowTransparent
         />
         <ColorField
+          label="Lightbox background"
+          value={themeDraft.colorLightboxBg}
+          onChange={(v) => updateTheme("colorLightboxBg", v)}
+        />
+        <ColorField
           label="Lightbox text"
           value={themeDraft.colorLightboxText}
           onChange={(v) => updateTheme("colorLightboxText", v)}
@@ -408,8 +561,10 @@ export default function LookAndFeelPage() {
           onChange={(v) => updateTheme("colorHeroOverlay", v)}
         />
       </SettingGroup>
+      )}
 
       {/* Lightbox */}
+      {tab === "lightbox" && (
       <SettingGroup
         title="Lightbox"
         desc="How photos appear when a visitor clicks a thumbnail."
@@ -482,6 +637,7 @@ export default function LookAndFeelPage() {
           </Select>
         </Field>
       </SettingGroup>
+      )}
 
       <div className="flex justify-end">
         <Button kind="primary" onClick={handleSave} disabled={saving}>
@@ -489,31 +645,43 @@ export default function LookAndFeelPage() {
         </Button>
       </div>
 
-      <p className="mt-4 text-[12px] text-admin-ink-soft">
+      <div className="mt-4 text-[12px] text-admin-ink-soft">
         <SectionLabel className="inline">Typography</SectionLabel> — fonts live
         in the{" "}
         <a href="/admin/settings/typography" className="text-admin-accent hover:underline">
           Typography
         </a>{" "}
         section and save to the same preset.
-      </p>
       </div>
+    </>
+  );
 
-      <aside className="xl:sticky xl:top-8 xl:self-start xl:max-h-[calc(100vh-4rem)] xl:overflow-y-auto space-y-5">
-        <div>
-          <div className="font-mono text-[10px] uppercase tracking-[2px] text-admin-ink-soft mb-2">
-            Public pages
-          </div>
-          <ThemePreview theme={themeDraft} siteTitle={siteTitle} logoUrl={logoUrl} />
-        </div>
-        <div>
-          <div className="font-mono text-[10px] uppercase tracking-[2px] text-admin-ink-soft mb-2">
-            Lightbox
-          </div>
-          <LightboxPreview theme={themeDraft} />
-        </div>
-      </aside>
-    </div>
+  const pagePreview = (
+    <PreviewCard key="pages" label="Public pages">
+      <ThemePreview theme={themeDraft} siteTitle={siteTitle} logoUrl={logoUrl} />
+    </PreviewCard>
+  );
+  const lightboxPreview = (
+    <PreviewCard key="lightbox" label="Lightbox" enlargeable={false}>
+      <LightboxPreview
+        theme={themeDraft}
+        settings={{
+          metadataFields: lightbox.metadataFields,
+          cornerRadius: lightbox.cornerRadius,
+          captionPosition: lightbox.captionPosition as LightboxSettings["captionPosition"],
+          fadeSpeed: lightbox.fadeSpeed as LightboxSettings["fadeSpeed"],
+          captionAlignment: lightbox.captionAlignment as LightboxSettings["captionAlignment"],
+        }}
+      />
+    </PreviewCard>
+  );
+
+  return (
+    <SettingsWithPreview
+      settings={settings}
+      // On the Lightbox tab, its preview comes first.
+      preview={tab === "lightbox" ? [lightboxPreview, pagePreview] : [pagePreview, lightboxPreview]}
+    />
   );
 }
 
@@ -557,38 +725,16 @@ function ColorField({
   onChange: (v: string) => void;
   allowTransparent?: boolean;
 }) {
-  const isTransparent = value === "transparent";
+  // These *are* the theme colours, so no theme swatches here.
   return (
     <Field label={label} inline>
-      <div className="flex items-center gap-2">
-        <input
-          type="color"
-          value={isTransparent ? "#ffffff" : value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={isTransparent}
-          className="h-9 w-10 cursor-pointer rounded-md border border-admin-border-strong disabled:cursor-not-allowed disabled:opacity-50"
-        />
-        <Input
-          type="text"
+      <div className="max-w-xs">
+        <ColorControl
           value={value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={isTransparent}
-          className="w-32"
-          maxLength={11}
+          onChange={onChange}
+          tokens={false}
+          allowTransparent={allowTransparent}
         />
-        {allowTransparent && (
-          <label className="flex items-center gap-1.5 text-[13px] text-admin-ink cursor-pointer">
-            <input
-              type="checkbox"
-              checked={isTransparent}
-              onChange={(e) =>
-                onChange(e.target.checked ? "transparent" : "#ffffff")
-              }
-              className="accent-admin-accent"
-            />
-            Transparent
-          </label>
-        )}
       </div>
     </Field>
   );

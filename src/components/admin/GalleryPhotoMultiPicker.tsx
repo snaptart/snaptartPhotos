@@ -9,6 +9,8 @@ interface Gallery {
   coverImageUrl: string | null;
 }
 
+type CameraSettings = { camera?: string; lens?: string; iso?: string; aperture?: string; shutter?: string } | null;
+
 interface Photo {
   id: string;
   url: string;
@@ -16,12 +18,29 @@ interface Photo {
   title: string | null;
   width: number;
   height: number;
+  focalX?: number | null;
+  focalY?: number | null;
+  description?: string | null;
+  location?: string | null;
+  cameraSettings?: CameraSettings;
+  takenAt?: string | null;
 }
 
 export interface PickedPhoto {
   url: string;
   title: string;
   gallerySlug: string;
+  /** The rest describe the library photo, for blocks that keep a reference to it. */
+  photoId: string;
+  thumbnailUrl: string;
+  width: number;
+  height: number;
+  focalX: number;
+  focalY: number;
+  description: string | null;
+  location: string | null;
+  cameraSettings: CameraSettings;
+  takenAt: string | null;
 }
 
 interface GalleryPhotoMultiPickerProps {
@@ -30,6 +49,8 @@ interface GalleryPhotoMultiPickerProps {
   onConfirm: (photos: PickedPhoto[]) => void;
   title?: string;
   confirmLabel?: (count: number) => string;
+  /** Pick one photo: choosing another replaces the choice. */
+  single?: boolean;
 }
 
 export default function GalleryPhotoMultiPicker({
@@ -38,6 +59,7 @@ export default function GalleryPhotoMultiPicker({
   onConfirm,
   title = "Add photos from gallery",
   confirmLabel,
+  single = false,
 }: GalleryPhotoMultiPickerProps) {
   const [galleries, setGalleries] = useState<Gallery[]>([]);
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -87,6 +109,7 @@ export default function GalleryPhotoMultiPicker({
 
   const toggle = (photo: Photo) => {
     setSelected((prev) => {
+      if (single) return prev[photo.id] ? {} : { [photo.id]: photo };
       const next = { ...prev };
       if (next[photo.id]) delete next[photo.id];
       else next[photo.id] = photo;
@@ -112,7 +135,21 @@ export default function GalleryPhotoMultiPicker({
     const slug = galleries.find((g) => g.id === selectedGallery)?.slug ?? "";
     const ordered = photos
       .filter((p) => selected[p.id])
-      .map((p) => ({ url: p.url, title: p.title ?? "", gallerySlug: slug }));
+      .map((p) => ({
+        url: p.url,
+        title: p.title ?? "",
+        gallerySlug: slug,
+        photoId: p.id,
+        thumbnailUrl: p.thumbnailUrl ?? p.url,
+        width: p.width ?? 800,
+        height: p.height ?? 600,
+        focalX: p.focalX ?? 50,
+        focalY: p.focalY ?? 50,
+        description: p.description ?? null,
+        location: p.location ?? null,
+        cameraSettings: p.cameraSettings ?? null,
+        takenAt: p.takenAt ?? null,
+      }));
     if (ordered.length === 0) return;
     onConfirm(ordered);
     onClose();
@@ -149,7 +186,7 @@ export default function GalleryPhotoMultiPicker({
               </option>
             ))}
           </select>
-          {photos.length > 0 && (
+          {photos.length > 0 && !single && (
             <button
               type="button"
               onClick={allOnPageSelected ? clearSelection : selectAll}

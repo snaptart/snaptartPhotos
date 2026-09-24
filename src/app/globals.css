@@ -68,14 +68,18 @@ body {
   min-height: 0;
 }
 
-/* Puck Columns: single column on mobile, custom widths at md+ */
-.puck-columns {
-  grid-template-columns: 1fr;
+/* Click-to-edit text on the Puck canvas (components/puck/inline/Editable.tsx).
+   Blank text shows a faded prompt, or what the site shows in its place
+   (e.g. the photo's own title). */
+[data-inline-edit] {
+  cursor: text;
 }
-@media (min-width: 768px) {
-  .puck-columns {
-    grid-template-columns: var(--col-template);
-  }
+[data-inline-edit]:empty::before {
+  content: attr(data-placeholder);
+  opacity: 0.4;
+}
+[data-inline-edit][data-fallback]:empty::before {
+  opacity: 1;
 }
 
 /* Tiptap: ensure empty paragraphs (line breaks) render with height */

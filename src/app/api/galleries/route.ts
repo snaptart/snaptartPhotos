@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { galleries, galleryPhotos } from "@/lib/db/schema";
+import { galleries, galleryPhotos, photos } from "@/lib/db/schema";
 import { eq, asc, sql, getTableColumns } from "drizzle-orm";
+import { builtCollectionPages, collectionHref } from "@/lib/collections";
 import { generateSlug } from "@/lib/utils";
 import { corsPreflight, withCors } from "@/lib/cors";
 
@@ -16,10 +17,17 @@ export async function GET() {
     // photoCount comes from the junction table so the Galleries Index block can show
     // a live count without a second round trip. ::int because Postgres count() is a
     // bigint, which the driver would otherwise hand back as a string.
+    // firstPhotoUrl stands in for a missing cover.
     const items = await db
       .select({
         ...getTableColumns(galleries),
         photoCount: sql<number>`count(${galleryPhotos.photoId})::int`,
+        firstPhotoUrl: sql<string | null>`(
+          select ${photos.url} from ${photos}
+          join ${galleryPhotos} gp on gp.photo_id = ${photos.id}
+          where gp.gallery_id = ${galleries.id}
+          order by gp.position asc limit 1
+        )`,
       })
       .from(galleries)
       .leftJoin(galleryPhotos, eq(galleryPhotos.galleryId, galleries.id))
@@ -27,7 +35,9 @@ export async function GET() {
       .groupBy(galleries.id)
       .orderBy(asc(galleries.position));
 
-    return withCors(NextResponse.json(items));
+    // Each collection's link: its built page when it has one (see @/lib/collections).
+    const built = await builtCollectionPages(items.map((g) => g.slug));
+    return withCors(NextResponse.json(items.map((g) => ({ ...g, href: collectionHref(g.slug, built) }))));
   } catch {
     return withCors(NextResponse.json({ error: "Internal server error" }, { status: 500 }));
   }

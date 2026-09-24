@@ -31,11 +31,14 @@ export default function GalleryGrid({
   photos,
   lightboxSettings,
   aspectRatio,
+  collectionTitle,
 }: {
   photos: Photo[];
   lightboxSettings?: LightboxSettings;
   /** Shares the vocabulary with the Puck gallery blocks — see lib/theme/aspect.ts. */
   aspectRatio?: GalleryAspect;
+  /** Named in the lightbox's counter line. */
+  collectionTitle?: string;
 }) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   // undefined = "natural": don't crop, let each photo keep its own proportions.
@@ -117,6 +120,7 @@ export default function GalleryGrid({
         selectedIndex={selectedIndex}
         onClose={() => setSelectedIndex(null)}
         settings={lightboxSettings}
+        collectionTitle={collectionTitle}
       />
     </>
   );

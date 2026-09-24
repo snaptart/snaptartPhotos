@@ -52,6 +52,7 @@ const siteConfig = {
     { key: "title", label: "Title", enabled: true },
     { key: "description", label: "Description", enabled: true },
     { key: "location", label: "Location", enabled: true },
+    { key: "date", label: "Date taken", enabled: true },
     { key: "camera", label: "Camera Settings", enabled: true },
     { key: "filename", label: "Filename", enabled: true },
   ],

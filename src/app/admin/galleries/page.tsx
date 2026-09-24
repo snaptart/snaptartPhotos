@@ -8,7 +8,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { ArrowLeft, ArrowRight, MapPin, Plus, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, ExternalLink, Eye, EyeOff, Images, MapPin, Plus, Trash2, X } from "lucide-react";
 import { SortableItem } from "@/components/admin/SortableItem";
 import { useSortableList } from "@/lib/hooks/useSortableList";
 import { useMessage } from "@/lib/hooks/useMessage";
@@ -20,9 +20,12 @@ import {
 import {
   Button,
   Card,
+  Drawer,
+  EmptyState,
   Field,
   Input,
   Pill,
+  RowMenu,
   SectionLabel,
   Select,
   Textarea,
@@ -34,6 +37,7 @@ import {
   DEFAULT_HANDWRITING_FONT,
   DEFAULT_STAMP_FONT,
 } from "@/components/public/slideFonts";
+import { ColorControl } from "@/components/admin/controls";
 
 interface Gallery {
   id: string;
@@ -50,6 +54,11 @@ interface Gallery {
   handwritingFont: string | null;
   stampFont: string | null;
   coverImageUrl: string | null;
+  /** Stands in for a missing cover (from /api/galleries). */
+  firstPhotoUrl?: string | null;
+  photoCount?: number;
+  /** Where the collection lives on the site: its own page, or /gallery/<slug>. */
+  href?: string;
   parentId: string | null;
   position: number;
   isPublished: boolean;
@@ -63,10 +72,6 @@ interface PickerPhoto {
 }
 
 const MAX_PREVIEW = 4;
-
-function isValidHex(v: string): boolean {
-  return /^#[0-9a-fA-F]{6}$/.test(v);
-}
 
 export default function GalleriesPage() {
   const [galleries, setGalleries] = useState<Gallery[]>([]);
@@ -178,17 +183,22 @@ export default function GalleriesPage() {
       setEditingId(null);
       showSuccess(`${siteConfig.labels.gallery} updated.`);
       fetchGalleries();
+    } else {
+      showError(`Couldn't save the ${siteConfig.labels.gallery.toLowerCase()}. Your changes are still in the form.`);
     }
   }
 
-  async function handleDelete(id: string) {
+  async function handleDelete(gallery: Gallery) {
+    // Deleting a gallery only removes its memberships; the photos stay in the library.
+    const count = gallery.photoCount ?? 0;
     if (
       !confirm(
-        `Delete this ${siteConfig.labels.gallery.toLowerCase()} and all its ${siteConfig.labels.photos.toLowerCase()}?`,
+        `Delete the "${gallery.title}" ${siteConfig.labels.gallery.toLowerCase()}?` +
+          (count ? ` Its ${count} ${siteConfig.labels.photos.toLowerCase()} stay in your library.` : ""),
       )
     )
       return;
-    const res = await fetch(`/api/galleries?id=${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/galleries?id=${gallery.id}`, { method: "DELETE" });
     if (res.ok) {
       showSuccess(`${siteConfig.labels.gallery} deleted.`);
       fetchGalleries();
@@ -219,9 +229,9 @@ export default function GalleriesPage() {
           <div className="flex items-center gap-2">
             <Link
               href="/admin/galleries/layout"
-              className="inline-flex items-center gap-1.5 text-[12px] font-mono uppercase tracking-[1.5px] text-admin-ink-soft hover:text-admin-ink"
+              className="inline-flex items-center gap-1.5 rounded-md border border-admin-border-strong bg-admin-surface px-3.5 py-2 text-[13px] font-medium text-admin-ink hover:bg-admin-surface-2"
             >
-              <MapPin className="h-3.5 w-3.5" /> Field Map
+              <MapPin className="h-3.5 w-3.5 opacity-80" /> Field Map
             </Link>
             <Button
               kind="primary"
@@ -242,220 +252,12 @@ export default function GalleriesPage() {
           <div className={alertClass}>{message.text}</div>
         )}
 
-        {isFormOpen && (
-          <Card
-            header={
-              <>
-                <SectionLabel>
-                  {editingId
-                    ? `Edit ${siteConfig.labels.gallery.toLowerCase()}`
-                    : `New ${siteConfig.labels.gallery.toLowerCase()}`}
-                </SectionLabel>
-                <button
-                  onClick={() => {
-                    setShowForm(false);
-                    setEditingId(null);
-                  }}
-                  className="p-1 text-admin-ink-soft hover:text-admin-ink"
-                  aria-label="Close form"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </>
-            }
-          >
-            <form
-              onSubmit={editingId ? handleUpdate : handleAdd}
-              className="space-y-4"
-            >
-              <Field label="Title" htmlFor="g-title">
-                <Input
-                  id="g-title"
-                  name="title"
-                  defaultValue={editingGallery?.title ?? ""}
-                  placeholder={`${siteConfig.labels.gallery} title`}
-                  required
-                />
-              </Field>
-              <Field label="Description" htmlFor="g-description">
-                <Textarea
-                  id="g-description"
-                  name="description"
-                  defaultValue={editingGallery?.description ?? ""}
-                  placeholder="Optional"
-                  rows={2}
-                />
-              </Field>
-              <Field label="Tagline" htmlFor="g-tagline" hint="Shown as the flavor line on Field Map pins and region view">
-                <Textarea
-                  id="g-tagline"
-                  name="tagline"
-                  defaultValue={editingGallery?.tagline ?? ""}
-                  placeholder="A short italic line that greets visitors."
-                  rows={2}
-                />
-              </Field>
-              <Field label="Accent color" htmlFor="g-accent" hint="Used on hover and the drawer underline. Click the swatch to pick.">
-                <div className="flex items-center gap-2">
-                  <label className="relative inline-block h-9 w-9 cursor-pointer rounded overflow-hidden border border-admin-border-strong shrink-0">
-                    <input
-                      type="color"
-                      value={isValidHex(accentColor) ? accentColor : "#b8824a"}
-                      onChange={(e) => setAccentColor(e.target.value)}
-                      className="absolute inset-0 h-full w-full opacity-0 cursor-pointer"
-                      aria-label="Pick accent color"
-                    />
-                    <span
-                      className="absolute inset-0 block"
-                      style={{
-                        background: isValidHex(accentColor) ? accentColor : "transparent",
-                        backgroundImage: !isValidHex(accentColor)
-                          ? "repeating-conic-gradient(#e4e1db 0% 25%, #fff 0% 50%) 50% / 8px 8px"
-                          : undefined,
-                      }}
-                    />
-                  </label>
-                  <Input
-                    id="g-accent"
-                    value={accentColor}
-                    onChange={(e) => setAccentColor(e.target.value)}
-                    placeholder="#b8824a"
-                    pattern="^#[0-9a-fA-F]{6}$"
-                  />
-                  {accentColor && (
-                    <button
-                      type="button"
-                      onClick={() => setAccentColor("")}
-                      className="text-[11px] font-mono uppercase tracking-[1.5px] text-admin-ink-soft hover:text-admin-danger"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-              </Field>
-              <Field label="Field Map position" htmlFor="g-latitude" hint="Decimal degrees. Pins the gallery to the world map.">
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    id="g-latitude"
-                    name="latitude"
-                    type="number"
-                    step="any"
-                    min={-90}
-                    max={90}
-                    defaultValue={editingGallery?.latitude ?? ""}
-                    placeholder="Latitude (e.g. 48.8566)"
-                  />
-                  <Input
-                    id="g-longitude"
-                    name="longitude"
-                    type="number"
-                    step="any"
-                    min={-180}
-                    max={180}
-                    defaultValue={editingGallery?.longitude ?? ""}
-                    placeholder="Longitude (e.g. 2.3522)"
-                  />
-                </div>
-              </Field>
-              <Field label="Room caption fields" htmlFor="g-caption-fields" hint="What appears below each framed photo in the room view.">
-                <div id="g-caption-fields" className="flex flex-col gap-1.5">
-                  {ROOM_CAPTION_FIELD_OPTIONS.map((opt) => (
-                    <label
-                      key={opt.key}
-                      className="flex items-center gap-2 text-[13px] text-admin-ink cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={captionFields.includes(opt.key)}
-                        onChange={(e) => {
-                          setCaptionFields((prev) =>
-                            e.target.checked
-                              ? [...prev, opt.key]
-                              : prev.filter((k) => k !== opt.key),
-                          );
-                        }}
-                        className="accent-admin-accent"
-                      />
-                      {opt.label}
-                    </label>
-                  ))}
-                </div>
-              </Field>
-              <SectionLabel>Slide frame</SectionLabel>
-              <Field label="Film stamp" htmlFor="g-film-stamp" hint="Printed on the slide mount (e.g. KODACHROME II). Leave blank to hide.">
-                <Input
-                  id="g-film-stamp"
-                  name="filmStamp"
-                  defaultValue={editingGallery?.filmStamp ?? ""}
-                  placeholder="KODACHROME II"
-                />
-              </Field>
-              <Field label="Handwriting font" htmlFor="g-handwriting-font" hint={`Caption font. Defaults to ${DEFAULT_HANDWRITING_FONT}.`}>
-                <Select
-                  id="g-handwriting-font"
-                  name="handwritingFont"
-                  defaultValue={editingGallery?.handwritingFont ?? ""}
-                >
-                  <option value="">Default ({DEFAULT_HANDWRITING_FONT})</option>
-                  {HANDWRITING_FONT_OPTIONS.map((f) => (
-                    <option key={f} value={f}>{f}</option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Stamp font" htmlFor="g-stamp-font" hint={`Film stamp, date, and frame number. Defaults to ${DEFAULT_STAMP_FONT}.`}>
-                <Select
-                  id="g-stamp-font"
-                  name="stampFont"
-                  defaultValue={editingGallery?.stampFont ?? ""}
-                >
-                  <option value="">Default ({DEFAULT_STAMP_FONT})</option>
-                  {STAMP_FONT_OPTIONS.map((f) => (
-                    <option key={f} value={f}>{f}</option>
-                  ))}
-                </Select>
-              </Field>
-
-              {editingId && (
-                <PreviewPicker
-                  photos={pickerPhotos}
-                  selected={previewIds}
-                  onChange={setPreviewIds}
-                />
-              )}
-              <label className="flex items-center gap-2 text-[13px] text-admin-ink cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="isPublished"
-                  defaultChecked={editingGallery?.isPublished ?? false}
-                  className="accent-admin-accent"
-                />
-                Published
-              </label>
-              <div className="flex gap-2">
-                <Button type="submit" kind="primary">
-                  {editingId ? "Update" : "Create"}
-                </Button>
-                <Button
-                  type="button"
-                  kind="ghost"
-                  onClick={() => {
-                    setShowForm(false);
-                    setEditingId(null);
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </Card>
-        )}
-
         {loading ? (
           <div className="text-admin-ink-soft">Loading...</div>
         ) : galleries.length === 0 ? (
           <EmptyState
             title={`No ${siteConfig.labels.galleries.toLowerCase()} yet`}
-            body={`Create one to get started.`}
+            body={`Create one, then add ${siteConfig.labels.photos.toLowerCase()} to it.`}
           />
         ) : (
           <Card padded={false}>
@@ -473,9 +275,9 @@ export default function GalleriesPage() {
                     <div className="flex items-center justify-between gap-4 border-b border-admin-border px-4 py-3 last:border-0">
                       <div className="flex min-w-0 items-center gap-3">
                         <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-md bg-admin-surface-2 border border-admin-border">
-                          {gallery.coverImageUrl && (
+                          {(gallery.coverImageUrl || gallery.firstPhotoUrl) && (
                             <Image
-                              src={gallery.coverImageUrl}
+                              src={(gallery.coverImageUrl || gallery.firstPhotoUrl) as string}
                               alt=""
                               fill
                               sizes="44px"
@@ -485,35 +287,54 @@ export default function GalleriesPage() {
                         </div>
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="truncate font-medium text-admin-ink">
-                              {gallery.title}
-                            </span>
-                            <Pill
-                              tone={gallery.isPublished ? "success" : "neutral"}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingId(gallery.id);
+                                setShowForm(false);
+                              }}
+                              className="truncate font-medium text-admin-ink hover:underline"
                             >
-                              {gallery.isPublished ? "Published" : "Draft"}
-                            </Pill>
+                              {gallery.title}
+                            </button>
+                            {!gallery.isPublished && <Pill>Draft</Pill>}
                           </div>
-                          <div className="text-[12px] text-admin-ink-soft truncate">
-                            /{gallery.slug}
-                            {gallery.description && ` · ${gallery.description}`}
+                          <div className="flex min-w-0 items-center gap-1.5 text-[12px] text-admin-ink-soft">
+                            <span className="shrink-0">
+                              {gallery.photoCount ?? 0} {siteConfig.labels.photos.toLowerCase()}
+                            </span>
+                            <span aria-hidden="true">·</span>
+                            <a
+                              href={gallery.href ?? `/${siteConfig.labels.gallerySlug}/${gallery.slug}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex shrink-0 items-center gap-1 hover:text-admin-ink"
+                              title={
+                                gallery.href === `/${gallery.slug}`
+                                  ? "Shown on its own page, built in Pages"
+                                  : "Shown on the automatic gallery page (no page of its own yet)"
+                              }
+                            >
+                              {gallery.href ?? `/${siteConfig.labels.gallerySlug}/${gallery.slug}`}
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                            {gallery.href === `/${gallery.slug}` ? (
+                              <Pill tone="accent">Own page</Pill>
+                            ) : (
+                              <Pill>Automatic page</Pill>
+                            )}
+                            {gallery.description && <span className="truncate">· {gallery.description}</span>}
                           </div>
                         </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-2">
+                      <div className="flex shrink-0 items-center gap-1.5">
                         <Link
                           href={`/admin/photos?galleryId=${gallery.id}`}
-                          className="text-[12px] text-admin-ink-soft hover:text-admin-ink"
+                          className="inline-flex items-center gap-1.5 rounded-md border border-admin-border-strong bg-admin-surface px-2.5 py-1 text-xs font-medium text-admin-ink hover:bg-admin-surface-2"
                         >
+                          <Images className="h-3.5 w-3.5 opacity-80" />
                           {siteConfig.labels.photos}
                         </Link>
-                        <Button
-                          kind="subtle"
-                          size="sm"
-                          onClick={() => togglePublish(gallery)}
-                        >
-                          {gallery.isPublished ? "Unpublish" : "Publish"}
-                        </Button>
                         <Button
                           kind="ghost"
                           size="sm"
@@ -524,13 +345,23 @@ export default function GalleriesPage() {
                         >
                           Edit
                         </Button>
-                        <Button
-                          kind="danger"
-                          size="sm"
-                          onClick={() => handleDelete(gallery.id)}
-                        >
-                          Delete
-                        </Button>
+                        <RowMenu
+                          items={[
+                            {
+                              label: "View on site",
+                              icon: <ExternalLink className="h-3.5 w-3.5" />,
+                              href: gallery.href ?? `/${siteConfig.labels.gallerySlug}/${gallery.slug}`,
+                              external: true,
+                            },
+                            {
+                              label: gallery.isPublished ? "Unpublish" : "Publish",
+                              icon: gallery.isPublished ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />,
+                              onSelect: () => togglePublish(gallery),
+                            },
+                            "divider",
+                            { label: "Delete…", icon: <Trash2 className="h-3.5 w-3.5" />, danger: true, onSelect: () => handleDelete(gallery) },
+                          ]}
+                        />
                       </div>
                     </div>
                   </SortableItem>
@@ -540,17 +371,179 @@ export default function GalleriesPage() {
           </Card>
         )}
       </div>
-    </div>
-  );
-}
 
-function EmptyState({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <div className="font-serif italic text-[22px] text-admin-ink mb-2">
-        {title}
-      </div>
-      <p className="text-[13px] text-admin-ink-soft max-w-sm">{body}</p>
+      <Drawer
+        open={isFormOpen}
+        onClose={() => {
+          setShowForm(false);
+          setEditingId(null);
+        }}
+        eyebrow={editingId ? `Edit ${siteConfig.labels.gallery.toLowerCase()}` : `New ${siteConfig.labels.gallery.toLowerCase()}`}
+        title={editingGallery?.title ?? `New ${siteConfig.labels.gallery.toLowerCase()}`}
+        width={560}
+        footer={
+          <>
+            <Button type="submit" form="gallery-form" kind="primary">
+              {editingId ? "Save" : "Create"}
+            </Button>
+            <Button
+              type="button"
+              kind="ghost"
+              onClick={() => {
+                setShowForm(false);
+                setEditingId(null);
+              }}
+            >
+              Cancel
+            </Button>
+          </>
+        }
+      >
+        <form
+          id="gallery-form"
+          key={editingId ?? "new"}
+          onSubmit={editingId ? handleUpdate : handleAdd}
+          className="space-y-4"
+        >
+          <Field label="Title" htmlFor="g-title">
+            <Input
+              id="g-title"
+              name="title"
+              defaultValue={editingGallery?.title ?? ""}
+              placeholder={`${siteConfig.labels.gallery} title`}
+              required
+            />
+          </Field>
+          <Field label="Description" htmlFor="g-description">
+            <Textarea
+              id="g-description"
+              name="description"
+              defaultValue={editingGallery?.description ?? ""}
+              placeholder="Optional"
+              rows={2}
+            />
+          </Field>
+          <label className="flex items-center gap-2 text-[13px] text-admin-ink cursor-pointer">
+            <input
+              type="checkbox"
+              name="isPublished"
+              defaultChecked={editingGallery?.isPublished ?? false}
+              className="accent-admin-accent"
+            />
+            Published
+          </label>
+          <SectionLabel>Field Map &amp; Hall</SectionLabel>
+          <Field label="Tagline" htmlFor="g-tagline" hint="Shown as the flavor line on Field Map pins and region view">
+            <Textarea
+              id="g-tagline"
+              name="tagline"
+              defaultValue={editingGallery?.tagline ?? ""}
+              placeholder="A short italic line that greets visitors."
+              rows={2}
+            />
+          </Field>
+          <Field label="Accent color" hint="Used on hover and the drawer underline.">
+            <div className="max-w-xs">
+              <ColorControl
+                value={accentColor}
+                onChange={setAccentColor}
+                tokens={false}
+                emptyLabel="#b8824a (default)"
+                placeholder="#b8824a"
+              />
+            </div>
+          </Field>
+          <Field label="Field Map position" htmlFor="g-latitude" hint="Decimal degrees. Pins the gallery to the world map.">
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                id="g-latitude"
+                name="latitude"
+                type="number"
+                step="any"
+                min={-90}
+                max={90}
+                defaultValue={editingGallery?.latitude ?? ""}
+                placeholder="Latitude (e.g. 48.8566)"
+              />
+              <Input
+                id="g-longitude"
+                name="longitude"
+                type="number"
+                step="any"
+                min={-180}
+                max={180}
+                defaultValue={editingGallery?.longitude ?? ""}
+                placeholder="Longitude (e.g. 2.3522)"
+              />
+            </div>
+          </Field>
+          <Field label="Room caption fields" htmlFor="g-caption-fields" hint="What appears below each framed photo in the room view.">
+            <div id="g-caption-fields" className="flex flex-col gap-1.5">
+              {ROOM_CAPTION_FIELD_OPTIONS.map((opt) => (
+                <label
+                  key={opt.key}
+                  className="flex items-center gap-2 text-[13px] text-admin-ink cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={captionFields.includes(opt.key)}
+                    onChange={(e) => {
+                      setCaptionFields((prev) =>
+                        e.target.checked
+                          ? [...prev, opt.key]
+                          : prev.filter((k) => k !== opt.key),
+                      );
+                    }}
+                    className="accent-admin-accent"
+                  />
+                  {opt.label}
+                </label>
+              ))}
+            </div>
+          </Field>
+          <SectionLabel>Slide frame</SectionLabel>
+          <Field label="Film stamp" htmlFor="g-film-stamp" hint="Printed on the slide mount (e.g. KODACHROME II). Leave blank to hide.">
+            <Input
+              id="g-film-stamp"
+              name="filmStamp"
+              defaultValue={editingGallery?.filmStamp ?? ""}
+              placeholder="KODACHROME II"
+            />
+          </Field>
+          <Field label="Handwriting font" htmlFor="g-handwriting-font" hint={`Caption font. Defaults to ${DEFAULT_HANDWRITING_FONT}.`}>
+            <Select
+              id="g-handwriting-font"
+              name="handwritingFont"
+              defaultValue={editingGallery?.handwritingFont ?? ""}
+            >
+              <option value="">Default ({DEFAULT_HANDWRITING_FONT})</option>
+              {HANDWRITING_FONT_OPTIONS.map((f) => (
+                <option key={f} value={f}>{f}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Stamp font" htmlFor="g-stamp-font" hint={`Film stamp, date, and frame number. Defaults to ${DEFAULT_STAMP_FONT}.`}>
+            <Select
+              id="g-stamp-font"
+              name="stampFont"
+              defaultValue={editingGallery?.stampFont ?? ""}
+            >
+              <option value="">Default ({DEFAULT_STAMP_FONT})</option>
+              {STAMP_FONT_OPTIONS.map((f) => (
+                <option key={f} value={f}>{f}</option>
+              ))}
+            </Select>
+          </Field>
+
+          {editingId && (
+            <PreviewPicker
+              photos={pickerPhotos}
+              selected={previewIds}
+              onChange={setPreviewIds}
+            />
+          )}
+        </form>
+      </Drawer>
     </div>
   );
 }

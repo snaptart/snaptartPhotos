@@ -5,9 +5,10 @@ import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import {
   Button,
   Card,
+  EmptyState,
   Pill,
-  Select,
   SectionLabel,
+  Select,
   Topbar,
 } from "@/components/admin/ui";
 
@@ -186,13 +187,3 @@ export default function SubmissionsPage() {
   );
 }
 
-function EmptyState({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <div className="font-serif italic text-[22px] text-admin-ink mb-2">
-        {title}
-      </div>
-      <p className="text-[13px] text-admin-ink-soft max-w-sm">{body}</p>
-    </div>
-  );
-}

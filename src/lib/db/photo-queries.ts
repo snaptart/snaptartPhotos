@@ -49,6 +49,12 @@ export function selectPhotosForGalleries(galleryIds: string[]) {
     .orderBy(asc(galleryPhotos.position));
 }
 
+/** Photos by id, in no particular order — for blocks that picked photos by hand. */
+export async function selectPhotosByIds(ids: string[]) {
+  if (ids.length === 0) return [];
+  return db.select(photoFields).from(photos).where(inArray(photos.id, ids));
+}
+
 export async function selectGalleryIdsForPhoto(photoId: string): Promise<string[]> {
   const rows = await db
     .select({ galleryId: galleryPhotos.galleryId })

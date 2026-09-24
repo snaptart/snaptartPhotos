@@ -1,53 +1,40 @@
 import Link from "next/link";
-import { db } from "@/lib/db";
-import { menuItems, siteSettings, themes } from "@/lib/db/schema";
-import { asc, eq } from "drizzle-orm";
-import { resolveTheme } from "@/lib/theme/types";
-import type { ThemeSettings } from "@/lib/theme/types";
+import { loadSiteChrome } from "@/lib/site-chrome";
 import { MobileMenu } from "./MobileMenu";
+import { NavLink } from "./NavLink";
 import siteConfig from "@/lib/site.config";
 import { PAGE_CONTAINER } from "@/lib/theme/layout";
+import { fontRole } from "@/lib/theme/role-style";
 
 export async function Navbar() {
-  let items: { id: string; label: string; url: string; targetType: string }[] = [];
-  let navSettings: { siteTitle: string; logoUrl: string | null; instagramUrl: string | null; activeThemeId: string | null } | null = null;
-  let theme: ThemeSettings = resolveTheme();
-
-  try {
-    items = await db.select().from(menuItems).orderBy(asc(menuItems.position));
-    const rows = await db.select().from(siteSettings).limit(1);
-    navSettings = rows[0] ?? null;
-    if (navSettings?.activeThemeId) {
-      const themeRows = await db.select().from(themes).where(eq(themes.id, navSettings.activeThemeId)).limit(1);
-      if (themeRows[0]) {
-        theme = resolveTheme(themeRows[0].themeSettings as Record<string, unknown>);
-      }
-    }
-  } catch {
-    // DB not available — use fallback
-  }
+  const { items, settings: navSettings, theme } = await loadSiteChrome();
 
   const siteTitle = navSettings?.siteTitle ?? siteConfig.siteName;
   const logoUrl = navSettings?.logoUrl;
   const instagramUrl = navSettings?.instagramUrl;
 
   const mobileLogoSize = Math.round(theme.logoSize / 3);
+  const wordmarkSize = theme.wordmarkSize ?? Math.round(theme.logoSize * 0.6);
 
-  const logoEl = (size: number) => (
+  const logoEl = (mobile: boolean) => (
     <Link href="/" className="flex items-center gap-3">
       {logoUrl ? (
         <img
           src={logoUrl}
           alt={siteTitle}
           className="w-auto"
-          style={{ height: `${size}px` }}
+          style={{ height: `${mobile ? mobileLogoSize : theme.logoSize}px` }}
         />
       ) : (
         <span
-          className="font-light tracking-widest"
           style={{
             fontFamily: "var(--theme-font-headings)",
-            fontSize: `${size * 0.6}px`,
+            // A third of the desktop size (the image logo's ratio) makes a
+            // text wordmark unreadably small, so text only steps down a little.
+            fontSize: `${mobile ? Math.round(wordmarkSize * 0.8) : wordmarkSize}px`,
+            fontWeight: theme.wordmarkWeight,
+            textTransform: theme.wordmarkUppercase ? "uppercase" : "none",
+            letterSpacing: `${theme.wordmarkTracking}em`,
           }}
         >
           {siteTitle}
@@ -59,18 +46,23 @@ export async function Navbar() {
   // Desktop menu (hidden on mobile)
   const menuEl = (
     <div
-      className="hidden md:flex items-center gap-8 tracking-wide"
-      style={{ fontSize: `var(--theme-font-nav-menu-size, ${theme.menuFontSize}px)`, fontFamily: "var(--theme-font-nav-menu-family, var(--theme-font-nav-menu))" }}
+      className="hidden md:flex items-center gap-8"
+      style={{
+        ...fontRole("navMenu", { tracking: "0.025em" }),
+        fontSize: `var(--theme-font-nav-menu-size, ${theme.menuFontSize}px)`,
+      }}
     >
       {items.map((item) => (
-        <Link
+        <NavLink
           key={item.id}
           href={item.url}
-          className="transition-colors hover:opacity-70"
-          {...(item.targetType === "external" ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+          sectionPaths={item.sectionPaths}
+          external={item.targetType === "external"}
+          // The current page or section is underlined, as on the design's boards.
+          className="border-b border-transparent py-1.5 transition-colors hover:opacity-70 aria-[current]:border-current"
         >
           {item.label}
-        </Link>
+        </NavLink>
       ))}
       {instagramUrl && (
         <a
@@ -96,7 +88,7 @@ export async function Navbar() {
   // Build 3-column layout: [left] [center] [right]
   // Place logo and menu into the correct slots based on theme
   const slots: Record<string, React.ReactNode[]> = { left: [], center: [], right: [] };
-  slots[theme.logoPosition].push(<div key="logo">{logoEl(theme.logoSize)}</div>);
+  slots[theme.logoPosition].push(<div key="logo">{logoEl(false)}</div>);
   slots[theme.menuJustify].push(<div key="menu">{menuEl}</div>);
 
   return (
@@ -125,7 +117,7 @@ export async function Navbar() {
         <div className="justify-self-start">
           {mobileMenuEl}
         </div>
-        <div>{logoEl(mobileLogoSize)}</div>
+        <div>{logoEl(true)}</div>
         <div />
       </nav>
     </header>

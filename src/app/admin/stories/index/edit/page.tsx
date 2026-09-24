@@ -5,7 +5,8 @@ import { Puck } from "@puckeditor/core";
 import type { Data } from "@puckeditor/core";
 import { puckConfig } from "@/lib/puck/config";
 import PuckThemeStyles from "@/components/admin/PuckThemeStyles";
-import { draggableOutlinePlugin } from "@/components/puck/DraggableOutline";
+import { puckOverrides } from "@/components/puck/overrides";
+import { useEditorSave } from "@/components/puck/useEditorSave";
 import { STORIES_INDEX_DEFAULTS } from "@/components/public/stories/StoriesIndex";
 import "@puckeditor/core/puck.css";
 
@@ -27,7 +28,6 @@ const SEEDED_DATA: Data = {
 
 export default function StoriesIndexEditorPage() {
   const [initialData, setInitialData] = useState<Data | null>(null);
-  const [saving, setSaving] = useState(false);
 
   const fetchDoc = useCallback(async () => {
     const res = await fetch("/api/stories-index");
@@ -44,18 +44,22 @@ export default function StoriesIndexEditorPage() {
     fetchDoc();
   }, [fetchDoc]);
 
-  const handleSave = async (data: Data) => {
-    setSaving(true);
-    try {
-      await fetch("/api/stories-index", {
+  const save = useCallback(
+    (data: Data) =>
+      fetch("/api/stories-index", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: data }),
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
+      }),
+    [],
+  );
+  const editor = useEditorSave(save);
+  const { begin } = editor;
+
+  // What was loaded is the starting point for "unpublished changes".
+  useEffect(() => {
+    if (initialData) begin(initialData);
+  }, [initialData, begin]);
 
   if (!initialData) {
     return (
@@ -71,16 +75,13 @@ export default function StoriesIndexEditorPage() {
       <Puck
         config={puckConfig}
         data={initialData}
-        onPublish={handleSave}
+        onPublish={editor.onPublish}
+        onChange={editor.onChange}
         headerTitle="Stories — Contents page"
         headerPath="/stories"
-        overrides={draggableOutlinePlugin().overrides}
+        overrides={puckOverrides}
       />
-      {saving && (
-        <div className="fixed bottom-4 right-4 z-50 rounded bg-neutral-900 px-4 py-2 text-sm text-white shadow-lg">
-          Saving...
-        </div>
-      )}
+      {editor.statusEl}
     </div>
   );
 }

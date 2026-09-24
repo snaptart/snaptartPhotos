@@ -37,7 +37,17 @@ const navItems: NavItem[] = [
   { label: "Settings", href: "/admin/settings", icon: SettingsIcon },
 ];
 
-export function AdminSidebar({ userEmail = "" }: { userEmail?: string }) {
+export function AdminSidebar({
+  userEmail = "",
+  siteTitle,
+  logoUrl,
+}: {
+  userEmail?: string;
+  /** From Settings → Identity; the build-time name is only a fallback. */
+  siteTitle?: string | null;
+  logoUrl?: string | null;
+}) {
+  const name = siteTitle || siteConfig.siteName;
   const pathname = usePathname();
   const [open, setOpen] = useState(true);
   const avatarLetter = userEmail.charAt(0).toUpperCase() || "S";
@@ -63,15 +73,21 @@ export function AdminSidebar({ userEmail = "" }: { userEmail?: string }) {
       >
         {/* Brand */}
         <div className="border-b border-admin-border px-[18px] py-5 flex items-center gap-2.5">
-          <div className="w-8 h-8 flex-shrink-0 bg-admin-ink text-admin-surface rounded-md flex items-center justify-center font-serif italic text-lg">
-            {siteConfig.siteName.charAt(0).toLowerCase()}
-          </div>
+          {logoUrl ? (
+            <div className="w-8 h-8 flex-shrink-0 overflow-hidden rounded-md border border-admin-border bg-white p-0.5">
+              <img src={logoUrl} alt="" className="h-full w-full object-contain" />
+            </div>
+          ) : (
+            <div className="w-8 h-8 flex-shrink-0 bg-admin-ink text-admin-surface rounded-md flex items-center justify-center font-serif italic text-lg">
+              {name.charAt(0).toLowerCase()}
+            </div>
+          )}
           <div className="min-w-0">
             <Link
               href="/admin"
               className="font-serif italic text-base leading-none text-admin-ink block truncate"
             >
-              {siteConfig.siteName}
+              {name}
             </Link>
             <div className="font-mono text-[9px] tracking-[1.5px] text-admin-ink-soft mt-0.5">
               ADMIN

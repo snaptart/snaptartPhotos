@@ -2,31 +2,40 @@
 
 import type { Config } from "@puckeditor/core";
 import { DropZone, usePuck } from "@puckeditor/core";
-import { generateHTML } from "@tiptap/html";
-import StarterKit from "@tiptap/starter-kit";
-import Image from "@tiptap/extension-image";
-import Link from "@tiptap/extension-link";
-import TextAlign from "@tiptap/extension-text-align";
-import Underline from "@tiptap/extension-underline";
-import { TextStyle } from "@tiptap/extension-text-style";
-import Color from "@tiptap/extension-color";
-import FontFamily from "@tiptap/extension-font-family";
-import { FontSize } from "@/lib/tiptap/font-size";
-import { Indent } from "@/lib/tiptap/indent";
+import type { ComponentConfig } from "@puckeditor/core";
+import {
+  BreakpointVisibility,
+  hideOnField,
+  phoneColumnsField,
+  responsiveColumns,
+  responsiveGrid,
+  tabletColumnsField,
+  type Breakpoint,
+  type PhoneColumns,
+  type TabletColumns,
+} from "@/lib/puck/responsive";
 import type { JSONContent } from "@tiptap/react";
+import { renderRichText } from "@/lib/tiptap/render-html";
+import { richTextCss } from "@/lib/tiptap/rich-text-css";
 import TiptapEditor from "@/components/admin/TiptapEditor";
+import { Editable, InlineEditScope } from "@/components/puck/inline/Editable";
+import { InlineRichText } from "@/components/puck/inline/InlineRichText";
 import ImagePicker from "@/components/admin/ImagePicker";
 import GalleryPhotoMultiPicker from "@/components/admin/GalleryPhotoMultiPicker";
 import NextLink from "next/link";
 import { parseLinks } from "@/lib/parseLinks";
 import siteConfig from "@/lib/site.config";
+import { ColorControl, ListControl, ListItemField, PhotoControl, PhotoListControl, SegmentedControl, SliderControl, SpacingControl, TextStyleControl } from "@/components/admin/controls";
+import { textStyleCss, type TextStyleValue } from "@/lib/theme/text-style-value";
+import { migrateButton, migrateForm, migrateGalleriesIndex, migrateImageBlock, migrateLinkList } from "@/lib/puck/legacy-typography";
+import { cssColor, withAlpha } from "@/lib/theme/color";
 import {
   GALLERY_ASPECT_CSS,
   GALLERY_ASPECT_OPTIONS,
   type GalleryAspect,
 } from "@/lib/theme/aspect";
-import { fontRole } from "@/lib/theme/role-style";
-import Lightbox from "@/components/public/Lightbox";
+import Lightbox, { photoDate } from "@/components/public/Lightbox";
+import { useGalleryTitle } from "@/lib/galleries-client";
 import type { LightboxPhoto, LightboxSettings } from "@/components/public/Lightbox";
 import StoriesIndex, { STORIES_INDEX_DEFAULTS } from "@/components/public/stories/StoriesIndex";
 import type { IndexStory } from "@/components/public/stories/StoriesIndex";
@@ -37,8 +46,31 @@ import type {
   MapStyle,
 } from "@/components/public/fieldmap/types";
 import { FormWrapperRender } from "@/components/puck/form/FormWrapper";
+import {
+  BreadcrumbRender,
+  DetailsRender,
+  PageIntroRender,
+  SectionHeaderRender,
+  type BreadcrumbProps,
+  type Crumb,
+  type DetailItem,
+  type DetailsProps,
+  type IntroStat,
+  type PageIntroProps,
+  type SectionHeaderProps,
+} from "@/components/puck/blocks/sections";
+import {
+  PLATE_ASPECT_OPTIONS,
+  PhotoPlateRender,
+  SelectedWorkRender,
+  type PhotoPlateProps,
+  type SelectedWorkProps,
+} from "@/components/puck/blocks/photos";
+import type { LibraryPhoto } from "@/lib/puck/photo-ref";
+import { NextCollectionRender, type NextCollectionProps } from "@/components/puck/blocks/collections";
 import type { FormWrapperProps } from "@/components/puck/form/FormWrapper";
 import {
+  FormFieldCell,
   TextFieldRender,
   TextAreaRender,
   SelectFieldRender,
@@ -55,33 +87,8 @@ import type {
   CheckboxProps,
 } from "@/components/puck/form/fields";
 
-// Tiptap extensions for HTML generation
-const tiptapExtensions = [
-  StarterKit,
-  Underline,
-  TextStyle,
-  Color,
-  FontFamily,
-  FontSize,
-  Image,
-  Link,
-  TextAlign.configure({ types: ["heading", "paragraph"] }),
-  Indent,
-];
-
-function tiptapToHtml(content: JSONContent | null): string {
-  if (!content) return "";
-  try {
-    const html = generateHTML(
-      content as Parameters<typeof generateHTML>[0],
-      tiptapExtensions
-    );
-    // Preserve empty paragraphs as visible line breaks
-    return html.replace(/<p([^>]*)><\/p>/g, "<p$1><br></p>");
-  } catch {
-    return "";
-  }
-}
+// Paragraphs, headings and any text style picked in the toolbar, from the theme.
+const RICH_TEXT_CSS = richTextCss(".richtext-render");
 
 // ----- Component prop types -----
 
@@ -92,7 +99,9 @@ type RichTextProps = {
 type HeroProps = {
   imageUrl: string;
   title: string;
+  titleStyle: TextStyleValue;
   subtitle: string;
+  subtitleStyle: TextStyleValue;
   height: string;
   overlay: boolean;
   focalX: number;
@@ -104,13 +113,10 @@ type ImageBlockProps = {
   alt: string;
   aspectRatio: "natural" | "square" | "4:3" | "3:2" | "16:9";
   caption: string;
+  captionStyle: TextStyleValue;
   width: number;
   captionX: number;
   captionY: number;
-  captionFontSize: number;
-  captionColor: string;
-  captionBold: boolean;
-  captionItalic: boolean;
   captionBgColor: string;
   captionBgOpacity: number;
   borderRadius: number;
@@ -141,6 +147,31 @@ type ColumnsProps = {
   columns: "2" | "3";
   distribution: string;
   gap: string;
+  /** How columns of different heights line up. */
+  align: "start" | "center" | "end" | "stretch";
+  /** Below which width the columns stack into one. */
+  stackBelow?: "phone" | "tablet" | "never";
+  /** Stacked, the order the columns come in: "2-1" puts the second first. Blank = as laid out. */
+  stackOrder?: string;
+};
+
+type RowsProps = {
+  gap: number;
+  align: "stretch" | "start" | "center" | "end";
+};
+
+const COLUMN_ALIGN: Record<ColumnsProps["align"], string> = {
+  start: "items-start",
+  center: "items-center",
+  end: "items-end",
+  stretch: "items-stretch",
+};
+
+const ROWS_ALIGN: Record<RowsProps["align"], string> = {
+  stretch: "items-stretch",
+  start: "items-start",
+  center: "items-center",
+  end: "items-end",
 };
 
 export type GlobalLightboxSettings = LightboxSettings;
@@ -148,14 +179,25 @@ export type GlobalLightboxSettings = LightboxSettings;
 type GalleryEmbedProps = {
   gallerySlug: string;
   maxPhotos: number;
-  layout: "grid" | "masonry";
+  /** hang: the design's staggered two columns, the right one dropped lower. */
+  layout: "grid" | "masonry" | "hang";
   columns: "2" | "3" | "4";
+  tabletColumns?: TabletColumns;
+  phoneColumns?: PhoneColumns;
   aspectRatio: GalleryAspect;
   gap: number;
   imageMaxWidth: number;
   borderRadius: number;
   showMetadata: boolean;
   metadataFields: string[];
+  /** Hang: number each photo's caption, 01, 02… */
+  numbered: boolean;
+  /** Hang: how far the right-hand column drops. */
+  hangOffset: number;
+  /** Hang: space between photos down a column. */
+  hangGap: number;
+  captionTitleStyle: TextStyleValue;
+  captionMetaStyle: TextStyleValue;
   useGlobalLightbox: boolean;
   lightboxMetadataFields: string[] | null;
   lightboxCornerRadius: number | null;
@@ -217,6 +259,8 @@ type CarouselProps = {
   gallerySlug: string;
   maxPhotos: number;
   slides: CarouselSlide[];
+  slideTitleStyle: TextStyleValue;
+  slideSubtitleStyle: TextStyleValue;
   slidesPerView: number;
   gap: number;
   aspectRatio: "none" | "16:9" | "3:2" | "4:3" | "1:1" | "3:4" | "2:3" | "9:16";
@@ -241,19 +285,18 @@ type GalleriesIndexProps = {
   sortOrder: "manual" | "position" | "newest" | "oldest" | "title-asc" | "title-desc";
   layout: "grid" | "list";
   columns: "1" | "2" | "3" | "4" | "5" | "6";
+  tabletColumns?: TabletColumns;
+  phoneColumns?: PhoneColumns;
   gap: number;
   showCount: boolean;
+  /** Follows the count on a cover: "04 photographs". */
+  countLabel: string;
+  /** A rule between a cover and its title, as on the design's collections index. */
+  titleRule: boolean;
   dividerColor: string;
-  // Index List gets its own type controls — a row of titles wants different
-  // settings from a caption under a cover. Each falls back to the grid's value
-  // when unset, so blocks saved before these existed look unchanged.
-  listTitleFontRole: "headings" | "body" | "navMenu" | "labels";
-  listTitleSize: number;
-  listTitleWeight: "300" | "400" | "500" | "600" | "700" | "800";
-  listTitleColor: string;
-  listTitleTransform: "none" | "uppercase" | "lowercase" | "capitalize";
-  listTitleTracking: number;
-  listTitleItalic: boolean;
+  // Index List gets its own title style — a row of titles wants different
+  // settings from a caption under a cover.
+  listTitleStyle: TextStyleValue;
   fullBleed: boolean;
   maxWidth: number;
   aspectRatio: GalleryAspect;
@@ -263,13 +306,8 @@ type GalleriesIndexProps = {
   showDescription: boolean;
   titlePosition: "below" | "overlay-bottom" | "overlay-top" | "overlay-center";
   textAlignment: "left" | "center" | "right";
-  titleFontRole: "headings" | "body" | "navMenu" | "labels";
-  titleSize: number;
-  titleColor: string;
-  titleWeight: "300" | "400" | "500" | "600" | "700" | "800";
-  titleTransform: "none" | "uppercase" | "lowercase" | "capitalize";
-  descriptionSize: number;
-  descriptionColor: string;
+  titleStyle: TextStyleValue;
+  descriptionStyle: TextStyleValue;
   textPaddingX: number;
   textPaddingY: number;
   textGap: number;
@@ -296,6 +334,8 @@ type LinkListProps = {
   items: LinkListItem[];
   layout: "vertical-list" | "horizontal-pills" | "button-stack" | "card-grid";
   columns: "1" | "2" | "3" | "4";
+  tabletColumns?: TabletColumns;
+  phoneColumns?: PhoneColumns;
   gap: number;
   alignment: "left" | "center" | "right";
   itemAlignment: "left" | "center" | "right";
@@ -315,15 +355,9 @@ type LinkListProps = {
   borderRadius: number;
   paddingX: number;
   paddingY: number;
-  fontRoleKey: "body" | "headings" | "navMenu" | "labels";
-  fontSize: number;
-  fontWeight: "300" | "400" | "500" | "600" | "700" | "800";
-  letterSpacing: number;
-  textTransform: "none" | "uppercase" | "lowercase" | "capitalize";
-  italic: boolean;
+  labelStyle: TextStyleValue;
   underline: boolean;
-  descriptionSize: number;
-  descriptionColor: string;
+  descriptionStyle: TextStyleValue;
   hoverBgColor: string;
   hoverTextColor: string;
   hoverBorderColor: string;
@@ -360,12 +394,7 @@ type ButtonProps = {
   paddingY: number;
   marginTop: number;
   marginBottom: number;
-  fontRoleKey: "body" | "headings" | "navMenu" | "labels";
-  fontSize: number;
-  fontWeight: "300" | "400" | "500" | "600" | "700" | "800";
-  letterSpacing: number;
-  textTransform: "none" | "uppercase" | "lowercase" | "capitalize";
-  italic: boolean;
+  labelStyle: TextStyleValue;
   underline: boolean;
   hoverBgColor: string;
   hoverTextColor: string;
@@ -376,7 +405,7 @@ type ButtonProps = {
   transitionMs: number;
 };
 
-type Components = {
+export type Components = {
   RichText: RichTextProps;
   Hero: HeroProps;
   HeroSlideshow: HeroSlideshowProps;
@@ -384,6 +413,7 @@ type Components = {
   Spacer: SpacerProps;
   Container: ContainerProps;
   Columns: ColumnsProps;
+  Rows: RowsProps;
   GalleryEmbed: GalleryEmbedProps;
   StoriesIndexBlock: StoriesIndexBlockProps;
   FieldMap: FieldMapBlockProps;
@@ -398,16 +428,58 @@ type Components = {
   RadioGroup: RadioGroupProps;
   CheckboxGroup: CheckboxGroupProps;
   Checkbox: CheckboxProps;
+  PageIntro: PageIntroProps;
+  SectionHeader: SectionHeaderProps;
+  Details: DetailsProps;
+  PhotoPlate: PhotoPlateProps;
+  SelectedWork: SelectedWorkProps;
+  NextCollection: NextCollectionProps;
+  Breadcrumb: BreadcrumbProps;
 };
 
 // ----- Puck config -----
 
+// ----- Columns: stacking -----
+
+// Written out in full so Tailwind finds every class. `order` applies only while
+// stacked; side by side, the columns keep their places.
+const STACK = {
+  phone: { grid: "grid-cols-1 @min-[40rem]:grid-cols-[var(--col-template)]", order: "order-[var(--stack-order)] @min-[40rem]:order-none" },
+  tablet: { grid: "grid-cols-1 @min-[48rem]:grid-cols-[var(--col-template)]", order: "order-[var(--stack-order)] @min-[48rem]:order-none" },
+  never: { grid: "grid-cols-[var(--col-template)]", order: "" },
+} as const;
+
+function permutations(items: number[]): number[][] {
+  if (items.length <= 1) return [items];
+  return items.flatMap((x, i) => permutations([...items.slice(0, i), ...items.slice(i + 1)]).map((rest) => [x, ...rest]));
+}
+
+/** Every order the columns could stack in, "Left first" style for two. */
+function stackOrderOptions(count: 2 | 3) {
+  const natural = { label: "As laid out", value: "" };
+  if (count === 2) return [natural, { label: "Right column first", value: "2-1" }];
+  return [
+    natural,
+    ...permutations([1, 2, 3])
+      .slice(1)
+      .map((order) => ({ label: order.join(" · "), value: order.join("-") })),
+  ];
+}
+
+/** "2-1-3" → each column's place in the stack: [2, 1, 3]. Null for the natural order or a stale value. */
+function stackPositions(order: string | undefined, count: number): number[] | null {
+  const seq = (order ?? "").split("-").map(Number);
+  if (seq.length !== count || new Set(seq).size !== count || seq.some((n) => !(n >= 1 && n <= count))) return null;
+  return Array.from({ length: count }, (_, i) => seq.indexOf(i + 1) + 1);
+}
+
 export const puckConfig: Config<Components> = {
   categories: {
     content: { components: ["RichText", "ImageBlock", "Button", "LinkList", "GalleryEmbed", "GalleriesIndex", "Carousel", "FieldMap"] },
-    layout: { components: ["Columns", "Spacer", "Container"] },
+    layout: { components: ["Columns", "Rows", "Spacer", "Container"] },
     hero: { components: ["Hero", "HeroSlideshow"] },
     stories: { title: "Stories", components: ["StoriesIndexBlock"] },
+    sections: { title: "Page sections", components: ["PageIntro", "SectionHeader", "Details", "PhotoPlate", "SelectedWork", "Breadcrumb", "NextCollection"] },
     forms: { components: ["Form", "TextField", "TextArea", "SelectField", "RadioGroup", "CheckboxGroup", "Checkbox"] },
   },
   components: {
@@ -429,34 +501,20 @@ export const puckConfig: Config<Components> = {
       defaultProps: {
         content: { type: "doc", content: [{ type: "paragraph" }] },
       },
-      render: ({ content }) => {
-        const html = tiptapToHtml(content);
-        if (!html) return <p className="text-neutral-400 italic">Start typing...</p>;
+      render: ({ content, puck }) => {
+        if (puck?.isEditing) {
+          return (
+            <>
+              <style>{RICH_TEXT_CSS}</style>
+              <InlineRichText path="content" content={content} className="richtext-render mx-auto max-w-none" />
+            </>
+          );
+        }
+        const html = renderRichText(content);
+        if (!html) return <></>;
         return (
           <>
-            <style>{`
-              .richtext-render {
-                font-family: var(--theme-font-body-family);
-                font-weight: var(--theme-font-body-weight);
-                font-style: var(--theme-font-body-style);
-                text-transform: var(--theme-font-body-transform);
-              }
-              .richtext-render p { margin: 0.125em 0; line-height: 1.5; font-size: var(--theme-font-body-size, 1.125rem); }
-              .richtext-render h1, .richtext-render h2, .richtext-render h3 {
-                font-family: var(--theme-font-headings-family);
-                font-weight: var(--theme-font-headings-weight);
-                font-style: var(--theme-font-headings-style);
-                text-transform: var(--theme-font-headings-transform);
-                margin: 0.75em 0 0.25em;
-              }
-              .richtext-render h1 { font-size: 2em; }
-              .richtext-render h2 { font-size: 1.5em; }
-              .richtext-render h3 { font-size: 1.25em; }
-              .richtext-render blockquote { border-left: 3px solid var(--theme-color-rule, #d4d4d4); padding-left: 1em; margin: 0.5em 0; font-style: italic; }
-              .richtext-render ul, .richtext-render ol { padding-left: 1.5em; margin: 0.25em 0; }
-              .richtext-render a { text-decoration: underline; }
-              .richtext-render hr { border-top: 1px solid var(--theme-color-rule, #d4d4d4); margin: 1em 0; }
-            `}</style>
+            <style>{RICH_TEXT_CSS}</style>
             <div
               className="richtext-render mx-auto max-w-none"
               dangerouslySetInnerHTML={{ __html: html }}
@@ -477,7 +535,21 @@ export const puckConfig: Config<Components> = {
           ),
         },
         title: { type: "text", label: "Title" },
+        titleStyle: {
+          type: "custom",
+          label: "Text style",
+          render: ({ value, onChange }) => (
+            <TextStyleControl value={value} onChange={onChange} fallback="display" withColor={false} />
+          ),
+        },
         subtitle: { type: "text", label: "Subtitle" },
+        subtitleStyle: {
+          type: "custom",
+          label: "Text style",
+          render: ({ value, onChange }) => (
+            <TextStyleControl value={value} onChange={onChange} fallback="lead" withColor={false} />
+          ),
+        },
         height: {
           type: "select",
           label: "Height",
@@ -488,20 +560,20 @@ export const puckConfig: Config<Components> = {
             { label: "Full Screen", value: "100vh" },
           ],
         },
-        overlay: { type: "radio", label: "Dark Overlay", options: [
+        overlay: { type: "radio", label: "Dark overlay", options: [
           { label: "Yes", value: true },
           { label: "No", value: false },
         ]},
         focalX: {
           type: "custom",
-          label: "Focal Point — Horizontal (0=left, 50=center, 100=right)",
+          label: "Focal point (horizontal)",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={100} step={1} unit="%" label="Horizontal" />
           ),
         },
         focalY: {
           type: "custom",
-          label: "Focal Point — Vertical (0=top, 50=center, 100=bottom)",
+          label: "Focal point (vertical)",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={100} step={1} unit="%" label="Vertical" />
           ),
@@ -510,13 +582,15 @@ export const puckConfig: Config<Components> = {
       defaultProps: {
         imageUrl: "",
         title: "",
+        titleStyle: { style: "display" },
         subtitle: "",
+        subtitleStyle: { style: "lead" },
         height: "500px",
         overlay: true,
         focalX: 50,
         focalY: 50,
       },
-      render: ({ imageUrl, title, subtitle, height, overlay, focalX, focalY }) => (
+      render: ({ imageUrl, title, titleStyle, subtitle, subtitleStyle, height, overlay, focalX, focalY }) => (
         <div
           className="relative flex items-center justify-center bg-neutral-200 bg-cover"
           style={{
@@ -530,13 +604,13 @@ export const puckConfig: Config<Components> = {
           )}
           <div className="relative z-10 text-center px-4">
             {title && (
-              <h1 className="text-4xl md:text-6xl tracking-tight mb-4" style={{ ...fontRole("headings"), color: "var(--theme-color-hero-overlay)" }}>
-                {title}
+              <h1 className="mb-4" style={{ ...textStyleCss(titleStyle, "display", { withColor: false }), color: "var(--theme-color-hero-overlay)" }}>
+                <Editable path="title" value={title} />
               </h1>
             )}
             {subtitle && (
-              <p className="text-xl md:text-2xl" style={{ ...fontRole("overlay"), color: "var(--theme-color-hero-overlay)", opacity: 0.9 }}>
-                {subtitle}
+              <p style={{ ...textStyleCss(subtitleStyle, "lead", { withColor: false }), color: "var(--theme-color-hero-overlay)", opacity: 0.9 }}>
+                <Editable path="subtitle" value={subtitle} />
               </p>
             )}
             {!imageUrl && !title && (
@@ -557,10 +631,10 @@ export const puckConfig: Config<Components> = {
             <ImagePicker value={value} onChange={onChange} />
           ),
         },
-        alt: { type: "text", label: "Alt Text" },
+        alt: { type: "text", label: "Alt text" },
         aspectRatio: {
           type: "select",
-          label: "Aspect Ratio",
+          label: "Aspect ratio",
           options: [
             { label: "Natural", value: "natural" },
             { label: "Square (1:1)", value: "square" },
@@ -571,87 +645,64 @@ export const puckConfig: Config<Components> = {
         },
         width: {
           type: "custom",
-          label: "Width (%)",
+          label: "Width",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={10} max={100} step={1} unit="%" label="Width" />
           ),
         },
         borderRadius: {
           type: "custom",
-          label: "Corner Radius (px)",
+          label: "Corner radius",
           render: ({ value, onChange }) => (
-            <SliderField value={value} onChange={onChange} min={0} max={32} step={1} unit="px" label="Corner Radius" />
+            <SliderField value={value} onChange={onChange} min={0} max={48} step={1} unit="px" label="Corner Radius" />
           ),
         },
         caption: { type: "text", label: "Caption" },
+        captionStyle: {
+          type: "custom",
+          label: "Text style",
+          render: ({ value, onChange }) => (
+            <TextStyleControl value={value} onChange={onChange} fallback="photoTitle" />
+          ),
+        },
         captionX: {
           type: "custom",
-          label: "Caption Horizontal Position",
+          label: "Horizontal",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={-20} max={120} step={1} unit="%" label="Horizontal Position" />
           ),
         },
         captionY: {
           type: "custom",
-          label: "Caption Vertical Position",
+          label: "Vertical",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={-20} max={120} step={1} unit="%" label="Vertical Position" />
           ),
         },
-        captionFontSize: {
-          type: "custom",
-          label: "Caption Font Size",
-          render: ({ value, onChange }) => (
-            <SliderField value={value} onChange={onChange} min={10} max={48} step={1} unit="px" label="Font Size" />
-          ),
-        },
-        captionColor: {
-          type: "custom",
-          label: "Caption Color",
-          render: ({ value, onChange }) => (
-            <ColorField value={value} onChange={onChange} />
-          ),
-        },
-        captionBold: {
-          type: "radio",
-          label: "Caption Bold",
-          options: [
-            { label: "Yes", value: true },
-            { label: "No", value: false },
-          ],
-        },
-        captionItalic: {
-          type: "radio",
-          label: "Caption Italic",
-          options: [
-            { label: "Yes", value: true },
-            { label: "No", value: false },
-          ],
-        },
         captionBgColor: {
           type: "custom",
-          label: "Caption Background Color",
+          label: "Background",
           render: ({ value, onChange }) => (
             <ColorField value={value} onChange={onChange} />
           ),
         },
         captionBgOpacity: {
           type: "custom",
-          label: "Caption Background Opacity",
+          label: "Background opacity",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={100} step={5} unit="%" label="Background Opacity" />
           ),
         },
         linkUrl: {
           type: "custom",
-          label: "Link URL",
+          label: "Goes to",
           render: ({ value, onChange }) => (
             <LinkPicker value={value} onChange={onChange} />
           ),
         },
         linkTarget: {
           type: "select",
-          label: "Link Opens In",
+          label: "Opens in",
           options: [
             { label: "Same Tab", value: "_self" },
             { label: "New Tab", value: "_blank" },
@@ -659,14 +710,14 @@ export const puckConfig: Config<Components> = {
         },
         focalX: {
           type: "custom",
-          label: "Focal Point — Horizontal (0=left, 50=center, 100=right)",
+          label: "Focal point (horizontal)",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={100} step={1} unit="%" label="Horizontal" />
           ),
         },
         focalY: {
           type: "custom",
-          label: "Focal Point — Vertical (0=top, 50=center, 100=bottom)",
+          label: "Focal point (vertical)",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={100} step={1} unit="%" label="Vertical" />
           ),
@@ -677,13 +728,10 @@ export const puckConfig: Config<Components> = {
         alt: "",
         aspectRatio: "natural",
         caption: "",
+        captionStyle: { style: "photoTitle" },
         width: 60,
         captionX: 50,
         captionY: 110,
-        captionFontSize: 14,
-        captionColor: "#737373",
-        captionBold: false,
-        captionItalic: true,
         captionBgColor: "#000000",
         captionBgOpacity: 0,
         borderRadius: 4,
@@ -692,22 +740,21 @@ export const puckConfig: Config<Components> = {
         focalX: 50,
         focalY: 50,
       },
-      render: ({ url, alt, aspectRatio, caption, width, captionX, captionY, captionFontSize, captionColor, captionBold, captionItalic, captionBgColor, captionBgOpacity, borderRadius, linkUrl, linkTarget, focalX, focalY }) => {
+      resolveData: ({ props }) => ({ props: migrateImageBlock(props) }),
+      render: (raw) => {
+        const { url, alt, aspectRatio, caption, captionStyle, width, captionX, captionY, captionBgColor, captionBgOpacity, borderRadius, linkUrl, linkTarget, focalX, focalY } = migrateImageBlock(raw);
         const isPriority = useImagePriority();
         const isOverlay = captionY >= 0 && captionY <= 100;
         const arMap: Record<string, string> = { square: "1/1", "4:3": "4/3", "3:2": "3/2", "16:9": "16/9" };
         const arValue = arMap[aspectRatio];
         const focalPos = `${focalX ?? 50}% ${focalY ?? 50}%`;
-        const captionStyle: React.CSSProperties = {
+        const captionBox: React.CSSProperties = {
+          ...textStyleCss(captionStyle, "photoTitle"),
           position: "absolute",
           left: `${captionX}%`,
           top: `${captionY}%`,
           transform: "translate(-50%, -50%)",
-          fontSize: `${captionFontSize}px`,
-          color: captionColor,
-          fontWeight: captionBold ? "bold" : "normal",
-          fontStyle: captionItalic ? "italic" : "normal",
-          backgroundColor: captionBgOpacity > 0 ? hexToRgba(captionBgColor, captionBgOpacity / 100) : "transparent",
+          backgroundColor: captionBgOpacity > 0 ? withAlpha(captionBgColor, captionBgOpacity / 100) : "transparent",
           padding: captionBgOpacity > 0 ? "4px 10px" : undefined,
           borderRadius: captionBgOpacity > 0 ? "4px" : undefined,
           whiteSpace: "nowrap",
@@ -767,8 +814,8 @@ export const puckConfig: Config<Components> = {
               <div className="relative overflow-visible">
                 {imageEl}
                 {caption && (
-                  <figcaption style={{ ...captionStyle, fontFamily: "var(--theme-font-captions)" }}>
-                    {caption}
+                  <figcaption style={captionBox}>
+                    <Editable path="caption" value={caption} />
                   </figcaption>
                 )}
               </div>
@@ -791,14 +838,14 @@ export const puckConfig: Config<Components> = {
         },
         selectedSlugs: {
           type: "custom",
-          label: `Pick ${siteConfig.labels.gallery} (used when Source = Hand-Picked)`,
+          label: `Pick ${siteConfig.labels.gallery}`,
           render: ({ value, onChange }) => (
             <GalleriesMultiSelect value={value} onChange={onChange} />
           ),
         },
         sortOrder: {
           type: "select",
-          label: "Sort Order",
+          label: "Sort order",
           options: [
             { label: "Manual / As Picked", value: "manual" },
             { label: "Admin Position", value: "position" },
@@ -810,7 +857,7 @@ export const puckConfig: Config<Components> = {
         },
         maxItems: {
           type: "custom",
-          label: "Max Items (0 = no limit)",
+          label: "Max items (0 = all)",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={48} step={1} unit="" label="Max Items" />
           ),
@@ -819,13 +866,13 @@ export const puckConfig: Config<Components> = {
           type: "select",
           label: "Layout",
           options: [
-            { label: "Cover Grid", value: "grid" },
-            { label: "Index List", value: "list" },
+            { label: "Cover grid", value: "grid" },
+            { label: "Index list", value: "list" },
           ],
         },
         columns: {
           type: "select",
-          label: "Columns (Cover Grid)",
+          label: "Columns",
           options: [
             { label: "1", value: "1" },
             { label: "2", value: "2" },
@@ -835,9 +882,20 @@ export const puckConfig: Config<Components> = {
             { label: "6", value: "6" },
           ],
         },
+        tabletColumns: tabletColumnsField,
+        phoneColumns: phoneColumnsField,
         showCount: {
           type: "radio",
-          label: "Show Photo Count (Index List)",
+          label: "Photo count",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        countLabel: { type: "text", label: "After the count", placeholder: "photographs" },
+        titleRule: {
+          type: "radio",
+          label: "Rule above the title",
           options: [
             { label: "Yes", value: true },
             { label: "No", value: false },
@@ -845,82 +903,28 @@ export const puckConfig: Config<Components> = {
         },
         dividerColor: {
           type: "custom",
-          label: "Divider Color (Index List)",
+          label: "Color",
           render: ({ value, onChange }) => (
             <ColorField value={value} onChange={onChange} />
           ),
         },
-        listTitleFontRole: {
-          type: "select",
-          label: "List Title Font",
-          options: [
-            { label: "Headings", value: "headings" },
-            { label: "Body", value: "body" },
-            { label: "Nav / Menu", value: "navMenu" },
-            { label: "Labels", value: "labels" },
-          ],
-        },
-        listTitleSize: {
+        listTitleStyle: {
           type: "custom",
-          label: "List Title Size (px)",
+          label: "Text style",
           render: ({ value, onChange }) => (
-            <SliderField value={value} onChange={onChange} min={12} max={72} step={1} unit="px" label="List Title Size" />
-          ),
-        },
-        listTitleWeight: {
-          type: "select",
-          label: "List Title Weight",
-          options: [
-            { label: "Light (300)", value: "300" },
-            { label: "Regular (400)", value: "400" },
-            { label: "Medium (500)", value: "500" },
-            { label: "Semibold (600)", value: "600" },
-            { label: "Bold (700)", value: "700" },
-            { label: "Extra Bold (800)", value: "800" },
-          ],
-        },
-        listTitleTracking: {
-          type: "custom",
-          label: "List Title Letter Spacing (px)",
-          render: ({ value, onChange }) => (
-            <SliderField value={value} onChange={onChange} min={-2} max={10} step={0.5} unit="px" label="Letter Spacing" />
-          ),
-        },
-        listTitleTransform: {
-          type: "select",
-          label: "List Title Transform",
-          options: [
-            { label: "None", value: "none" },
-            { label: "UPPERCASE", value: "uppercase" },
-            { label: "lowercase", value: "lowercase" },
-            { label: "Capitalize", value: "capitalize" },
-          ],
-        },
-        listTitleItalic: {
-          type: "radio",
-          label: "List Title Italic",
-          options: [
-            { label: "Yes", value: true },
-            { label: "No", value: false },
-          ],
-        },
-        listTitleColor: {
-          type: "custom",
-          label: "List Title Color",
-          render: ({ value, onChange }) => (
-            <ColorField value={value} onChange={onChange} />
+            <TextStyleControl value={value} onChange={onChange} fallback="collectionTitle" />
           ),
         },
         gap: {
           type: "custom",
-          label: "Gap (px)",
+          label: "Gap",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={64} step={2} unit="px" label="Gap" />
           ),
         },
         fullBleed: {
           type: "radio",
-          label: "Full Bleed",
+          label: "Full bleed",
           options: [
             { label: "Yes", value: true },
             { label: "No", value: false },
@@ -928,26 +932,26 @@ export const puckConfig: Config<Components> = {
         },
         maxWidth: {
           type: "custom",
-          label: "Max Width (% — when not full bleed)",
+          label: "Max width",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={30} max={100} step={1} unit="%" label="Max Width" />
           ),
         },
         aspectRatio: {
           type: "select",
-          label: "Image Aspect Ratio",
+          label: "Aspect ratio",
           options: GALLERY_ASPECT_OPTIONS,
         },
         borderRadius: {
           type: "custom",
-          label: "Corner Radius (px)",
+          label: "Corner radius",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={48} step={1} unit="px" label="Corner Radius" />
           ),
         },
         imageHoverEffect: {
           type: "select",
-          label: "Image Hover Effect",
+          label: "Image effect",
           options: [
             { label: "None", value: "none" },
             { label: "Zoom", value: "zoom" },
@@ -958,7 +962,7 @@ export const puckConfig: Config<Components> = {
         },
         showTitle: {
           type: "radio",
-          label: "Show Title",
+          label: "Title",
           options: [
             { label: "Yes", value: true },
             { label: "No", value: false },
@@ -966,7 +970,7 @@ export const puckConfig: Config<Components> = {
         },
         showDescription: {
           type: "radio",
-          label: "Show Description",
+          label: "Description",
           options: [
             { label: "Yes", value: true },
             { label: "No", value: false },
@@ -974,7 +978,7 @@ export const puckConfig: Config<Components> = {
         },
         titlePosition: {
           type: "select",
-          label: "Title Position",
+          label: "Title position",
           options: [
             { label: "Below Image", value: "below" },
             { label: "Overlay — Bottom", value: "overlay-bottom" },
@@ -984,125 +988,79 @@ export const puckConfig: Config<Components> = {
         },
         textAlignment: {
           type: "radio",
-          label: "Text Alignment",
+          label: "Alignment",
           options: [
             { label: "Left", value: "left" },
             { label: "Center", value: "center" },
             { label: "Right", value: "right" },
           ],
         },
-        titleFontRole: {
-          type: "select",
-          label: "Title Font Role",
-          options: [
-            { label: "Headings", value: "headings" },
-            { label: "Body", value: "body" },
-            { label: "Nav / Menu", value: "navMenu" },
-            { label: "Labels", value: "labels" },
-          ],
-        },
-        titleSize: {
+        titleStyle: {
           type: "custom",
-          label: "Title Size (px)",
+          label: "Text style",
           render: ({ value, onChange }) => (
-            <SliderField value={value} onChange={onChange} min={10} max={48} step={1} unit="px" label="Title Size" />
+            <TextStyleControl value={value} onChange={onChange} fallback="collectionTitle" />
           ),
         },
-        titleColor: {
+        descriptionStyle: {
           type: "custom",
-          label: "Title Color",
+          label: "Text style",
           render: ({ value, onChange }) => (
-            <ColorField value={value} onChange={onChange} />
-          ),
-        },
-        titleWeight: {
-          type: "select",
-          label: "Title Weight",
-          options: [
-            { label: "Light (300)", value: "300" },
-            { label: "Regular (400)", value: "400" },
-            { label: "Medium (500)", value: "500" },
-            { label: "Semibold (600)", value: "600" },
-            { label: "Bold (700)", value: "700" },
-            { label: "Extra Bold (800)", value: "800" },
-          ],
-        },
-        titleTransform: {
-          type: "select",
-          label: "Title Transform",
-          options: [
-            { label: "None", value: "none" },
-            { label: "UPPERCASE", value: "uppercase" },
-            { label: "lowercase", value: "lowercase" },
-            { label: "Capitalize", value: "capitalize" },
-          ],
-        },
-        descriptionSize: {
-          type: "custom",
-          label: "Description Size (px)",
-          render: ({ value, onChange }) => (
-            <SliderField value={value} onChange={onChange} min={10} max={24} step={1} unit="px" label="Description Size" />
-          ),
-        },
-        descriptionColor: {
-          type: "custom",
-          label: "Description Color",
-          render: ({ value, onChange }) => (
-            <ColorField value={value} onChange={onChange} />
+            <TextStyleControl value={value} onChange={onChange} fallback="body" />
           ),
         },
         textPaddingX: {
           type: "custom",
-          label: "Text Horizontal Padding (px)",
+          label: "Padding (horizontal)",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={48} step={1} unit="px" label="Padding X" />
           ),
         },
         textPaddingY: {
           type: "custom",
-          label: "Text Vertical Padding (px)",
+          label: "Padding (vertical)",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={48} step={1} unit="px" label="Padding Y" />
           ),
         },
         textGap: {
           type: "custom",
-          label: "Title→Description Gap (px)",
+          label: "Space above description",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={32} step={1} unit="px" label="Gap" />
           ),
         },
         overlayBgColor: {
           type: "custom",
-          label: "Overlay Background Color",
+          label: "Color",
           render: ({ value, onChange }) => (
             <ColorField value={value} onChange={onChange} />
           ),
         },
         overlayOpacity: {
           type: "custom",
-          label: "Overlay Opacity",
+          label: "Opacity",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={100} step={5} unit="%" label="Opacity" />
           ),
         },
         marginTop: {
           type: "custom",
-          label: "Margin Top (px)",
+          label: "Space above",
           render: ({ value, onChange }) => (
-            <SliderField value={value} onChange={onChange} min={0} max={120} step={2} unit="px" label="Margin Top" />
+            <SpacingControl value={value} onChange={onChange} />
           ),
         },
         marginBottom: {
           type: "custom",
-          label: "Margin Bottom (px)",
+          label: "Space below",
           render: ({ value, onChange }) => (
-            <SliderField value={value} onChange={onChange} min={0} max={120} step={2} unit="px" label="Margin Bottom" />
+            <SpacingControl value={value} onChange={onChange} />
           ),
         },
         transitionMs: {
           type: "custom",
-          label: "Hover Transition (ms)",
+          label: "Transition",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={800} step={10} unit="ms" label="Transition" />
           ),
@@ -1117,14 +1075,10 @@ export const puckConfig: Config<Components> = {
         columns: "3",
         gap: 16,
         showCount: true,
+        countLabel: "photographs",
+        titleRule: false,
         dividerColor: "#e5e5e5",
-        listTitleFontRole: "headings",
-        listTitleSize: 20,
-        listTitleWeight: "300",
-        listTitleColor: "#171717",
-        listTitleTransform: "none",
-        listTitleTracking: 0,
-        listTitleItalic: false,
+        listTitleStyle: { style: "collectionTitle", size: 20 },
         fullBleed: false,
         maxWidth: 100,
         aspectRatio: "4:5",
@@ -1134,13 +1088,8 @@ export const puckConfig: Config<Components> = {
         showDescription: false,
         titlePosition: "below",
         textAlignment: "center",
-        titleFontRole: "headings",
-        titleSize: 18,
-        titleColor: "#171717",
-        titleWeight: "500",
-        titleTransform: "none",
-        descriptionSize: 13,
-        descriptionColor: "#737373",
+        titleStyle: { style: "collectionTitle" },
+        descriptionStyle: { style: "body" },
         textPaddingX: 8,
         textPaddingY: 12,
         textGap: 4,
@@ -1150,7 +1099,8 @@ export const puckConfig: Config<Components> = {
         marginBottom: 0,
         transitionMs: 300,
       },
-      render: (props) => <GalleriesIndexRender {...props} />,
+      resolveData: ({ props }) => ({ props: migrateGalleriesIndex(props) }),
+      render: (props) => <GalleriesIndexRender {...migrateGalleriesIndex(props)} />,
     },
 
     LinkList: {
@@ -1175,7 +1125,7 @@ export const puckConfig: Config<Components> = {
         },
         columns: {
           type: "select",
-          label: "Columns (Card Grid)",
+          label: "Columns",
           options: [
             { label: "1", value: "1" },
             { label: "2", value: "2" },
@@ -1183,16 +1133,18 @@ export const puckConfig: Config<Components> = {
             { label: "4", value: "4" },
           ],
         },
+        tabletColumns: tabletColumnsField,
+        phoneColumns: phoneColumnsField,
         gap: {
           type: "custom",
-          label: "Gap (px)",
+          label: "Gap",
           render: ({ value, onChange }) => (
-            <SliderField value={value} onChange={onChange} min={0} max={48} step={1} unit="px" label="Gap" />
+            <SliderField value={value} onChange={onChange} min={0} max={64} step={1} unit="px" label="Gap" />
           ),
         },
         alignment: {
           type: "radio",
-          label: "Block Alignment",
+          label: "Alignment",
           options: [
             { label: "Left", value: "left" },
             { label: "Center", value: "center" },
@@ -1201,7 +1153,7 @@ export const puckConfig: Config<Components> = {
         },
         itemAlignment: {
           type: "radio",
-          label: "Item Text Alignment",
+          label: "Text alignment",
           options: [
             { label: "Left", value: "left" },
             { label: "Center", value: "center" },
@@ -1210,7 +1162,7 @@ export const puckConfig: Config<Components> = {
         },
         showImage: {
           type: "radio",
-          label: "Show Item Image",
+          label: "Image",
           options: [
             { label: "Yes", value: true },
             { label: "No", value: false },
@@ -1218,7 +1170,7 @@ export const puckConfig: Config<Components> = {
         },
         showDescription: {
           type: "radio",
-          label: "Show Description",
+          label: "Description",
           options: [
             { label: "Yes", value: true },
             { label: "No", value: false },
@@ -1226,7 +1178,7 @@ export const puckConfig: Config<Components> = {
         },
         showIcon: {
           type: "radio",
-          label: "Show Icon",
+          label: "Icon",
           options: [
             { label: "Yes", value: true },
             { label: "No", value: false },
@@ -1234,7 +1186,7 @@ export const puckConfig: Config<Components> = {
         },
         imagePosition: {
           type: "select",
-          label: "Image Position",
+          label: "Position",
           options: [
             { label: "Left of text", value: "left" },
             { label: "Right of text", value: "right" },
@@ -1243,14 +1195,14 @@ export const puckConfig: Config<Components> = {
         },
         imageSize: {
           type: "custom",
-          label: "Image Size (px)",
+          label: "Size",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={24} max={400} step={4} unit="px" label="Image Size" />
           ),
         },
         imageAspectRatio: {
           type: "select",
-          label: "Image Aspect Ratio",
+          label: "Aspect ratio",
           options: [
             { label: "Square (1:1)", value: "square" },
             { label: "4:3", value: "4:3" },
@@ -1261,127 +1213,80 @@ export const puckConfig: Config<Components> = {
         },
         imageBorderRadius: {
           type: "custom",
-          label: "Image Corner Radius (px)",
+          label: "Corner radius",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={200} step={1} unit="px" label="Image Radius" />
           ),
         },
         iconGap: {
           type: "custom",
-          label: "Icon/Image Gap (px)",
+          label: "Gap beside image or icon",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={32} step={1} unit="px" label="Icon Gap" />
           ),
         },
         bgColor: {
           type: "custom",
-          label: "Item Background Color",
+          label: "Background",
           render: ({ value, onChange }) => (
             <ColorField value={value} onChange={onChange} />
           ),
         },
         bgOpacity: {
           type: "custom",
-          label: "Item Background Opacity",
+          label: "Background opacity",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={100} step={5} unit="%" label="Opacity" />
           ),
         },
         textColor: {
           type: "custom",
-          label: "Text Color",
+          label: "Text color",
           render: ({ value, onChange }) => (
             <ColorField value={value} onChange={onChange} />
           ),
         },
         borderColor: {
           type: "custom",
-          label: "Border Color",
+          label: "Border color",
           render: ({ value, onChange }) => (
             <ColorField value={value} onChange={onChange} />
           ),
         },
         borderWidth: {
           type: "custom",
-          label: "Border Width (px)",
+          label: "Border width",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={6} step={1} unit="px" label="Border Width" />
           ),
         },
         borderRadius: {
           type: "custom",
-          label: "Item Corner Radius (px)",
+          label: "Corner radius",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={100} step={1} unit="px" label="Corner Radius" />
           ),
         },
         paddingX: {
           type: "custom",
-          label: "Item Padding X (px)",
+          label: "Horizontal",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={64} step={1} unit="px" label="Padding X" />
           ),
         },
         paddingY: {
           type: "custom",
-          label: "Item Padding Y (px)",
+          label: "Vertical",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={48} step={1} unit="px" label="Padding Y" />
           ),
         },
-        fontRoleKey: {
-          type: "select",
-          label: "Font Role",
-          options: [
-            { label: "Body", value: "body" },
-            { label: "Headings", value: "headings" },
-            { label: "Nav / Menu", value: "navMenu" },
-            { label: "Labels", value: "labels" },
-          ],
-        },
-        fontSize: {
+        labelStyle: {
           type: "custom",
-          label: "Font Size (px)",
+          label: "Text style",
           render: ({ value, onChange }) => (
-            <SliderField value={value} onChange={onChange} min={10} max={36} step={1} unit="px" label="Font Size" />
+            <TextStyleControl value={value} onChange={onChange} fallback="body" withColor={false} />
           ),
-        },
-        fontWeight: {
-          type: "select",
-          label: "Font Weight",
-          options: [
-            { label: "Light (300)", value: "300" },
-            { label: "Regular (400)", value: "400" },
-            { label: "Medium (500)", value: "500" },
-            { label: "Semibold (600)", value: "600" },
-            { label: "Bold (700)", value: "700" },
-            { label: "Extra Bold (800)", value: "800" },
-          ],
-        },
-        letterSpacing: {
-          type: "custom",
-          label: "Letter Spacing (px)",
-          render: ({ value, onChange }) => (
-            <SliderField value={value} onChange={onChange} min={-2} max={12} step={0.5} unit="px" label="Letter Spacing" />
-          ),
-        },
-        textTransform: {
-          type: "select",
-          label: "Text Transform",
-          options: [
-            { label: "None", value: "none" },
-            { label: "UPPERCASE", value: "uppercase" },
-            { label: "lowercase", value: "lowercase" },
-            { label: "Capitalize", value: "capitalize" },
-          ],
-        },
-        italic: {
-          type: "radio",
-          label: "Italic",
-          options: [
-            { label: "Yes", value: true },
-            { label: "No", value: false },
-          ],
         },
         underline: {
           type: "radio",
@@ -1391,44 +1296,37 @@ export const puckConfig: Config<Components> = {
             { label: "No", value: false },
           ],
         },
-        descriptionSize: {
+        descriptionStyle: {
           type: "custom",
-          label: "Description Size (px)",
+          label: "Text style",
           render: ({ value, onChange }) => (
-            <SliderField value={value} onChange={onChange} min={10} max={24} step={1} unit="px" label="Description Size" />
-          ),
-        },
-        descriptionColor: {
-          type: "custom",
-          label: "Description Color",
-          render: ({ value, onChange }) => (
-            <ColorField value={value} onChange={onChange} />
+            <TextStyleControl value={value} onChange={onChange} fallback="body" />
           ),
         },
         hoverBgColor: {
           type: "custom",
-          label: "Hover Background Color",
+          label: "Hover background",
           render: ({ value, onChange }) => (
             <ColorField value={value} onChange={onChange} />
           ),
         },
         hoverTextColor: {
           type: "custom",
-          label: "Hover Text Color",
+          label: "Hover text",
           render: ({ value, onChange }) => (
             <ColorField value={value} onChange={onChange} />
           ),
         },
         hoverBorderColor: {
           type: "custom",
-          label: "Hover Border Color",
+          label: "Hover border",
           render: ({ value, onChange }) => (
             <ColorField value={value} onChange={onChange} />
           ),
         },
         hoverEffect: {
           type: "select",
-          label: "Hover Effect",
+          label: "Effect",
           options: [
             { label: "None", value: "none" },
             { label: "Lift", value: "lift" },
@@ -1449,7 +1347,7 @@ export const puckConfig: Config<Components> = {
         },
         hoverShadow: {
           type: "select",
-          label: "Hover Shadow",
+          label: "Hover shadow",
           options: [
             { label: "None", value: "none" },
             { label: "Small", value: "sm" },
@@ -1459,7 +1357,7 @@ export const puckConfig: Config<Components> = {
         },
         dividers: {
           type: "radio",
-          label: "Dividers (Vertical List only)",
+          label: "Between rows",
           options: [
             { label: "Yes", value: true },
             { label: "No", value: false },
@@ -1467,28 +1365,28 @@ export const puckConfig: Config<Components> = {
         },
         dividerColor: {
           type: "custom",
-          label: "Divider Color",
+          label: "Divider color",
           render: ({ value, onChange }) => (
             <ColorField value={value} onChange={onChange} />
           ),
         },
         marginTop: {
           type: "custom",
-          label: "Margin Top (px)",
+          label: "Space above",
           render: ({ value, onChange }) => (
-            <SliderField value={value} onChange={onChange} min={0} max={120} step={2} unit="px" label="Margin Top" />
+            <SpacingControl value={value} onChange={onChange} />
           ),
         },
         marginBottom: {
           type: "custom",
-          label: "Margin Bottom (px)",
+          label: "Space below",
           render: ({ value, onChange }) => (
-            <SliderField value={value} onChange={onChange} min={0} max={120} step={2} unit="px" label="Margin Bottom" />
+            <SpacingControl value={value} onChange={onChange} />
           ),
         },
         transitionMs: {
           type: "custom",
-          label: "Transition (ms)",
+          label: "Transition",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={800} step={10} unit="ms" label="Transition" />
           ),
@@ -1517,15 +1415,9 @@ export const puckConfig: Config<Components> = {
         borderRadius: 4,
         paddingX: 16,
         paddingY: 12,
-        fontRoleKey: "body",
-        fontSize: 16,
-        fontWeight: "500",
-        letterSpacing: 0,
-        textTransform: "none",
-        italic: false,
+        labelStyle: { style: "body" },
         underline: false,
-        descriptionSize: 13,
-        descriptionColor: "#737373",
+        descriptionStyle: { style: "body" },
         hoverBgColor: "#f5f5f5",
         hoverTextColor: "#171717",
         hoverBorderColor: "#d4d4d4",
@@ -1538,7 +1430,8 @@ export const puckConfig: Config<Components> = {
         marginBottom: 0,
         transitionMs: 200,
       },
-      render: (props) => <LinkListRender {...props} />,
+      resolveData: ({ props }) => ({ props: migrateLinkList(props) }),
+      render: (props) => <LinkListRender {...migrateLinkList(props)} />,
     },
 
     Button: {
@@ -1547,24 +1440,24 @@ export const puckConfig: Config<Components> = {
         label: { type: "text", label: "Label" },
         link: {
           type: "custom",
-          label: "Link",
+          label: "Goes to",
           render: ({ value, onChange }) => (
             <LinkPicker value={value} onChange={onChange} />
           ),
         },
         linkTarget: {
           type: "select",
-          label: "Link Opens In",
+          label: "Opens in",
           options: [
             { label: "Same Tab", value: "_self" },
             { label: "New Tab", value: "_blank" },
           ],
         },
-        ariaLabel: { type: "text", label: "Aria Label (accessibility)" },
-        iconText: { type: "text", label: "Icon (text/emoji, e.g. → ↗ ★)" },
+        ariaLabel: { type: "text", label: "Screen-reader label" },
+        iconText: { type: "text", label: "Icon (text or emoji, e.g. → ↗ ★)" },
         iconPosition: {
           type: "radio",
-          label: "Icon Position",
+          label: "Position",
           options: [
             { label: "Left", value: "left" },
             { label: "Right", value: "right" },
@@ -1572,7 +1465,7 @@ export const puckConfig: Config<Components> = {
         },
         iconGap: {
           type: "custom",
-          label: "Icon Gap (px)",
+          label: "Gap",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={32} step={1} unit="px" label="Icon Gap" />
           ),
@@ -1588,7 +1481,7 @@ export const puckConfig: Config<Components> = {
         },
         widthMode: {
           type: "select",
-          label: "Width Mode",
+          label: "Width",
           options: [
             { label: "Auto (fits content)", value: "auto" },
             { label: "Full Width", value: "full" },
@@ -1597,56 +1490,56 @@ export const puckConfig: Config<Components> = {
         },
         customWidth: {
           type: "custom",
-          label: "Custom Width (%)",
+          label: "Custom width",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={10} max={100} step={1} unit="%" label="Width" />
           ),
         },
         minWidth: {
           type: "custom",
-          label: "Min Width (px)",
+          label: "Min width",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={400} step={4} unit="px" label="Min Width" />
           ),
         },
         bgColor: {
           type: "custom",
-          label: "Background Color",
+          label: "Background",
           render: ({ value, onChange }) => (
             <ColorField value={value} onChange={onChange} />
           ),
         },
         bgOpacity: {
           type: "custom",
-          label: "Background Opacity",
+          label: "Background opacity",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={100} step={5} unit="%" label="Opacity" />
           ),
         },
         textColor: {
           type: "custom",
-          label: "Text Color",
+          label: "Text color",
           render: ({ value, onChange }) => (
             <ColorField value={value} onChange={onChange} />
           ),
         },
         borderColor: {
           type: "custom",
-          label: "Border Color",
+          label: "Border color",
           render: ({ value, onChange }) => (
             <ColorField value={value} onChange={onChange} />
           ),
         },
         borderWidth: {
           type: "custom",
-          label: "Border Width (px)",
+          label: "Border width",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={8} step={1} unit="px" label="Border Width" />
           ),
         },
         borderStyle: {
           type: "select",
-          label: "Border Style",
+          label: "Border style",
           options: [
             { label: "Solid", value: "solid" },
             { label: "Dashed", value: "dashed" },
@@ -1655,92 +1548,45 @@ export const puckConfig: Config<Components> = {
         },
         borderRadius: {
           type: "custom",
-          label: "Corner Radius (px)",
+          label: "Corner radius",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={100} step={1} unit="px" label="Corner Radius" />
           ),
         },
         paddingX: {
           type: "custom",
-          label: "Horizontal Padding (px)",
+          label: "Horizontal",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={80} step={1} unit="px" label="Horizontal Padding" />
           ),
         },
         paddingY: {
           type: "custom",
-          label: "Vertical Padding (px)",
+          label: "Vertical",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={60} step={1} unit="px" label="Vertical Padding" />
           ),
         },
         marginTop: {
           type: "custom",
-          label: "Margin Top (px)",
+          label: "Space above",
           render: ({ value, onChange }) => (
-            <SliderField value={value} onChange={onChange} min={0} max={120} step={2} unit="px" label="Margin Top" />
+            <SpacingControl value={value} onChange={onChange} />
           ),
         },
         marginBottom: {
           type: "custom",
-          label: "Margin Bottom (px)",
+          label: "Space below",
           render: ({ value, onChange }) => (
-            <SliderField value={value} onChange={onChange} min={0} max={120} step={2} unit="px" label="Margin Bottom" />
+            <SpacingControl value={value} onChange={onChange} />
           ),
         },
-        fontRoleKey: {
-          type: "select",
-          label: "Font Role",
-          options: [
-            { label: "Body", value: "body" },
-            { label: "Headings", value: "headings" },
-            { label: "Nav / Menu", value: "navMenu" },
-            { label: "Labels", value: "labels" },
-          ],
-        },
-        fontSize: {
+        labelStyle: {
           type: "custom",
-          label: "Font Size (px)",
+          label: "Text style",
           render: ({ value, onChange }) => (
-            <SliderField value={value} onChange={onChange} min={10} max={48} step={1} unit="px" label="Font Size" />
+            <TextStyleControl value={value} onChange={onChange} fallback="label" withColor={false} />
           ),
-        },
-        fontWeight: {
-          type: "select",
-          label: "Font Weight",
-          options: [
-            { label: "Light (300)", value: "300" },
-            { label: "Regular (400)", value: "400" },
-            { label: "Medium (500)", value: "500" },
-            { label: "Semibold (600)", value: "600" },
-            { label: "Bold (700)", value: "700" },
-            { label: "Extra Bold (800)", value: "800" },
-          ],
-        },
-        letterSpacing: {
-          type: "custom",
-          label: "Letter Spacing (px)",
-          render: ({ value, onChange }) => (
-            <SliderField value={value} onChange={onChange} min={-2} max={12} step={0.5} unit="px" label="Letter Spacing" />
-          ),
-        },
-        textTransform: {
-          type: "select",
-          label: "Text Transform",
-          options: [
-            { label: "None", value: "none" },
-            { label: "UPPERCASE", value: "uppercase" },
-            { label: "lowercase", value: "lowercase" },
-            { label: "Capitalize", value: "capitalize" },
-          ],
-        },
-        italic: {
-          type: "radio",
-          label: "Italic",
-          options: [
-            { label: "Yes", value: true },
-            { label: "No", value: false },
-          ],
         },
         underline: {
           type: "radio",
@@ -1752,28 +1598,28 @@ export const puckConfig: Config<Components> = {
         },
         hoverBgColor: {
           type: "custom",
-          label: "Hover Background Color",
+          label: "Hover background",
           render: ({ value, onChange }) => (
             <ColorField value={value} onChange={onChange} />
           ),
         },
         hoverTextColor: {
           type: "custom",
-          label: "Hover Text Color",
+          label: "Hover text",
           render: ({ value, onChange }) => (
             <ColorField value={value} onChange={onChange} />
           ),
         },
         hoverBorderColor: {
           type: "custom",
-          label: "Hover Border Color",
+          label: "Hover border",
           render: ({ value, onChange }) => (
             <ColorField value={value} onChange={onChange} />
           ),
         },
         hoverEffect: {
           type: "select",
-          label: "Hover Effect",
+          label: "Effect",
           options: [
             { label: "None", value: "none" },
             { label: "Lift", value: "lift" },
@@ -1793,7 +1639,7 @@ export const puckConfig: Config<Components> = {
         },
         hoverShadow: {
           type: "select",
-          label: "Hover Shadow",
+          label: "Hover shadow",
           options: [
             { label: "None", value: "none" },
             { label: "Small", value: "sm" },
@@ -1803,7 +1649,7 @@ export const puckConfig: Config<Components> = {
         },
         transitionMs: {
           type: "custom",
-          label: "Transition Duration (ms)",
+          label: "Transition",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={800} step={10} unit="ms" label="Transition" />
           ),
@@ -1832,12 +1678,7 @@ export const puckConfig: Config<Components> = {
         paddingY: 12,
         marginTop: 0,
         marginBottom: 0,
-        fontRoleKey: "labels",
-        fontSize: 14,
-        fontWeight: "500",
-        letterSpacing: 0,
-        textTransform: "none",
-        italic: false,
+        labelStyle: { style: "label" },
         underline: false,
         hoverBgColor: "#404040",
         hoverTextColor: "#ffffff",
@@ -1847,7 +1688,9 @@ export const puckConfig: Config<Components> = {
         hoverShadow: "md",
         transitionMs: 200,
       },
-      render: (props) => <ButtonRender {...props} />,
+      // Blocks saved before text styles: convert the old font settings.
+      resolveData: ({ props }) => ({ props: migrateButton(props) }),
+      render: (props) => <ButtonRender {...migrateButton(props)} />,
     },
 
     Spacer: {
@@ -1864,7 +1707,7 @@ export const puckConfig: Config<Components> = {
         height: { type: "number", label: "Height", min: 0, max: 1000 },
         line: {
           type: "radio",
-          label: "Horizontal Rule",
+          label: "Draw a rule",
           options: [
             { label: "Yes", value: true },
             { label: "No", value: false },
@@ -1872,21 +1715,21 @@ export const puckConfig: Config<Components> = {
         },
         lineWidth: {
           type: "custom",
-          label: "Rule Thickness (px)",
+          label: "Thickness",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={1} max={8} step={1} unit="px" label="Thickness" />
           ),
         },
         lineLength: {
           type: "custom",
-          label: "Rule Width (%)",
+          label: "Length",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={10} max={100} step={5} unit="%" label="Width" />
           ),
         },
         lineAlign: {
           type: "radio",
-          label: "Rule Alignment",
+          label: "Alignment",
           options: [
             { label: "Left", value: "left" },
             { label: "Center", value: "center" },
@@ -1895,9 +1738,9 @@ export const puckConfig: Config<Components> = {
         },
         lineColor: {
           type: "custom",
-          label: "Rule Color (blank = theme hairline)",
+          label: "Color",
           render: ({ value, onChange }) => (
-            <ColorField value={value} onChange={onChange} />
+            <ColorField value={value} onChange={onChange} emptyLabel="Theme hairline" />
           ),
         },
       },
@@ -1925,7 +1768,7 @@ export const puckConfig: Config<Components> = {
             <div
               style={{
                 width: `${lineLength ?? 100}%`,
-                borderTop: `${lineWidth ?? 1}px solid ${lineColor || "var(--theme-color-rule, #e5e5e5)"}`,
+                borderTop: `${lineWidth ?? 1}px solid ${cssColor(lineColor, "var(--theme-color-rule, #e5e5e5)")}`,
               }}
             />
           )}
@@ -1936,14 +1779,45 @@ export const puckConfig: Config<Components> = {
     Container: {
       label: "Container",
       fields: {
-        paddingLeft: { type: "number", label: "Left Padding (px)", min: 0, max: 300 },
-        paddingRight: { type: "number", label: "Right Padding (px)", min: 0, max: 300 },
+        paddingLeft: { type: "number", label: "Left padding", min: 0, max: 300 },
+        paddingRight: { type: "number", label: "Right padding", min: 0, max: 300 },
       },
       defaultProps: { paddingLeft: 0, paddingRight: 0 },
       render: ({ paddingLeft, paddingRight, puck }) => (
         <div style={{ paddingLeft, paddingRight }}>
           <DropZone zone="container-content" />
         </div>
+      ),
+    },
+
+    Rows: {
+      label: "Rows",
+      fields: {
+        gap: {
+          type: "custom",
+          label: "Space between rows",
+          render: ({ value, onChange }) => <SpacingControl value={value} onChange={onChange} />,
+        },
+        align: {
+          type: "radio",
+          label: "Line up",
+          options: [
+            { label: "Full width", value: "stretch" },
+            { label: "Left", value: "start" },
+            { label: "Center", value: "center" },
+            { label: "Right", value: "end" },
+          ],
+        },
+      },
+      defaultProps: { gap: 24, align: "stretch" },
+      // Blocks stacked with a set gap between them — the vertical partner to
+      // Columns. A block's own space above/below still adds to the gap.
+      render: ({ gap, align }) => (
+        <DropZone
+          zone="rows"
+          className={`flex flex-col ${ROWS_ALIGN[align ?? "stretch"]}`}
+          style={{ gap: gap ?? 24 }}
+        />
       ),
     },
 
@@ -1960,7 +1834,7 @@ export const puckConfig: Config<Components> = {
         },
         distribution: {
           type: "select",
-          label: "Width Distribution",
+          label: "Widths",
           options: [],
         },
         gap: {
@@ -1970,6 +1844,30 @@ export const puckConfig: Config<Components> = {
             { label: "Small", value: "gap-4" },
             { label: "Medium", value: "gap-8" },
             { label: "Large", value: "gap-12" },
+          ],
+        },
+        stackBelow: {
+          type: "radio",
+          label: "Stack into one column",
+          options: [
+            { label: "On phones", value: "phone" },
+            { label: "Phones & tablets", value: "tablet" },
+            { label: "Never", value: "never" },
+          ],
+        },
+        stackOrder: {
+          type: "select",
+          label: "Stacked order",
+          options: [],
+        },
+        align: {
+          type: "radio",
+          label: "Line up",
+          options: [
+            { label: "Top", value: "start" },
+            { label: "Middle", value: "center" },
+            { label: "Bottom", value: "end" },
+            { label: "Stretch", value: "stretch" },
           ],
         },
       },
@@ -1991,13 +1889,18 @@ export const puckConfig: Config<Components> = {
           ...fields,
           distribution: {
             type: "select" as const,
-            label: "Width Distribution",
+            label: "Widths",
             options: data.props.columns === "3" ? threeColOptions : twoColOptions,
+          },
+          stackOrder: {
+            type: "select" as const,
+            label: "Stacked order",
+            options: stackOrderOptions(data.props.columns === "3" ? 3 : 2),
           },
         };
       },
-      defaultProps: { columns: "2", distribution: "equal", gap: "gap-8" },
-      render: ({ columns, distribution, gap }) => {
+      defaultProps: { columns: "2", distribution: "equal", gap: "gap-8", align: "stretch", stackBelow: "phone", stackOrder: "" },
+      render: ({ columns, distribution, gap, align, stackBelow, stackOrder }) => {
         const colCount = columns === "3" ? 3 : 2;
 
         // Filter distribution options based on column count
@@ -2024,14 +1927,27 @@ export const puckConfig: Config<Components> = {
         const templateKey = `${colCount}-${dist}`;
         const gridTemplate = gridTemplates[templateKey] || (colCount === 3 ? "1fr 1fr 1fr" : "1fr 1fr");
 
+        // Side by side once the block itself is wide enough (640px, or 768px when
+        // tablets stack too), stacked below that. Measuring the block rather than
+        // the screen keeps the columns in the editor whatever its preview width,
+        // and on the site within any container.
+        const stack = STACK[stackBelow ?? "phone"];
+        const order = stackPositions(stackOrder, colCount);
         return (
-          <div
-            className={`puck-columns grid ${gap}`}
-            style={{ "--col-template": gridTemplate } as React.CSSProperties}
-          >
-            {Array.from({ length: colCount }).map((_, i) => (
-              <DropZone key={i} zone={`column-${i}`} />
-            ))}
+          <div className="@container">
+            <div
+              className={`puck-columns grid ${stack.grid} ${gap} ${COLUMN_ALIGN[align ?? "stretch"]}`}
+              style={{ "--col-template": gridTemplate } as React.CSSProperties}
+            >
+              {Array.from({ length: colCount }).map((_, i) => (
+                <DropZone
+                  key={i}
+                  zone={`column-${i}`}
+                  className={order ? `min-w-0 ${stack.order}` : "min-w-0"}
+                  style={order ? ({ "--stack-order": order[i] } as React.CSSProperties) : undefined}
+                />
+              ))}
+            </div>
           </div>
         );
       },
@@ -2047,10 +1963,10 @@ export const puckConfig: Config<Components> = {
             <GalleryPicker value={value} onChange={onChange} />
           ),
         },
-        maxPhotos: { type: "number", label: `Max ${siteConfig.labels.photos}`, min: 1, max: 20 },
+        maxPhotos: { type: "number", label: `Max ${siteConfig.labels.photos.toLowerCase()}`, min: 1, max: 20 },
         height: {
           type: "select",
-          label: "Height (or min-height when aspect ratio is set)",
+          label: "Height",
           options: [
             { label: "Full Screen (100dvh)", value: "100dvh" },
             { label: "90%", value: "90dvh" },
@@ -2065,7 +1981,7 @@ export const puckConfig: Config<Components> = {
         },
         aspectRatio: {
           type: "select",
-          label: "Aspect Ratio",
+          label: "Aspect ratio",
           options: [
             { label: "None (use height only)", value: "none" },
             { label: "16:9", value: "16:9" },
@@ -2076,7 +1992,7 @@ export const puckConfig: Config<Components> = {
         },
         fullBleed: {
           type: "radio",
-          label: "Full Bleed (edge-to-edge)",
+          label: "Full bleed",
           options: [
             { label: "Yes", value: true },
             { label: "No", value: false },
@@ -2084,7 +2000,7 @@ export const puckConfig: Config<Components> = {
         },
         maxWidth: {
           type: "select",
-          label: "Max Width (when Full Bleed is off)",
+          label: "Max width",
           options: [
             { label: "100%", value: "100%" },
             { label: "90%", value: "90%" },
@@ -2096,7 +2012,7 @@ export const puckConfig: Config<Components> = {
         },
         objectFit: {
           type: "select",
-          label: "Image Fit",
+          label: "Image fit",
           options: [
             { label: "Cover (fill & crop)", value: "cover" },
             { label: "Contain (letterbox)", value: "contain" },
@@ -2104,14 +2020,14 @@ export const puckConfig: Config<Components> = {
         },
         overlayOpacity: {
           type: "custom",
-          label: "Dark Overlay Opacity",
+          label: "Dark overlay",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={0} max={80} step={5} unit="%" label="Overlay Opacity" />
           ),
         },
         autoPlay: {
           type: "radio",
-          label: "Auto-play",
+          label: "Autoplay",
           options: [
             { label: "Yes", value: true },
             { label: "No", value: false },
@@ -2126,7 +2042,7 @@ export const puckConfig: Config<Components> = {
         },
         pauseOnHover: {
           type: "radio",
-          label: "Pause on Hover",
+          label: "Pause on hover",
           options: [
             { label: "Yes", value: true },
             { label: "No", value: false },
@@ -2134,14 +2050,14 @@ export const puckConfig: Config<Components> = {
         },
         transitionDuration: {
           type: "custom",
-          label: "Fade Duration (ms)",
+          label: "Fade speed",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={100} max={2000} step={100} unit="ms" label="Fade Duration" />
           ),
         },
         showArrows: {
           type: "radio",
-          label: "Show Arrows",
+          label: "Arrows",
           options: [
             { label: "Yes", value: true },
             { label: "No", value: false },
@@ -2149,7 +2065,7 @@ export const puckConfig: Config<Components> = {
         },
         showDots: {
           type: "radio",
-          label: "Show Dots",
+          label: "Dots",
           options: [
             { label: "Yes", value: true },
             { label: "No", value: false },
@@ -2208,7 +2124,7 @@ export const puckConfig: Config<Components> = {
       fields: {
         sourceMode: {
           type: "radio",
-          label: "Slide Source",
+          label: "Source",
           options: [
             { label: "Manual slides", value: "manual" },
             { label: `From ${siteConfig.labels.gallery.toLowerCase()}`, value: "gallery" },
@@ -2216,42 +2132,56 @@ export const puckConfig: Config<Components> = {
         },
         gallerySlug: {
           type: "custom",
-          label: `${siteConfig.labels.gallery} (when source is gallery)`,
+          label: siteConfig.labels.gallery,
           render: ({ value, onChange }) => (
             <GalleryPicker value={value} onChange={onChange} />
           ),
         },
         maxPhotos: {
           type: "custom",
-          label: "Max Photos (gallery source)",
+          label: "Max photos",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={1} max={50} step={1} unit="" label="Max Photos" />
           ),
         },
         slides: {
           type: "custom",
-          label: "Slides (manual source)",
+          label: "Slides",
           render: ({ value, onChange }) => (
             <CarouselSlideEditor value={value} onChange={onChange} />
           ),
         },
+        slideTitleStyle: {
+          type: "custom",
+          label: "Title",
+          render: ({ value, onChange }) => (
+            <TextStyleControl value={value} onChange={onChange} fallback="collectionTitle" withColor={false} />
+          ),
+        },
+        slideSubtitleStyle: {
+          type: "custom",
+          label: "Subtitle",
+          render: ({ value, onChange }) => (
+            <TextStyleControl value={value} onChange={onChange} fallback="body" withColor={false} />
+          ),
+        },
         slidesPerView: {
           type: "custom",
-          label: "Slides Per View",
+          label: "Slides per view",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={1} max={5} step={1} unit="" label="Slides Per View" />
           ),
         },
         gap: {
           type: "custom",
-          label: "Gap Between Slides (px)",
+          label: "Gap",
           render: ({ value, onChange }) => (
-            <SliderField value={value} onChange={onChange} min={0} max={48} step={2} unit="px" label="Gap" />
+            <SliderField value={value} onChange={onChange} min={0} max={64} step={2} unit="px" label="Gap" />
           ),
         },
         aspectRatio: {
           type: "select",
-          label: "Aspect Ratio",
+          label: "Aspect ratio",
           options: [
             { label: "None (use height)", value: "none" },
             { label: "16:9 (landscape)", value: "16:9" },
@@ -2279,7 +2209,7 @@ export const puckConfig: Config<Components> = {
         },
         transition: {
           type: "select",
-          label: "Transition Style",
+          label: "Transition",
           options: [
             { label: "Slide", value: "slide" },
             { label: "Fade (single slide only)", value: "fade" },
@@ -2287,14 +2217,14 @@ export const puckConfig: Config<Components> = {
         },
         transitionDuration: {
           type: "custom",
-          label: "Transition Duration (ms)",
+          label: "Transition speed",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={100} max={2000} step={100} unit="ms" label="Duration" />
           ),
         },
         objectFit: {
           type: "select",
-          label: "Image Fit",
+          label: "Image fit",
           options: [
             { label: "Cover (fill & crop)", value: "cover" },
             { label: "Contain (letterbox)", value: "contain" },
@@ -2302,14 +2232,14 @@ export const puckConfig: Config<Components> = {
         },
         borderRadius: {
           type: "custom",
-          label: "Corner Radius (px)",
+          label: "Corner radius",
           render: ({ value, onChange }) => (
-            <SliderField value={value} onChange={onChange} min={0} max={32} step={1} unit="px" label="Corner Radius" />
+            <SliderField value={value} onChange={onChange} min={0} max={48} step={1} unit="px" label="Corner Radius" />
           ),
         },
         autoPlay: {
           type: "radio",
-          label: "Auto-play",
+          label: "Autoplay",
           options: [
             { label: "Yes", value: true },
             { label: "No", value: false },
@@ -2324,7 +2254,7 @@ export const puckConfig: Config<Components> = {
         },
         pauseOnHover: {
           type: "radio",
-          label: "Pause on Hover",
+          label: "Pause on hover",
           options: [
             { label: "Yes", value: true },
             { label: "No", value: false },
@@ -2332,7 +2262,7 @@ export const puckConfig: Config<Components> = {
         },
         showArrows: {
           type: "radio",
-          label: "Show Arrows",
+          label: "Arrows",
           options: [
             { label: "Yes", value: true },
             { label: "No", value: false },
@@ -2340,7 +2270,7 @@ export const puckConfig: Config<Components> = {
         },
         showDots: {
           type: "radio",
-          label: "Show Dots",
+          label: "Dots",
           options: [
             { label: "Yes", value: true },
             { label: "No", value: false },
@@ -2348,14 +2278,14 @@ export const puckConfig: Config<Components> = {
         },
         initialSlide: {
           type: "custom",
-          label: "Initial Slide (centered on load)",
+          label: "Start on slide",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={1} max={50} step={1} unit="" label="Initial Slide" />
           ),
         },
         slideLinkOverrides: {
           type: "custom",
-          label: "Per-photo links (gallery source)",
+          label: "Per-photo links",
           render: ({ value, onChange }) => (
             <CarouselGalleryLinkOverridesEditor value={value} onChange={onChange} />
           ),
@@ -2366,6 +2296,8 @@ export const puckConfig: Config<Components> = {
         gallerySlug: "",
         maxPhotos: 12,
         slides: [],
+        slideTitleStyle: { style: "collectionTitle" },
+        slideSubtitleStyle: { style: "body" },
         slidesPerView: 3,
         gap: 16,
         aspectRatio: "4:3",
@@ -2417,13 +2349,14 @@ export const puckConfig: Config<Components> = {
             <GalleryPicker value={value} onChange={onChange} />
           ),
         },
-        maxPhotos: { type: "number", label: `Max ${siteConfig.labels.photos}`, min: 1, max: 50 },
+        maxPhotos: { type: "number", label: `Max ${siteConfig.labels.photos.toLowerCase()}`, min: 1, max: 50 },
         layout: {
           type: "select",
           label: "Layout",
           options: [
             { label: "Grid", value: "grid" },
             { label: "Masonry", value: "masonry" },
+            { label: "Hang (staggered pair)", value: "hang" },
           ],
         },
         columns: {
@@ -2435,35 +2368,37 @@ export const puckConfig: Config<Components> = {
             { label: "4 Columns", value: "4" },
           ],
         },
+        tabletColumns: tabletColumnsField,
+        phoneColumns: phoneColumnsField,
         aspectRatio: {
           type: "select",
-          label: "Aspect Ratio",
+          label: "Aspect ratio",
           options: GALLERY_ASPECT_OPTIONS,
         },
         gap: {
           type: "custom",
-          label: "Gap (px)",
+          label: "Gap",
           render: ({ value, onChange }) => (
-            <SliderField value={value} onChange={onChange} min={0} max={48} step={1} unit="px" label="Gap" />
+            <SliderField value={value} onChange={onChange} min={0} max={64} step={1} unit="px" label="Gap" />
           ),
         },
         imageMaxWidth: {
           type: "custom",
-          label: "Image Max Width (px)",
+          label: "Max photo width",
           render: ({ value, onChange }) => (
             <SliderField value={value} onChange={onChange} min={100} max={800} step={10} unit="px" label="Max Width" />
           ),
         },
         borderRadius: {
           type: "custom",
-          label: "Corner Radius (px)",
+          label: "Corner radius",
           render: ({ value, onChange }) => (
-            <SliderField value={value} onChange={onChange} min={0} max={32} step={1} unit="px" label="Corner Radius" />
+            <SliderField value={value} onChange={onChange} min={0} max={48} step={1} unit="px" label="Corner Radius" />
           ),
         },
         showMetadata: {
           type: "radio",
-          label: "Show Photo Info",
+          label: "Show",
           options: [
             { label: "Yes", value: true },
             { label: "No", value: false },
@@ -2471,36 +2406,68 @@ export const puckConfig: Config<Components> = {
         },
         metadataFields: {
           type: "custom",
-          label: "Info to Display",
+          label: "Details to show",
           render: ({ value, onChange }) => (
             <MetadataFieldsPicker value={value} onChange={onChange} />
           ),
         },
+        numbered: {
+          type: "radio",
+          label: "Number the photos",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        hangOffset: {
+          type: "custom",
+          label: "Right column drops by",
+          render: ({ value, onChange }) => <SliderField value={value ?? 140} onChange={onChange} min={0} max={400} step={4} unit="px" />,
+        },
+        hangGap: {
+          type: "custom",
+          label: "Space between photos",
+          render: ({ value, onChange }) => <SliderField value={value ?? 76} onChange={onChange} min={0} max={160} step={2} unit="px" />,
+        },
+        captionTitleStyle: {
+          type: "custom",
+          label: "Title",
+          render: ({ value, onChange }) => (
+            <TextStyleControl value={value} onChange={onChange} fallback="photoTitle" />
+          ),
+        },
+        captionMetaStyle: {
+          type: "custom",
+          label: "Details",
+          render: ({ value, onChange }) => (
+            <TextStyleControl value={value} onChange={onChange} fallback="meta" />
+          ),
+        },
         useGlobalLightbox: {
           type: "radio",
-          label: "Lightbox Settings",
+          label: "Settings",
           options: [
-            { label: "Use global defaults", value: true },
-            { label: "Customize for this embed", value: false },
+            { label: "Site defaults", value: true },
+            { label: "Custom", value: false },
           ],
         },
         lightboxMetadataFields: {
           type: "custom",
-          label: "Lightbox: Metadata to Show",
+          label: "Details to show",
           render: ({ value, onChange }) => (
             <MetadataFieldsPicker value={value ?? ["title", "location"]} onChange={onChange} />
           ),
         },
         lightboxCornerRadius: {
           type: "custom",
-          label: "Lightbox: Corner Radius (px)",
+          label: "Corner radius",
           render: ({ value, onChange }) => (
-            <SliderField value={value ?? 0} onChange={onChange} min={0} max={32} step={1} unit="px" label="Corner Radius" />
+            <SliderField value={value ?? 0} onChange={onChange} min={0} max={48} step={1} unit="px" label="Corner Radius" />
           ),
         },
         lightboxCaptionPosition: {
           type: "select",
-          label: "Lightbox: Caption Position",
+          label: "Caption position",
           options: [
             { label: "Below image", value: "below" },
             { label: "Overlay — top", value: "overlay-top" },
@@ -2509,7 +2476,7 @@ export const puckConfig: Config<Components> = {
         },
         lightboxFadeSpeed: {
           type: "select",
-          label: "Lightbox: Fade Speed",
+          label: "Fade speed",
           options: [
             { label: "None (instant)", value: "none" },
             { label: "Fast (150ms)", value: "fast" },
@@ -2519,7 +2486,7 @@ export const puckConfig: Config<Components> = {
         },
         lightboxCaptionAlignment: {
           type: "select",
-          label: "Lightbox: Caption Alignment",
+          label: "Caption alignment",
           options: [
             { label: "Left", value: "left" },
             { label: "Center", value: "center" },
@@ -2538,6 +2505,11 @@ export const puckConfig: Config<Components> = {
         borderRadius: 8,
         showMetadata: false,
         metadataFields: ["title"],
+        numbered: true,
+        hangOffset: 140,
+        hangGap: 76,
+        captionTitleStyle: { style: "photoTitle" },
+        captionMetaStyle: { style: "meta" },
         useGlobalLightbox: true,
         lightboxMetadataFields: ["title", "location"],
         lightboxCornerRadius: 0,
@@ -2545,7 +2517,7 @@ export const puckConfig: Config<Components> = {
         lightboxFadeSpeed: "medium",
         lightboxCaptionAlignment: "left",
       },
-      render: ({ gallerySlug, maxPhotos, layout, columns, aspectRatio, gap, imageMaxWidth, borderRadius, showMetadata, metadataFields, useGlobalLightbox, lightboxMetadataFields, lightboxCornerRadius, lightboxCaptionPosition, lightboxFadeSpeed, lightboxCaptionAlignment, puck }) => {
+      render: ({ gallerySlug, maxPhotos, layout, columns, tabletColumns, phoneColumns, aspectRatio, gap, imageMaxWidth, borderRadius, showMetadata, metadataFields, numbered, hangOffset, hangGap, captionTitleStyle, captionMetaStyle, useGlobalLightbox, lightboxMetadataFields, lightboxCornerRadius, lightboxCaptionPosition, lightboxFadeSpeed, lightboxCaptionAlignment, puck }) => {
         if (!gallerySlug) {
           return (
             <div className="rounded border-2 border-dashed border-neutral-300 p-8 text-center text-neutral-400">
@@ -2560,12 +2532,19 @@ export const puckConfig: Config<Components> = {
             max={maxPhotos}
             layout={layout}
             columns={columns}
+            tabletColumns={tabletColumns}
+            phoneColumns={phoneColumns}
             aspectRatio={aspectRatio}
             gap={gap}
             imageMaxWidth={imageMaxWidth}
             borderRadius={borderRadius}
             showMetadata={showMetadata}
             metadataFields={metadataFields}
+            numbered={numbered ?? true}
+            hangOffset={hangOffset ?? 140}
+            hangGap={hangGap ?? 76}
+            captionTitleStyle={captionTitleStyle}
+            captionMetaStyle={captionMetaStyle}
             useGlobalLightbox={useGlobalLightbox}
             lightboxMetadataFields={lightboxMetadataFields}
             lightboxCornerRadius={lightboxCornerRadius}
@@ -2678,7 +2657,7 @@ export const puckConfig: Config<Components> = {
               rel="stylesheet"
               href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
             />
-            <div className="relative w-full" style={{ ...fillStyle, backgroundColor }}>
+            <div className="relative w-full" style={{ ...fillStyle, backgroundColor: cssColor(backgroundColor) }}>
               <FieldMap
                 regions={injected.regions}
                 yearBounds={injected.yearBounds}
@@ -2686,7 +2665,7 @@ export const puckConfig: Config<Components> = {
                 mapStyle={mapStyle}
                 siteTitle={injected.siteTitle}
                 showBrand={showBrand}
-                backgroundColor={backgroundColor}
+                backgroundColor={cssColor(backgroundColor)}
               />
             </div>
           </>
@@ -2694,30 +2673,741 @@ export const puckConfig: Config<Components> = {
       },
     },
 
+    // ----- Page sections (design canvas) -----
+
+    PageIntro: {
+      label: "Page Intro",
+      fields: {
+        eyebrow: { type: "text", label: "Eyebrow" },
+        title: { type: "textarea", label: "Title" },
+        text: { type: "textarea", label: "Text (a blank line starts a new paragraph)" },
+        linkLabel: { type: "text", label: "Link text" },
+        link: {
+          type: "custom",
+          label: "Goes to",
+          render: ({ value, onChange }) => <LinkPicker value={value ?? ""} onChange={onChange} />,
+        },
+        stats: {
+          type: "custom",
+          render: ({ value, onChange }) => (
+            <ListControl<IntroStat>
+              value={value}
+              onChange={onChange}
+              addLabel="Add stat"
+              newItem={() => ({ id: crypto.randomUUID(), label: "", value: "" })}
+              summary={(s) => [s.label, s.value].filter(Boolean).join(" · ")}
+              renderItem={(s, update) => (
+                <>
+                  <ListItemField label="Label" value={s.label} onChange={(v) => update({ label: v })} placeholder="Photographs" />
+                  <ListItemField label="Value" value={s.value} onChange={(v) => update({ value: v })} placeholder="04" />
+                </>
+              )}
+            />
+          ),
+        },
+        eyebrowStyle: {
+          type: "custom",
+          label: "Text style",
+          render: ({ value, onChange }) => <TextStyleControl value={value} onChange={onChange} fallback="label" />,
+        },
+        titleStyle: {
+          type: "custom",
+          label: "Text style",
+          render: ({ value, onChange }) => <TextStyleControl value={value} onChange={onChange} fallback="display" />,
+        },
+        titleTag: {
+          type: "radio",
+          label: "Heading level",
+          options: [
+            { label: "Page title (H1)", value: "h1" },
+            { label: "Section (H2)", value: "h2" },
+          ],
+        },
+        textStyle: {
+          type: "custom",
+          label: "Text style",
+          render: ({ value, onChange }) => <TextStyleControl value={value} onChange={onChange} fallback="lead" />,
+        },
+        linkStyle: {
+          type: "custom",
+          label: "Text style",
+          render: ({ value, onChange }) => <TextStyleControl value={value} onChange={onChange} fallback="label" withColor={false} />,
+        },
+        statLabelStyle: {
+          type: "custom",
+          label: "Label text style",
+          render: ({ value, onChange }) => <TextStyleControl value={value} onChange={onChange} fallback="meta" />,
+        },
+        statValueStyle: {
+          type: "custom",
+          label: "Value text style",
+          render: ({ value, onChange }) => <TextStyleControl value={value} onChange={onChange} fallback="collectionTitle" />,
+        },
+        alignment: {
+          type: "radio",
+          label: "Alignment",
+          options: [
+            { label: "Left", value: "left" },
+            { label: "Center", value: "center" },
+          ],
+        },
+        textMaxWidth: {
+          type: "custom",
+          label: "Text width (0 = full)",
+          render: ({ value, onChange }) => <SliderField value={value ?? 0} onChange={onChange} min={0} max={1248} step={4} unit="px" />,
+        },
+        ruleBelow: {
+          type: "radio",
+          label: "Rule below",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        ruleGap: {
+          type: "custom",
+          label: "Space above the rule",
+          render: ({ value, onChange }) => <SpacingControl value={value} onChange={onChange} />,
+        },
+        marginTop: {
+          type: "custom",
+          label: "Space above",
+          render: ({ value, onChange }) => <SpacingControl value={value} onChange={onChange} />,
+        },
+        marginBottom: {
+          type: "custom",
+          label: "Space below",
+          render: ({ value, onChange }) => <SpacingControl value={value} onChange={onChange} />,
+        },
+      },
+      defaultProps: {
+        eyebrow: "Collections",
+        title: "Bodies of work.",
+        text: "",
+        linkLabel: "",
+        link: "",
+        stats: [],
+        eyebrowStyle: { style: "label" },
+        titleStyle: { style: "display" },
+        titleTag: "h1",
+        textStyle: { style: "lead" },
+        linkStyle: { style: "label" },
+        statLabelStyle: { style: "meta" },
+        statValueStyle: { style: "collectionTitle", size: 26 },
+        alignment: "left",
+        textMaxWidth: 720,
+        ruleBelow: true,
+        ruleGap: 64,
+        marginTop: 0,
+        marginBottom: 72,
+      },
+      render: ({ puck: _puck, ...props }) => <PageIntroRender {...props} />,
+    },
+
+    SectionHeader: {
+      label: "Section Header",
+      fields: {
+        title: { type: "text", label: "Title" },
+        linkLabel: { type: "text", label: "Link text" },
+        link: {
+          type: "custom",
+          label: "Goes to",
+          render: ({ value, onChange }) => <LinkPicker value={value ?? ""} onChange={onChange} />,
+        },
+        titleStyle: {
+          type: "custom",
+          label: "Text style",
+          render: ({ value, onChange }) => <TextStyleControl value={value} onChange={onChange} fallback="label" />,
+        },
+        titleTag: {
+          type: "radio",
+          label: "Heading level",
+          options: [
+            { label: "H2", value: "h2" },
+            { label: "H3", value: "h3" },
+          ],
+        },
+        linkStyle: {
+          type: "custom",
+          label: "Text style",
+          render: ({ value, onChange }) => <TextStyleControl value={value} onChange={onChange} fallback="meta" />,
+        },
+        ruleBelow: {
+          type: "radio",
+          label: "Rule below",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        marginTop: {
+          type: "custom",
+          label: "Space above",
+          render: ({ value, onChange }) => <SpacingControl value={value} onChange={onChange} />,
+        },
+        marginBottom: {
+          type: "custom",
+          label: "Space below",
+          render: ({ value, onChange }) => <SpacingControl value={value} onChange={onChange} />,
+        },
+      },
+      defaultProps: {
+        title: "Selected work",
+        linkLabel: "",
+        link: "",
+        titleStyle: { style: "label" },
+        titleTag: "h2",
+        linkStyle: { style: "meta" },
+        ruleBelow: true,
+        marginTop: 48,
+        marginBottom: 48,
+      },
+      render: ({ puck: _puck, ...props }) => <SectionHeaderRender {...props} />,
+    },
+
+    Details: {
+      label: "Details",
+      fields: {
+        items: {
+          type: "custom",
+          render: ({ value, onChange }) => (
+            <ListControl<DetailItem>
+              value={value}
+              onChange={onChange}
+              addLabel="Add detail"
+              newItem={() => ({ id: crypto.randomUUID(), term: "", description: "", link: "" })}
+              summary={(d) => [d.term, d.description].filter(Boolean).join(" · ")}
+              renderItem={(d, update) => (
+                <>
+                  <ListItemField label="Term" value={d.term} onChange={(v) => update({ term: v })} placeholder="Email" />
+                  <ListItemField label="Description" value={d.description} onChange={(v) => update({ description: v })} multiline />
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[12px] font-medium text-admin-ink">Link (optional)</span>
+                    <LinkPicker value={d.link} onChange={(v) => update({ link: v })} />
+                  </div>
+                </>
+              )}
+            />
+          ),
+        },
+        layout: {
+          type: "radio",
+          label: "Layout",
+          options: [
+            { label: "Rows", value: "rows" },
+            { label: "Columns", value: "columns" },
+            { label: "In a line", value: "inline" },
+          ],
+        },
+        columns: {
+          type: "select",
+          label: "Columns",
+          options: [
+            { label: "2", value: "2" },
+            { label: "3", value: "3" },
+            { label: "4", value: "4" },
+          ],
+        },
+        tabletColumns: tabletColumnsField,
+        phoneColumns: phoneColumnsField,
+        dividers: {
+          type: "radio",
+          label: "Rules between rows",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        termStyle: {
+          type: "custom",
+          label: "Text style",
+          render: ({ value, onChange }) => <TextStyleControl value={value} onChange={onChange} fallback="meta" />,
+        },
+        descriptionStyle: {
+          type: "custom",
+          label: "Text style",
+          render: ({ value, onChange }) => <TextStyleControl value={value} onChange={onChange} fallback="collectionTitle" />,
+        },
+        marginTop: {
+          type: "custom",
+          label: "Space above",
+          render: ({ value, onChange }) => <SpacingControl value={value} onChange={onChange} />,
+        },
+        marginBottom: {
+          type: "custom",
+          label: "Space below",
+          render: ({ value, onChange }) => <SpacingControl value={value} onChange={onChange} />,
+        },
+      },
+      defaultProps: {
+        items: [],
+        layout: "rows",
+        columns: "3",
+        dividers: true,
+        termStyle: { style: "meta" },
+        descriptionStyle: { style: "collectionTitle", size: 22 },
+        marginTop: 0,
+        marginBottom: 48,
+      },
+      render: ({ puck, ...props }) => <DetailsRender {...props} editing={!!puck?.isEditing} />,
+    },
+
+    PhotoPlate: {
+      label: "Photo Plate",
+      fields: {
+        photo: {
+          type: "custom",
+          render: ({ value, onChange }) => <PhotoControl value={value} onChange={onChange} />,
+        },
+        title: { type: "text", label: "Title (blank = the photo's title)" },
+        meta: { type: "text", label: "Details (blank = the photo's location)" },
+        onClick: {
+          type: "radio",
+          label: "Clicking the photo",
+          options: [
+            { label: "Enlarges it", value: "lightbox" },
+            { label: "Follows a link", value: "link" },
+            { label: "Nothing", value: "none" },
+          ],
+        },
+        link: {
+          type: "custom",
+          label: "Goes to",
+          render: ({ value, onChange }) => <LinkPicker value={value ?? ""} onChange={onChange} />,
+        },
+        aspectRatio: {
+          type: "select",
+          label: "Crop",
+          options: PLATE_ASPECT_OPTIONS,
+        },
+        showCaption: {
+          type: "radio",
+          label: "Display",
+          options: [
+            { label: "Show", value: true },
+            { label: "Hide", value: false },
+          ],
+        },
+        captionRule: {
+          type: "radio",
+          label: "Rule above the caption",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        titleStyle: {
+          type: "custom",
+          label: "Title text style",
+          render: ({ value, onChange }) => <TextStyleControl value={value} onChange={onChange} fallback="photoTitle" />,
+        },
+        metaStyle: {
+          type: "custom",
+          label: "Details text style",
+          render: ({ value, onChange }) => <TextStyleControl value={value} onChange={onChange} fallback="meta" />,
+        },
+        marginTop: {
+          type: "custom",
+          label: "Space above",
+          render: ({ value, onChange }) => <SpacingControl value={value} onChange={onChange} />,
+        },
+        marginBottom: {
+          type: "custom",
+          label: "Space below",
+          render: ({ value, onChange }) => <SpacingControl value={value} onChange={onChange} />,
+        },
+      },
+      defaultProps: {
+        photo: null,
+        title: "",
+        meta: "",
+        onClick: "lightbox",
+        link: "",
+        aspectRatio: "natural",
+        showCaption: true,
+        captionRule: true,
+        titleStyle: { style: "photoTitle" },
+        metaStyle: { style: "meta" },
+        marginTop: 0,
+        marginBottom: 72,
+      },
+      render: ({ puck, ...props }) => {
+        const metadata = puck?.metadata as Record<string, unknown> | undefined;
+        return (
+          <PhotoPlateRender
+            {...props}
+            editing={!!puck?.isEditing}
+            library={metadata?.photosById as Record<string, LibraryPhoto> | undefined}
+            lightbox={metadata?.globalLightbox as GlobalLightboxSettings | undefined}
+          />
+        );
+      },
+    },
+
+    SelectedWork: {
+      label: "Selected Work",
+      fields: {
+        photos: {
+          type: "custom",
+          render: ({ value, onChange }) => <PhotoListControl value={value} onChange={onChange} />,
+        },
+        onClick: {
+          type: "radio",
+          label: "Clicking a photo",
+          options: [
+            { label: "Enlarges it", value: "lightbox" },
+            { label: "Nothing", value: "none" },
+          ],
+        },
+        showTitles: {
+          type: "radio",
+          label: "Titles",
+          options: [
+            { label: "Show", value: true },
+            { label: "Hide", value: false },
+          ],
+        },
+        titleStyle: {
+          type: "custom",
+          label: "Text style",
+          render: ({ value, onChange }) => <TextStyleControl value={value} onChange={onChange} fallback="photoTitle" />,
+        },
+        aspectRatio: {
+          type: "select",
+          label: "Crop",
+          options: GALLERY_ASPECT_OPTIONS,
+        },
+        columns: {
+          type: "select",
+          label: "Columns",
+          options: [
+            { label: "2", value: "2" },
+            { label: "3", value: "3" },
+            { label: "4", value: "4" },
+          ],
+        },
+        tabletColumns: tabletColumnsField,
+        phoneColumns: phoneColumnsField,
+        columnGap: {
+          type: "custom",
+          label: "Gap between columns",
+          render: ({ value, onChange }) => <SliderField value={value ?? 24} onChange={onChange} min={0} max={64} step={1} unit="px" />,
+        },
+        rowGap: {
+          type: "custom",
+          label: "Gap between rows",
+          render: ({ value, onChange }) => <SliderField value={value ?? 56} onChange={onChange} min={0} max={120} step={2} unit="px" />,
+        },
+        marginTop: {
+          type: "custom",
+          label: "Space above",
+          render: ({ value, onChange }) => <SpacingControl value={value} onChange={onChange} />,
+        },
+        marginBottom: {
+          type: "custom",
+          label: "Space below",
+          render: ({ value, onChange }) => <SpacingControl value={value} onChange={onChange} />,
+        },
+      },
+      defaultProps: {
+        photos: [],
+        onClick: "lightbox",
+        showTitles: true,
+        titleStyle: { style: "photoTitle", size: 17 },
+        aspectRatio: "4:5",
+        columns: "3",
+        columnGap: 24,
+        rowGap: 56,
+        marginTop: 0,
+        marginBottom: 96,
+      },
+      render: ({ puck, ...props }) => {
+        const metadata = puck?.metadata as Record<string, unknown> | undefined;
+        return (
+          <SelectedWorkRender
+            {...props}
+            editing={!!puck?.isEditing}
+            library={metadata?.photosById as Record<string, LibraryPhoto> | undefined}
+            lightbox={metadata?.globalLightbox as GlobalLightboxSettings | undefined}
+          />
+        );
+      },
+    },
+
+    NextCollection: {
+      label: "Next Collection",
+      fields: {
+        gallerySlug: {
+          type: "custom",
+          label: "This page's collection",
+          render: ({ value, onChange }) => <GalleryPicker value={value ?? ""} onChange={onChange} />,
+        },
+        label: { type: "text", label: "Label" },
+        wrap: {
+          type: "radio",
+          label: "After the last collection",
+          options: [
+            { label: "Back to the first", value: true },
+            { label: "Show nothing", value: false },
+          ],
+        },
+        labelStyle: {
+          type: "custom",
+          label: "Text style",
+          render: ({ value, onChange }) => <TextStyleControl value={value} onChange={onChange} fallback="label" />,
+        },
+        titleStyle: {
+          type: "custom",
+          label: "Text style",
+          render: ({ value, onChange }) => <TextStyleControl value={value} onChange={onChange} fallback="display" />,
+        },
+        marginTop: {
+          type: "custom",
+          label: "Space above",
+          render: ({ value, onChange }) => <SpacingControl value={value} onChange={onChange} />,
+        },
+        marginBottom: {
+          type: "custom",
+          label: "Space below",
+          render: ({ value, onChange }) => <SpacingControl value={value} onChange={onChange} />,
+        },
+      },
+      defaultProps: {
+        gallerySlug: "",
+        label: "Next collection",
+        wrap: true,
+        labelStyle: { style: "label" },
+        titleStyle: { style: "display", size: 40 },
+        marginTop: 96,
+        marginBottom: 0,
+      },
+      render: ({ puck, ...props }) => <NextCollectionRender {...props} editing={!!puck?.isEditing} />,
+    },
+
+    Breadcrumb: {
+      label: "Breadcrumb",
+      fields: {
+        items: {
+          type: "custom",
+          render: ({ value, onChange }) => (
+            <ListControl<Crumb>
+              value={value}
+              onChange={onChange}
+              addLabel="Add step"
+              newItem={() => ({ id: crypto.randomUUID(), label: "", link: "" })}
+              summary={(c) => c.label}
+              renderItem={(c, update) => (
+                <>
+                  <ListItemField label="Label" value={c.label} onChange={(v) => update({ label: v })} placeholder="Collections" />
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[12px] font-medium text-admin-ink">Goes to</span>
+                    <LinkPicker value={c.link} onChange={(v) => update({ link: v })} />
+                  </div>
+                </>
+              )}
+            />
+          ),
+        },
+        current: { type: "text", label: "This page (last, not a link)" },
+        separator: {
+          type: "radio",
+          label: "Between steps",
+          options: [
+            { label: "/", value: "/" },
+            { label: "›", value: "›" },
+            { label: "·", value: "·" },
+          ],
+        },
+        linkStyle: {
+          type: "custom",
+          label: "Text style",
+          render: ({ value, onChange }) => <TextStyleControl value={value} onChange={onChange} fallback="meta" />,
+        },
+        currentStyle: {
+          type: "custom",
+          label: "Text style",
+          render: ({ value, onChange }) => <TextStyleControl value={value} onChange={onChange} fallback="meta" />,
+        },
+        marginTop: {
+          type: "custom",
+          label: "Space above",
+          render: ({ value, onChange }) => <SpacingControl value={value} onChange={onChange} />,
+        },
+        marginBottom: {
+          type: "custom",
+          label: "Space below",
+          render: ({ value, onChange }) => <SpacingControl value={value} onChange={onChange} />,
+        },
+      },
+      defaultProps: {
+        items: [{ id: "collections", label: "Collections", link: "/collections" }],
+        current: "",
+        separator: "/",
+        linkStyle: { style: "meta" },
+        // The design sets where-you-are in the ink colour, the steps before it muted.
+        currentStyle: { style: "meta", color: "token:text" },
+        marginTop: 0,
+        marginBottom: 48,
+      },
+      render: ({ puck, ...props }) => <BreadcrumbRender {...props} editing={!!puck?.isEditing} />,
+    },
+
     // ----- Form components -----
 
     Form: {
       label: "Form",
       fields: {
-        formName: { type: "text", label: "Form Name (identifier)" },
-        submitLabel: { type: "text", label: "Submit Button Text" },
-        successMessage: { type: "textarea", label: "Success Message" },
-        recipientEmail: { type: "text", label: "Notification Email (for future use)" },
+        formName: { type: "text", label: "Form name (identifier)" },
+        submitLabel: { type: "text", label: "Submit button" },
+        labelStyle: {
+          type: "custom",
+          label: "Text style",
+          render: ({ value, onChange }) => (
+            <TextStyleControl value={value} onChange={onChange} fallback="label" />
+          ),
+        },
+        successMessage: { type: "textarea", label: "Success message" },
+        recipientEmail: { type: "text", label: "Notification email (not used yet)" },
+        fieldTextStyle: {
+          type: "custom",
+          label: "Text style",
+          render: ({ value, onChange }) => (
+            <TextStyleControl value={value} onChange={onChange} fallback="body" />
+          ),
+        },
+        placeholderColor: {
+          type: "custom",
+          label: "Placeholder color",
+          render: ({ value, onChange }) => (
+            <ColorField value={value ?? ""} onChange={onChange} emptyLabel="Browser default" />
+          ),
+        },
+        fieldLook: {
+          type: "radio",
+          label: "Look",
+          options: [
+            { label: "Box", value: "box" },
+            { label: "Underline", value: "underline" },
+          ],
+        },
+        fieldBorderColor: {
+          type: "custom",
+          label: "Border color",
+          render: ({ value, onChange }) => (
+            <ColorField value={value ?? ""} onChange={onChange} />
+          ),
+        },
+        fieldBackground: {
+          type: "custom",
+          label: "Background",
+          render: ({ value, onChange }) => (
+            <ColorField value={value ?? ""} onChange={onChange} allowTransparent />
+          ),
+        },
+        fieldRadius: {
+          type: "custom",
+          label: "Corner radius",
+          render: ({ value, onChange }) => (
+            <SliderField value={value ?? 0} onChange={onChange} min={0} max={24} step={1} unit="px" />
+          ),
+        },
+        submitTextStyle: {
+          type: "custom",
+          label: "Text style",
+          render: ({ value, onChange }) => (
+            <TextStyleControl value={value} onChange={onChange} fallback="label" withColor={false} />
+          ),
+        },
+        submitTextColor: {
+          type: "custom",
+          label: "Text color",
+          render: ({ value, onChange }) => (
+            <ColorField value={value ?? ""} onChange={onChange} />
+          ),
+        },
+        submitBgColor: {
+          type: "custom",
+          label: "Background",
+          render: ({ value, onChange }) => (
+            <ColorField value={value ?? ""} onChange={onChange} />
+          ),
+        },
+        submitHoverBgColor: {
+          type: "custom",
+          label: "Hover background",
+          render: ({ value, onChange }) => (
+            <ColorField value={value ?? ""} onChange={onChange} />
+          ),
+        },
+        submitRadius: {
+          type: "custom",
+          label: "Corner radius",
+          render: ({ value, onChange }) => (
+            <SliderField value={value ?? 0} onChange={onChange} min={0} max={32} step={1} unit="px" />
+          ),
+        },
+        panel: {
+          type: "radio",
+          label: "Panel behind the form",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        panelColor: {
+          type: "custom",
+          label: "Color",
+          render: ({ value, onChange }) => (
+            <ColorField value={value ?? ""} onChange={onChange} />
+          ),
+        },
+        panelPadding: {
+          type: "custom",
+          label: "Padding",
+          render: ({ value, onChange }) => (
+            <SliderField value={value ?? 48} onChange={onChange} min={0} max={96} step={4} unit="px" />
+          ),
+        },
+        panelRadius: {
+          type: "custom",
+          label: "Corner radius",
+          render: ({ value, onChange }) => (
+            <SliderField value={value ?? 0} onChange={onChange} min={0} max={32} step={1} unit="px" />
+          ),
+        },
       },
       defaultProps: {
         formName: "contact",
         submitLabel: "Submit",
+        labelStyle: { style: "label" },
         successMessage: "Thank you! Your submission has been received.",
         recipientEmail: "",
+        fieldTextStyle: { style: "body" },
+        placeholderColor: "token:muted",
+        fieldLook: "box",
+        fieldBorderColor: "token:rule",
+        fieldBackground: "transparent",
+        fieldRadius: 2,
+        submitTextStyle: { style: "label" },
+        submitTextColor: "token:background",
+        submitBgColor: "token:accent",
+        submitHoverBgColor: "token:text",
+        submitRadius: 2,
+        panel: true,
+        panelColor: "token:surface",
+        panelPadding: 48,
+        panelRadius: 0,
       },
-      render: (props) => <FormWrapperRender {...props} />,
+      // Forms saved before these settings keep the look they had.
+      resolveData: ({ props }) => ({ props: migrateForm(props) }),
+      render: (props) => <FormWrapperRender {...migrateForm(props)} />,
     },
 
     TextField: {
       label: "Text Field",
       fields: {
         label: { type: "text", label: "Label" },
-        name: { type: "text", label: "Field Name (key)" },
+        name: { type: "text", label: "Field name (key)" },
         placeholder: { type: "text", label: "Placeholder" },
         required: {
           type: "radio",
@@ -2729,7 +3419,7 @@ export const puckConfig: Config<Components> = {
         },
         fieldType: {
           type: "select",
-          label: "Input Type",
+          label: "Input type",
           options: [
             { label: "Text", value: "text" },
             { label: "Email", value: "email" },
@@ -2737,22 +3427,37 @@ export const puckConfig: Config<Components> = {
             { label: "URL", value: "url" },
           ],
         },
+        width: {
+          type: "radio",
+          label: "Width",
+          options: [
+            { label: "Full", value: "full" },
+            { label: "Half", value: "half" },
+          ],
+        },
       },
       defaultProps: {
+        width: "full",
         label: "Name",
         name: "name",
         placeholder: "",
         required: false,
         fieldType: "text",
       },
-      render: (props) => <TextFieldRender {...props} />,
+      // Inline: the field itself is the grid cell (in the editor too), so it can take half the row.
+      inline: true,
+      render: ({ puck, width, ...props }) => (
+        <FormFieldCell width={width} dragRef={puck.dragRef}>
+          <TextFieldRender {...props} />
+        </FormFieldCell>
+      ),
     },
 
     TextArea: {
       label: "Text Area",
       fields: {
         label: { type: "text", label: "Label" },
-        name: { type: "text", label: "Field Name (key)" },
+        name: { type: "text", label: "Field name (key)" },
         placeholder: { type: "text", label: "Placeholder" },
         required: {
           type: "radio",
@@ -2763,22 +3468,37 @@ export const puckConfig: Config<Components> = {
           ],
         },
         rows: { type: "number", label: "Rows", min: 2, max: 20 },
+        width: {
+          type: "radio",
+          label: "Width",
+          options: [
+            { label: "Full", value: "full" },
+            { label: "Half", value: "half" },
+          ],
+        },
       },
       defaultProps: {
+        width: "full",
         label: "Message",
         name: "message",
         placeholder: "",
         required: false,
         rows: 4,
       },
-      render: (props) => <TextAreaRender {...props} />,
+      // Inline: the field itself is the grid cell (in the editor too), so it can take half the row.
+      inline: true,
+      render: ({ puck, width, ...props }) => (
+        <FormFieldCell width={width} dragRef={puck.dragRef}>
+          <TextAreaRender {...props} />
+        </FormFieldCell>
+      ),
     },
 
     SelectField: {
       label: "Dropdown Select",
       fields: {
         label: { type: "text", label: "Label" },
-        name: { type: "text", label: "Field Name (key)" },
+        name: { type: "text", label: "Field name (key)" },
         required: {
           type: "radio",
           label: "Required",
@@ -2791,21 +3511,36 @@ export const puckConfig: Config<Components> = {
           type: "textarea",
           label: "Options (one per line, use value|label for custom values)",
         },
+        width: {
+          type: "radio",
+          label: "Width",
+          options: [
+            { label: "Full", value: "full" },
+            { label: "Half", value: "half" },
+          ],
+        },
       },
       defaultProps: {
+        width: "full",
         label: "Subject",
         name: "subject",
         required: false,
         options: "General Inquiry\nPrint Request\nCollaboration",
       },
-      render: (props) => <SelectFieldRender {...props} />,
+      // Inline: the field itself is the grid cell (in the editor too), so it can take half the row.
+      inline: true,
+      render: ({ puck, width, ...props }) => (
+        <FormFieldCell width={width} dragRef={puck.dragRef}>
+          <SelectFieldRender {...props} />
+        </FormFieldCell>
+      ),
     },
 
     RadioGroup: {
       label: "Radio Buttons",
       fields: {
         label: { type: "text", label: "Label" },
-        name: { type: "text", label: "Field Name (key)" },
+        name: { type: "text", label: "Field name (key)" },
         required: {
           type: "radio",
           label: "Required",
@@ -2818,45 +3553,90 @@ export const puckConfig: Config<Components> = {
           type: "textarea",
           label: "Options (one per line, use value|label for custom values)",
         },
+        width: {
+          type: "radio",
+          label: "Width",
+          options: [
+            { label: "Full", value: "full" },
+            { label: "Half", value: "half" },
+          ],
+        },
       },
       defaultProps: {
+        width: "full",
         label: "Preferred Contact",
         name: "preferred_contact",
         required: false,
         options: "email|Email\nphone|Phone",
       },
-      render: (props) => <RadioGroupRender {...props} />,
+      // Inline: the field itself is the grid cell (in the editor too), so it can take half the row.
+      inline: true,
+      render: ({ puck, width, ...props }) => (
+        <FormFieldCell width={width} dragRef={puck.dragRef}>
+          <RadioGroupRender {...props} />
+        </FormFieldCell>
+      ),
     },
 
     CheckboxGroup: {
       label: "Checkbox Group",
       fields: {
         label: { type: "text", label: "Label" },
-        name: { type: "text", label: "Field Name (key)" },
+        name: { type: "text", label: "Field name (key)" },
         options: {
           type: "textarea",
           label: "Options (one per line, use value|label for custom values)",
         },
+        width: {
+          type: "radio",
+          label: "Width",
+          options: [
+            { label: "Full", value: "full" },
+            { label: "Half", value: "half" },
+          ],
+        },
       },
       defaultProps: {
+        width: "full",
         label: "Interests",
         name: "interests",
         options: "prints|Prints\ncommissions|Commissions\nworkshops|Workshops",
       },
-      render: (props) => <CheckboxGroupRender {...props} />,
+      // Inline: the field itself is the grid cell (in the editor too), so it can take half the row.
+      inline: true,
+      render: ({ puck, width, ...props }) => (
+        <FormFieldCell width={width} dragRef={puck.dragRef}>
+          <CheckboxGroupRender {...props} />
+        </FormFieldCell>
+      ),
     },
 
     Checkbox: {
       label: "Checkbox",
       fields: {
         label: { type: "text", label: "Label" },
-        name: { type: "text", label: "Field Name (key)" },
+        name: { type: "text", label: "Field name (key)" },
+        width: {
+          type: "radio",
+          label: "Width",
+          options: [
+            { label: "Full", value: "full" },
+            { label: "Half", value: "half" },
+          ],
+        },
       },
       defaultProps: {
+        width: "full",
         label: "I agree to the terms",
         name: "agree_terms",
       },
-      render: (props) => <CheckboxRender {...props} />,
+      // Inline: the field itself is the grid cell (in the editor too), so it can take half the row.
+      inline: true,
+      render: ({ puck, width, ...props }) => (
+        <FormFieldCell width={width} dragRef={puck.dragRef}>
+          <CheckboxRender {...props} />
+        </FormFieldCell>
+      ),
     },
   },
 };
@@ -2892,7 +3672,7 @@ function GalleryPicker({ value, onChange }: { value: string; onChange: (val: str
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded border border-neutral-300 px-3 py-2 text-sm"
+      className={PICKER_INPUT}
     >
       <option value="">-- Select a gallery --</option>
       {galleries.map((g) => (
@@ -2904,26 +3684,10 @@ function GalleryPicker({ value, onChange }: { value: string; onChange: (val: str
 
 // ----- Slider field -----
 
-function SliderField({ value, onChange, min, max, step, unit, label }: { value: number; onChange: (v: number) => void; min: number; max: number; step: number; unit: string; label?: string }) {
-  return (
-    <div className="flex flex-col gap-1">
-      {label && (
-        <span className="text-xs font-medium text-neutral-500">{label}</span>
-      )}
-      <div className="flex items-center gap-3">
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          className="flex-1"
-        />
-        <span className="text-sm text-neutral-600 w-14 text-right tabular-nums">{value}{unit}</span>
-      </div>
-    </div>
-  );
+// The field's label comes from the panel (components/puck/fieldTypes), so the
+// `label` these used to draw themselves is ignored.
+function SliderField({ value, onChange, min, max, step, unit }: { value: number; onChange: (v: number) => void; min: number; max: number; step: number; unit: string; label?: string }) {
+  return <SliderControl value={value} onChange={onChange} min={min} max={max} step={step} unit={unit} />;
 }
 
 // ----- Color field -----
@@ -2932,44 +3696,25 @@ function ColorField({
   value,
   onChange,
   allowTransparent,
+  emptyLabel,
 }: {
   value: string;
   onChange: (v: string) => void;
   allowTransparent?: boolean;
+  emptyLabel?: string;
 }) {
-  const isTransparent = value === "transparent";
   return (
-    <div className="flex items-center gap-3">
-      <input
-        type="color"
-        value={isTransparent ? "#ffffff" : value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={isTransparent}
-        className="h-8 w-10 cursor-pointer rounded border border-neutral-300 disabled:cursor-not-allowed disabled:opacity-50"
-      />
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={isTransparent}
-        className="flex-1 rounded border border-neutral-300 px-2 py-1 text-sm font-mono disabled:bg-neutral-50 disabled:text-neutral-400"
-        placeholder="#000000"
-      />
-      {allowTransparent && (
-        <label className="flex items-center gap-1 text-xs text-neutral-700 cursor-pointer whitespace-nowrap">
-          <input
-            type="checkbox"
-            checked={isTransparent}
-            onChange={(e) =>
-              onChange(e.target.checked ? "transparent" : "#ffffff")
-            }
-          />
-          Transparent
-        </label>
-      )}
-    </div>
+    <ColorControl
+      value={value}
+      onChange={onChange}
+      allowTransparent={allowTransparent}
+      emptyLabel={emptyLabel}
+    />
   );
 }
+
+const PICKER_INPUT =
+  "w-full rounded-md border border-admin-border-strong bg-admin-surface px-2.5 py-1.5 text-[13px] text-admin-ink placeholder:text-admin-ink-faint focus:border-admin-accent focus:outline-none";
 
 // ----- Link picker (internal pages/galleries + external URL) -----
 
@@ -3005,27 +3750,23 @@ function LinkPicker({ value, onChange }: { value: string; onChange: (v: string) 
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex gap-1 text-xs">
-        <button
-          type="button"
-          onClick={() => { setMode("internal"); onChange(""); }}
-          className={`px-2 py-1 rounded ${mode === "internal" ? "bg-neutral-800 text-white" : "bg-neutral-100 text-neutral-600"}`}
-        >
-          Internal
-        </button>
-        <button
-          type="button"
-          onClick={() => { setMode("external"); onChange(""); }}
-          className={`px-2 py-1 rounded ${mode === "external" ? "bg-neutral-800 text-white" : "bg-neutral-100 text-neutral-600"}`}
-        >
-          External
-        </button>
-      </div>
+      <SegmentedControl
+        options={[
+          { label: "On this site", value: "internal" },
+          { label: "Web address", value: "external" },
+        ]}
+        value={mode}
+        onChange={(m) => {
+          if (m === mode) return;
+          setMode(m as "internal" | "external");
+          onChange("");
+        }}
+      />
       {mode === "internal" ? (
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full rounded border border-neutral-300 px-3 py-2 text-sm"
+          className={PICKER_INPUT}
         >
           {options.map((opt) => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -3037,20 +3778,27 @@ function LinkPicker({ value, onChange }: { value: string; onChange: (v: string) 
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="https://example.com"
-          className="w-full rounded border border-neutral-300 px-3 py-2 text-sm"
+          className={PICKER_INPUT}
         />
       )}
     </div>
   );
 }
 
-// ----- Hex to rgba helper -----
+// ----- Colour props -----
 
-function hexToRgba(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16) || 0;
-  const g = parseInt(hex.slice(3, 5), 16) || 0;
-  const b = parseInt(hex.slice(5, 7), 16) || 0;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+/**
+ * Turns the named colour props into CSS values: a theme colour ("token:muted")
+ * becomes its var(), hex passes through. Renderers destructure from the result
+ * so every later use of those props is already CSS.
+ */
+function withCssColors<T extends object>(props: T, keys: (keyof T & string)[]): T {
+  const out = { ...props } as Record<string, unknown>;
+  for (const key of keys) {
+    const v = out[key];
+    if (typeof v === "string") out[key] = cssColor(v);
+  }
+  return out as T;
 }
 
 // ----- Button render -----
@@ -3095,12 +3843,7 @@ function ButtonRender(props: ButtonProps) {
     paddingY,
     marginTop,
     marginBottom,
-    fontRoleKey,
-    fontSize,
-    fontWeight,
-    letterSpacing,
-    textTransform,
-    italic,
+    labelStyle,
     underline,
     hoverBgColor,
     hoverTextColor,
@@ -3109,10 +3852,10 @@ function ButtonRender(props: ButtonProps) {
     shadow,
     hoverShadow,
     transitionMs,
-  } = props;
+  } = withCssColors(props, ["bgColor", "textColor", "borderColor", "hoverBgColor", "hoverTextColor", "hoverBorderColor"]);
 
   const opacity = (bgOpacity ?? 100) / 100;
-  const bg = hovered ? hoverBgColor : hexToRgba(bgColor, opacity);
+  const bg = hovered ? hoverBgColor : withAlpha(bgColor, opacity);
   const fg = hovered ? hoverTextColor : textColor;
   const bd = hovered ? hoverBorderColor : borderColor;
   const sh = BUTTON_SHADOWS[hovered ? hoverShadow : shadow] ?? "none";
@@ -3126,12 +3869,7 @@ function ButtonRender(props: ButtonProps) {
         : { display: "inline-block" };
 
   const buttonStyle: React.CSSProperties = {
-    ...fontRole(fontRoleKey),
-    fontSize: `${fontSize}px`,
-    fontWeight,
-    letterSpacing: `${letterSpacing}px`,
-    textTransform,
-    fontStyle: italic ? "italic" : "normal",
+    ...textStyleCss(labelStyle, "label", { withColor: false }),
     textDecoration: underline ? "underline" : "none",
     color: fg,
     backgroundColor: bg,
@@ -3144,7 +3882,7 @@ function ButtonRender(props: ButtonProps) {
     transition: `background-color ${transitionMs}ms, color ${transitionMs}ms, border-color ${transitionMs}ms, box-shadow ${transitionMs}ms, transform ${transitionMs}ms`,
     cursor: link ? "pointer" : "default",
     textAlign: "center",
-    lineHeight: 1.2,
+    lineHeight: labelStyle?.lineHeight ?? 1.2,
     boxSizing: "border-box",
     ...widthStyle,
   };
@@ -3164,7 +3902,9 @@ function ButtonRender(props: ButtonProps) {
       }}
     >
       {iconEl}
-      <span>{label}</span>
+      <span>
+        <Editable path="label" value={label} />
+      </span>
     </span>
   );
 
@@ -3221,7 +3961,15 @@ type GalleryRow = {
   createdAt?: string;
   /** Added by GET /api/galleries — number of photographs in the gallery. */
   photoCount?: number;
+  /** Added by GET /api/galleries — the collection's built page, or its /gallery page. */
+  href?: string;
+  /** Added by GET /api/galleries — stands in for a missing cover. */
+  firstPhotoUrl?: string | null;
 };
+
+/** A collection's link, from the API when it has one (see @/lib/collections). */
+const collectionHref = (g: GalleryRow) => g.href ?? `/${siteConfig.labels.gallerySlug}/${g.slug}`;
+const twoDigits = (n: number) => (n < 10 ? `0${n}` : String(n));
 
 function GalleriesMultiSelect({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
   const [galleries, setGalleries] = useState<GalleryRow[]>([]);
@@ -3298,6 +4046,22 @@ function GalleriesMultiSelect({ value, onChange }: { value: string[]; onChange: 
 
 const GALLERY_AR_MAP = GALLERY_ASPECT_CSS;
 
+/** A collection with no photographs yet: the design's wall-coloured frame. */
+function CoverPlaceholder({ fill }: { fill: boolean }) {
+  return (
+    <div
+      className={`flex w-full items-center justify-center ${fill ? "h-full" : "h-48"}`}
+      style={{ background: "var(--theme-color-surface, #f2efe9)", color: "var(--theme-color-muted, #8c877d)" }}
+      aria-hidden="true"
+    >
+      <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4" />
+      </svg>
+    </div>
+  );
+}
+
 function GalleriesIndexRender(props: GalleriesIndexProps) {
   const {
     sourceMode,
@@ -3308,14 +4072,10 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
     columns,
     gap,
     showCount,
+    countLabel,
+    titleRule,
     dividerColor,
-    listTitleFontRole,
-    listTitleSize,
-    listTitleWeight,
-    listTitleColor,
-    listTitleTransform,
-    listTitleTracking,
-    listTitleItalic,
+    listTitleStyle,
     fullBleed,
     maxWidth,
     aspectRatio,
@@ -3325,13 +4085,8 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
     showDescription,
     titlePosition,
     textAlignment,
-    titleFontRole,
-    titleSize,
-    titleColor,
-    titleWeight,
-    titleTransform,
-    descriptionSize,
-    descriptionColor,
+    titleStyle,
+    descriptionStyle,
     textPaddingX,
     textPaddingY,
     textGap,
@@ -3340,7 +4095,7 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
     marginTop,
     marginBottom,
     transitionMs,
-  } = props;
+  } = withCssColors(props, ["dividerColor", "overlayBgColor"]);
 
   const [galleries, setGalleries] = useState<GalleryRow[]>([]);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -3377,7 +4132,10 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
   const limited = maxItems > 0 ? sorted.slice(0, maxItems) : sorted;
 
   const colCount = parseInt(columns, 10) || 3;
+  const descriptionCss = textStyleCss(descriptionStyle, "body");
   const arValue = GALLERY_AR_MAP[aspectRatio];
+  // Blocks saved before the setting existed read "photographs".
+  const countUnit = countLabel ?? "photographs";
   const isOverlay = titlePosition !== "below";
 
   const wrapperStyle: React.CSSProperties = {
@@ -3385,11 +4143,7 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
     margin: fullBleed ? `${marginTop}px 0 ${marginBottom}px` : `${marginTop}px auto ${marginBottom}px`,
   };
 
-  const gridStyle: React.CSSProperties = {
-    display: "grid",
-    gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))`,
-    gap: `${gap}px`,
-  };
+  const grid = responsiveGrid(colCount, props.tabletColumns, props.phoneColumns);
 
   if (limited.length === 0) {
     return (
@@ -3406,7 +4160,7 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
       <div style={wrapperStyle}>
         {limited.map((g, i) => {
           const hovered = hoveredId === g.id;
-          const href = `/${siteConfig.labels.gallerySlug}/${g.slug}`;
+          const href = collectionHref(g);
           return (
             <a
               key={g.id}
@@ -3429,16 +4183,7 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
               <span style={{ minWidth: 0 }}>
                 <span
                   style={{
-                    ...fontRole(listTitleFontRole ?? titleFontRole),
-                    fontSize: `${listTitleSize ?? titleSize}px`,
-                    fontWeight: listTitleWeight ?? titleWeight,
-                    color: listTitleColor || titleColor,
-                    textTransform: listTitleTransform ?? titleTransform,
-                    // Only set when asked, so an unset control leaves the theme
-                    // role's own tracking and slant alone rather than forcing them.
-                    ...(listTitleTracking ? { letterSpacing: `${listTitleTracking}px` } : {}),
-                    ...(listTitleItalic ? { fontStyle: "italic" as const } : {}),
-                    lineHeight: 1.25,
+                    ...textStyleCss(listTitleStyle, "collectionTitle"),
                   }}
                 >
                   {g.title}
@@ -3447,10 +4192,8 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
                   <span
                     style={{
                       display: "block",
+                      ...descriptionCss,
                       marginTop: `${textGap}px`,
-                      fontSize: `${descriptionSize}px`,
-                      color: descriptionColor,
-                      lineHeight: 1.5,
                     }}
                   >
                     {g.description}
@@ -3460,13 +4203,11 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
               {showCount && typeof g.photoCount === "number" && (
                 <span
                   style={{
+                    ...textStyleCss(undefined, "meta"),
                     flexShrink: 0,
-                    fontSize: `${descriptionSize}px`,
-                    color: descriptionColor,
-                    letterSpacing: "0.1em",
                   }}
                 >
-                  {g.photoCount < 10 ? `0${g.photoCount}` : g.photoCount}
+                  {twoDigits(g.photoCount)}
                 </span>
               )}
             </a>
@@ -3477,11 +4218,16 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
   }
 
   return (
-    <div style={wrapperStyle}>
-      <div style={gridStyle}>
+    <div style={wrapperStyle} className="@container">
+      <div className={grid.className} style={{ ...grid.style, gap: `${gap}px` }}>
         {limited.map((g) => {
           const hovered = hoveredId === g.id;
-          const href = `/${siteConfig.labels.gallerySlug}/${g.slug}`;
+          const href = collectionHref(g);
+          const cover = g.coverImageUrl || g.firstPhotoUrl;
+          const count =
+            showCount && typeof g.photoCount === "number"
+              ? `${twoDigits(g.photoCount)}${countUnit ? ` ${countUnit}` : ""}`
+              : null;
 
           const overlayInset =
             titlePosition === "overlay-top"
@@ -3490,30 +4236,33 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
                 ? { top: 0, left: 0, right: 0, bottom: 0, display: "flex", alignItems: "center", justifyContent: "center" }
                 : { bottom: 0, left: 0, right: 0 };
 
-          const titleEl = showTitle && (
+          const titleText = (
             <div
               style={{
-                ...fontRole(titleFontRole),
-                fontSize: `${titleSize}px`,
-                fontWeight: titleWeight,
-                color: titleColor,
-                textTransform: titleTransform,
+                ...textStyleCss(titleStyle, "collectionTitle"),
                 textAlign: textAlignment,
-                lineHeight: 1.25,
               }}
             >
               {g.title}
             </div>
           );
+          // Below the cover, the count sits at the end of the title's line.
+          const titleEl =
+            showTitle && count && !isOverlay ? (
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", columnGap: 16, rowGap: 4 }}>
+                {titleText}
+                <span style={{ ...textStyleCss(undefined, "meta"), flexShrink: 0 }}>{count}</span>
+              </div>
+            ) : (
+              showTitle && titleText
+            );
 
           const descEl = showDescription && g.description && (
             <div
               style={{
-                fontSize: `${descriptionSize}px`,
-                color: descriptionColor,
+                ...descriptionCss,
                 textAlign: textAlignment,
                 marginTop: `${textGap}px`,
-                lineHeight: 1.4,
               }}
             >
               {g.description}
@@ -3541,7 +4290,7 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
             filter: hovered && imageHoverEffect === "darken" ? "brightness(0.7)" : "none",
           };
 
-          const overlayBg = isOverlay ? hexToRgba(overlayBgColor, overlayOpacity / 100) : undefined;
+          const overlayBg = isOverlay ? withAlpha(overlayBgColor, overlayOpacity / 100) : undefined;
 
           return (
             <a
@@ -3552,16 +4301,14 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
               onMouseLeave={() => setHoveredId(null)}
             >
               <div style={imageWrapperStyle}>
-                {g.coverImageUrl ? (
+                {cover ? (
                   arValue ? (
-                    <img src={g.coverImageUrl} alt={g.title} style={imageStyle} loading="lazy" />
+                    <img src={cover} alt={g.title} style={imageStyle} loading="lazy" />
                   ) : (
-                    <img src={g.coverImageUrl} alt={g.title} style={{ ...imageStyle, height: "auto" }} loading="lazy" />
+                    <img src={cover} alt={g.title} style={{ ...imageStyle, height: "auto" }} loading="lazy" />
                   )
                 ) : (
-                  <div className="flex h-48 w-full items-center justify-center bg-neutral-100 text-xs text-neutral-400">
-                    No cover image
-                  </div>
+                  <CoverPlaceholder fill={!!arValue} />
                 )}
                 {isOverlay && (showTitle || showDescription) && (
                   <div
@@ -3581,7 +4328,17 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
                 )}
               </div>
               {!isOverlay && (showTitle || showDescription) && (
-                <div style={{ padding: `${textPaddingY}px ${textPaddingX}px` }}>
+                <div
+                  style={
+                    titleRule
+                      ? {
+                          marginTop: textPaddingY,
+                          padding: `${textPaddingY}px ${textPaddingX}px 0`,
+                          borderTop: "1px solid var(--theme-color-rule, #e0dcd3)",
+                        }
+                      : { padding: `${textPaddingY}px ${textPaddingX}px` }
+                  }
+                >
                   {titleEl}
                   {descEl}
                 </div>
@@ -3756,15 +4513,9 @@ function LinkListRender(props: LinkListProps) {
     borderRadius,
     paddingX,
     paddingY,
-    fontRoleKey,
-    fontSize,
-    fontWeight,
-    letterSpacing,
-    textTransform,
-    italic,
+    labelStyle,
     underline,
-    descriptionSize,
-    descriptionColor,
+    descriptionStyle,
     hoverBgColor,
     hoverTextColor,
     hoverBorderColor,
@@ -3776,9 +4527,10 @@ function LinkListRender(props: LinkListProps) {
     marginTop,
     marginBottom,
     transitionMs,
-  } = props;
+  } = withCssColors(props, ["bgColor", "textColor", "borderColor", "hoverBgColor", "hoverTextColor", "hoverBorderColor", "dividerColor"]);
 
   const safeItems = items ?? [];
+  const descriptionCss = textStyleCss(descriptionStyle, "body");
 
   const justify =
     alignment === "left" ? "flex-start" : alignment === "right" ? "flex-end" : "center";
@@ -3791,11 +4543,11 @@ function LinkListRender(props: LinkListProps) {
     marginBottom: `${marginBottom}px`,
   };
 
-  if (layout === "card-grid") {
+  const grid = layout === "card-grid" ? responsiveGrid(colCount, props.tabletColumns, props.phoneColumns) : null;
+  if (grid) {
     containerStyle = {
       ...containerStyle,
-      display: "grid",
-      gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))`,
+      ...grid.style,
       gap: `${gap}px`,
     };
   } else if (layout === "horizontal-pills") {
@@ -3834,8 +4586,8 @@ function LinkListRender(props: LinkListProps) {
     );
   }
 
-  return (
-    <div style={containerStyle}>
+  const content = (
+    <div className={grid?.className} style={containerStyle}>
       {safeItems.map((item, i) => {
         const hovered = hoveredId === item.id;
         const isLast = i === safeItems.length - 1;
@@ -3843,7 +4595,7 @@ function LinkListRender(props: LinkListProps) {
         const bg = hovered
           ? hoverBgColor
           : bgOpacity > 0
-            ? hexToRgba(bgColor, bgOpacity / 100)
+            ? withAlpha(bgColor, bgOpacity / 100)
             : "transparent";
 
         const fg = hovered ? hoverTextColor : textColor;
@@ -3860,12 +4612,7 @@ function LinkListRender(props: LinkListProps) {
         const showHoverUnderline = hovered && hoverEffect === "underline";
 
         const itemStyle: React.CSSProperties = {
-          ...fontRole(fontRoleKey),
-          fontSize: `${fontSize}px`,
-          fontWeight,
-          letterSpacing: `${letterSpacing}px`,
-          textTransform,
-          fontStyle: italic ? "italic" : "normal",
+          ...textStyleCss(labelStyle, "body", { withColor: false }),
           textDecoration: underline || showHoverUnderline ? "underline" : "none",
           color: fg,
           backgroundColor: bg,
@@ -3937,22 +4684,19 @@ function LinkListRender(props: LinkListProps) {
 
         const textEl = (
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div>{item.label}</div>
+            <div>
+              <Editable path={`items[${i}].label`} value={item.label} />
+            </div>
             {showDescription && item.description && (
               <div
                 style={{
-                  fontSize: `${descriptionSize}px`,
-                  color: hovered ? hoverTextColor : descriptionColor,
+                  ...descriptionCss,
+                  ...(hovered ? { color: hoverTextColor } : {}),
                   marginTop: 2,
-                  fontWeight: 400,
-                  textTransform: "none",
-                  letterSpacing: 0,
-                  fontStyle: "normal",
                   textDecoration: "none",
-                  lineHeight: 1.4,
                 }}
               >
-                {item.description}
+                <Editable path={`items[${i}].description`} value={item.description} />
               </div>
             )}
           </div>
@@ -3964,16 +4708,12 @@ function LinkListRender(props: LinkListProps) {
               flexShrink: 0,
               marginLeft: "auto",
               paddingLeft: 16,
-              fontSize: `${descriptionSize}px`,
-              color: hovered ? hoverTextColor : descriptionColor,
-              fontWeight: 400,
-              textTransform: "none",
-              letterSpacing: 0,
-              fontStyle: "normal",
+              ...descriptionCss,
+              ...(hovered ? { color: hoverTextColor } : {}),
               textDecoration: "none",
             }}
           >
-            {item.meta}
+            <Editable path={`items[${i}].meta`} value={item.meta} />
           </span>
         ) : null;
 
@@ -4023,6 +4763,8 @@ function LinkListRender(props: LinkListProps) {
       })}
     </div>
   );
+  // A grid counts its columns by its own width, so it needs a container to measure.
+  return grid ? <div className="@container">{content}</div> : content;
 }
 
 // ----- Metadata fields picker -----
@@ -4032,6 +4774,7 @@ const METADATA_OPTIONS = [
   { key: "filename", label: "Filename" },
   { key: "description", label: "Description" },
   { key: "location", label: "Location" },
+  { key: "date", label: "Date taken" },
   { key: "camera", label: "Camera Settings" },
 ] as const;
 
@@ -4336,14 +5079,16 @@ function CarouselSlideEditor({ value, onChange }: { value: CarouselSlide[]; onCh
                     <label className="text-xs font-medium text-neutral-500">Subtitle</label>
                     <input type="text" value={slide.subtitle} onChange={(e) => updateSlide(slide.id, { subtitle: e.target.value })} className="mt-0.5 w-full rounded border border-neutral-200 px-2 py-1 text-sm" />
                   </div>
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <label className="text-xs font-medium text-neutral-500">Background</label>
-                      <input type="color" value={slide.bgColor} onChange={(e) => updateSlide(slide.id, { bgColor: e.target.value })} className="mt-0.5 h-8 w-full cursor-pointer rounded border border-neutral-200" />
+                  <div>
+                    <span className="text-xs font-medium text-neutral-500">Background</span>
+                    <div className="mt-1">
+                      <ColorControl value={slide.bgColor} onChange={(v) => updateSlide(slide.id, { bgColor: v })} />
                     </div>
-                    <div className="flex-1">
-                      <label className="text-xs font-medium text-neutral-500">Text Color</label>
-                      <input type="color" value={slide.textColor} onChange={(e) => updateSlide(slide.id, { textColor: e.target.value })} className="mt-0.5 h-8 w-full cursor-pointer rounded border border-neutral-200" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-medium text-neutral-500">Text Color</span>
+                    <div className="mt-1">
+                      <ColorControl value={slide.textColor} onChange={(v) => updateSlide(slide.id, { textColor: v })} />
                     </div>
                   </div>
                 </>
@@ -4400,6 +5145,8 @@ function CarouselLinkGalleryHelper({ onPick }: { onPick: (slug: string) => void 
 
 function CarouselClient({
   slides,
+  slideTitleStyle,
+  slideSubtitleStyle,
   slidesPerView,
   gap,
   aspectRatio,
@@ -4893,10 +5640,10 @@ function CarouselClient({
       return (
         <div
           className="flex flex-col items-center justify-center p-6 text-center"
-          style={{ ...slideStyle, backgroundColor: slide.bgColor, color: slide.textColor }}
+          style={{ ...slideStyle, backgroundColor: cssColor(slide.bgColor), color: cssColor(slide.textColor) }}
         >
-          {slide.title && <h3 className="text-xl mb-2" style={fontRole("headings")}>{slide.title}</h3>}
-          {slide.subtitle && <p className="text-sm opacity-80">{slide.subtitle}</p>}
+          {slide.title && <h3 className="mb-2" style={textStyleCss(slideTitleStyle, "collectionTitle", { withColor: false })}>{slide.title}</h3>}
+          {slide.subtitle && <p className="opacity-80" style={textStyleCss(slideSubtitleStyle, "body", { withColor: false })}>{slide.subtitle}</p>}
         </div>
       );
     }
@@ -4916,12 +5663,12 @@ function CarouselClient({
             onLoad={(e) => { (e.target as HTMLImageElement).classList.remove("opacity-0"); }}
           />
         ) : (
-          <div className="h-full w-full" style={{ backgroundColor: slide.bgColor }} />
+          <div className="h-full w-full" style={{ backgroundColor: cssColor(slide.bgColor) }} />
         )}
         <div className="absolute inset-0 bg-black/30" style={{ borderRadius: `${borderRadius}px` }} />
-        <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center" style={{ color: slide.textColor || "#fff" }}>
-          {slide.title && <h3 className="text-xl mb-1" style={fontRole("headings")}>{slide.title}</h3>}
-          {slide.subtitle && <p className="text-sm opacity-90">{slide.subtitle}</p>}
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center" style={{ color: cssColor(slide.textColor, "#fff") }}>
+          {slide.title && <h3 className="mb-1" style={textStyleCss(slideTitleStyle, "collectionTitle", { withColor: false })}>{slide.title}</h3>}
+          {slide.subtitle && <p className="opacity-90" style={textStyleCss(slideSubtitleStyle, "body", { withColor: false })}>{slide.subtitle}</p>}
         </div>
       </div>
     ));
@@ -5168,6 +5915,7 @@ export interface EmbedPhoto {
   description: string | null;
   location: string | null;
   cameraSettings: { camera?: string; lens?: string; iso?: string; aperture?: string; shutter?: string } | null;
+  takenAt?: Date | string | null;
   width: number;
   height: number;
   focalX: number;
@@ -5185,14 +5933,21 @@ const DEFAULT_LIGHTBOX: GlobalLightboxSettings = {
 interface GalleryEmbedRendererProps {
   slug: string;
   max: number;
-  layout: "grid" | "masonry";
+  layout: "grid" | "masonry" | "hang";
+  numbered: boolean;
+  hangOffset: number;
+  hangGap: number;
   columns: "2" | "3" | "4";
+  tabletColumns?: TabletColumns;
+  phoneColumns?: PhoneColumns;
   aspectRatio: GalleryAspect;
   gap: number;
   imageMaxWidth: number;
   borderRadius: number;
   showMetadata: boolean;
   metadataFields: string[];
+  captionTitleStyle?: TextStyleValue;
+  captionMetaStyle?: TextStyleValue;
   useGlobalLightbox: boolean;
   lightboxMetadataFields: string[] | null;
   lightboxCornerRadius: number | null;
@@ -5204,10 +5959,8 @@ interface GalleryEmbedRendererProps {
 }
 
 const aspectRatioValues = GALLERY_ASPECT_CSS;
-const gridColClasses = { "2": "grid-cols-1 sm:grid-cols-2", "3": "grid-cols-1 sm:grid-cols-2 md:grid-cols-3", "4": "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4" };
-const masonryColClasses = { "2": "columns-1 sm:columns-2", "3": "columns-1 sm:columns-2 md:columns-3", "4": "columns-1 sm:columns-2 md:columns-3 lg:columns-4" };
 
-function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, imageMaxWidth, borderRadius, showMetadata, metadataFields, useGlobalLightbox, lightboxMetadataFields, lightboxCornerRadius, lightboxCaptionPosition, lightboxFadeSpeed, lightboxCaptionAlignment, globalLightbox, serverPhotos }: GalleryEmbedRendererProps) {
+function GalleryEmbedRenderer({ slug, max, layout, columns, tabletColumns, phoneColumns, aspectRatio, gap, imageMaxWidth, borderRadius, showMetadata, metadataFields, numbered, hangOffset, hangGap, captionTitleStyle, captionMetaStyle, useGlobalLightbox, lightboxMetadataFields, lightboxCornerRadius, lightboxCaptionPosition, lightboxFadeSpeed, lightboxCaptionAlignment, globalLightbox, serverPhotos }: GalleryEmbedRendererProps) {
   const lbBase = globalLightbox ?? DEFAULT_LIGHTBOX;
   const lb: GlobalLightboxSettings = useGlobalLightbox ? lbBase : {
     metadataFields: lightboxMetadataFields ?? lbBase.metadataFields,
@@ -5220,6 +5973,7 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
   const [fetchedPhotos, setFetchedPhotos] = useState<EmbedPhoto[]>([]);
   const [loading, setLoading] = useState(!serverPhotos);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const collectionTitle = useGalleryTitle(slug);
 
   useEffect(() => {
     if (serverPhotos) return;
@@ -5251,25 +6005,34 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
   }
 
   const gapStyle = { gap: `${gap}px` };
+  const colCount = Number(columns) || 3;
+  const gridCols = responsiveGrid(colCount, tabletColumns, phoneColumns);
+  const masonryCols = responsiveColumns(colCount, tabletColumns, phoneColumns);
 
-  const renderPhotoMeta = (photo: EmbedPhoto) => {
+  const titleCss = textStyleCss(captionTitleStyle, "photoTitle");
+  const metaCss = textStyleCss(captionMetaStyle, "meta");
+
+  const renderPhotoMeta = (photo: EmbedPhoto, className = "mt-1.5 space-y-0.5") => {
     if (!showMetadata || metadataFields.length === 0) return null;
     return (
-      <div className="mt-1.5 space-y-0.5 text-sm" style={{ color: "var(--theme-color-gallery-captions)" }}>
+      <div className={className}>
         {metadataFields.includes("title") && photo.title && (
-          <p className="font-medium" style={{ fontFamily: "var(--theme-font-captions)" }}>{parseLinks(photo.title)}</p>
+          <p style={titleCss}>{parseLinks(photo.title)}</p>
         )}
         {metadataFields.includes("filename") && photo.filename && (
-          <p className="text-xs" style={{ opacity: 0.65 }}>{photo.filename}</p>
+          <p style={metaCss}>{photo.filename}</p>
         )}
         {metadataFields.includes("description") && photo.description && (
-          <p style={{ opacity: 0.85 }}>{parseLinks(photo.description)}</p>
+          <p style={metaCss}>{parseLinks(photo.description)}</p>
         )}
         {metadataFields.includes("location") && photo.location && (
-          <p className="text-xs" style={{ opacity: 0.65 }}>{parseLinks(photo.location)}</p>
+          <p style={metaCss}>{parseLinks(photo.location)}</p>
+        )}
+        {metadataFields.includes("date") && photoDate(photo.takenAt) && (
+          <p style={metaCss}>{photoDate(photo.takenAt)}</p>
         )}
         {metadataFields.includes("camera") && photo.cameraSettings && (
-          <p className="text-xs" style={{ opacity: 0.65 }}>
+          <p style={metaCss}>
             {[photo.cameraSettings.camera, photo.cameraSettings.lens, photo.cameraSettings.aperture, photo.cameraSettings.shutter, photo.cameraSettings.iso ? `ISO ${photo.cameraSettings.iso}` : null].filter(Boolean).join(" \u00b7 ")}
           </p>
         )}
@@ -5318,10 +6081,80 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
     </div>
   );
 
+  // Hang: photos alternate between two columns, so they still read 1, 2, 3…
+  // across; the right column starts lower. One column when the block is narrow.
+  const hangItem = (photo: EmbedPhoto, index: number) => {
+    const meta = renderPhotoMeta(photo, "min-w-0 space-y-0.5");
+    return (
+      <figure key={photo.id} style={{ margin: 0 }}>
+        <button
+          type="button"
+          onClick={() => setLightboxIndex(index)}
+          className="group block w-full cursor-zoom-in"
+          style={{ borderRadius: radius }}
+          aria-label={`Enlarge ${photo.title || "photograph"}`}
+        >
+          {arValue ? (
+            <div className="relative overflow-hidden" style={{ aspectRatio: arValue, borderRadius: radius }}>
+              <img
+                src={photo.url}
+                alt={photo.title ?? ""}
+                loading="lazy"
+                className="absolute inset-0 h-full w-full object-cover transition-opacity duration-300 group-hover:opacity-[.88]"
+                style={{ objectPosition: `${photo.focalX ?? 50}% ${photo.focalY ?? 50}%` }}
+              />
+            </div>
+          ) : (
+            <img
+              src={photo.url}
+              alt={photo.title ?? ""}
+              width={photo.width}
+              height={photo.height}
+              loading="lazy"
+              className="block h-auto w-full transition-opacity duration-300 group-hover:opacity-[.88]"
+              style={{ borderRadius: radius }}
+            />
+          )}
+        </button>
+        {(meta || numbered) && (
+          <figcaption
+            className="flex items-start justify-between gap-6"
+            style={{ marginTop: 18, paddingTop: 14, borderTop: "1px solid var(--theme-color-rule, #e0dcd3)" }}
+          >
+            {meta ?? <span />}
+            {numbered && <span style={{ ...metaCss, flexShrink: 0 }}>{index + 1 < 10 ? `0${index + 1}` : index + 1}</span>}
+          </figcaption>
+        )}
+      </figure>
+    );
+  };
+
+  if (layout === "hang") {
+    const indexed = photos.map((photo, i) => ({ photo, i }));
+    return (
+      <>
+        <div className="@container">
+          <div className="flex flex-col @min-[40rem]:hidden" style={{ gap: hangGap }}>
+            {indexed.map(({ photo, i }) => hangItem(photo, i))}
+          </div>
+          <div className="hidden items-start @min-[40rem]:flex" style={{ gap: `${gap}px` }}>
+            <div className="flex min-w-0 flex-1 flex-col" style={{ gap: hangGap }}>
+              {indexed.filter(({ i }) => i % 2 === 0).map(({ photo, i }) => hangItem(photo, i))}
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col" style={{ gap: hangGap, paddingTop: hangOffset }}>
+              {indexed.filter(({ i }) => i % 2 === 1).map(({ photo, i }) => hangItem(photo, i))}
+            </div>
+          </div>
+        </div>
+        <Lightbox photos={photos} selectedIndex={lightboxIndex} onClose={() => setLightboxIndex(null)} settings={lb} collectionTitle={collectionTitle} />
+      </>
+    );
+  }
+
   return (
-    <>
+    <div className="@container">
       {layout === "masonry" ? (
-        <div className={masonryColClasses[columns]} style={{ ...gapStyle, columnGap: `${gap}px` }}>
+        <div className={masonryCols.className} style={{ ...masonryCols.style, ...gapStyle, columnGap: `${gap}px` }}>
           {photos.map((photo, i) => (
             <div key={photo.id} style={{ marginBottom: `${gap}px` }} className="break-inside-avoid">
               {photoCard(photo, i, false)}
@@ -5329,7 +6162,7 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
           ))}
         </div>
       ) : (
-        <div className={`grid ${gridColClasses[columns]}`} style={gapStyle}>
+        <div className={gridCols.className} style={{ ...gridCols.style, ...gapStyle }}>
           {photos.map((photo, i) => (
             <div key={photo.id}>
               {photoCard(photo, i, true)}
@@ -5343,8 +6176,9 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, aspectRatio, gap, im
         selectedIndex={lightboxIndex}
         onClose={() => setLightboxIndex(null)}
         settings={lb}
+        collectionTitle={collectionTitle}
       />
-    </>
+    </div>
   );
 }
 
@@ -5427,5 +6261,29 @@ function StoriesIndexBlockRender({
 }
 
 // ----- Puck Data type re-export for convenience -----
+// Every block but the form fields can be left off phones, tablets or desktops.
+// (A form field hidden on one screen would still be required on it.)
+const FORM_FIELD_BLOCKS = new Set(["TextField", "TextArea", "SelectField", "RadioGroup", "CheckboxGroup", "Checkbox"]);
+for (const [name, component] of Object.entries(puckConfig.components) as [string, ComponentConfig<any>][]) {
+  if (FORM_FIELD_BLOCKS.has(name)) continue;
+  const Block = component.render;
+  component.fields = { ...component.fields, hideOn: hideOnField };
+  component.render = (props) => (
+    <BreakpointVisibility hideOn={props.hideOn as Breakpoint[] | undefined} editing={!!props.puck?.isEditing}>
+      <Block {...props} />
+    </BreakpointVisibility>
+  );
+}
+
+// On the editor canvas, a block's <Editable> text can be typed into.
+for (const component of Object.values(puckConfig.components) as ComponentConfig<any>[]) {
+  const Block = component.render;
+  component.render = (props) => (
+    <InlineEditScope id={props.id as string | undefined} editing={!!props.puck?.isEditing}>
+      <Block {...props} />
+    </InlineEditScope>
+  );
+}
+
 export type { Config };
 export type PuckData = Parameters<typeof import("@puckeditor/core").Render>[0]["data"];

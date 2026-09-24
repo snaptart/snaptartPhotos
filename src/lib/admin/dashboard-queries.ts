@@ -94,7 +94,15 @@ export async function getRecentGalleries(limit = 4): Promise<RecentGallery[]> {
       id: galleries.id,
       title: galleries.title,
       slug: galleries.slug,
-      coverImageUrl: galleries.coverImageUrl,
+      // A gallery without a cover shows its first photo, as the public index does.
+      // (The outer id is spelled out: with one table, Drizzle leaves column names
+      // unqualified, and a bare "id" in the subquery would mean the photo's.)
+      coverImageUrl: sql<string | null>`coalesce(nullif(${galleries.coverImageUrl}, ''), (
+        select p.thumbnail_url from photos p
+        join gallery_photos gp on gp.photo_id = p.id
+        where gp.gallery_id = "galleries"."id"
+        order by gp.position asc limit 1
+      ))`,
       isPublished: galleries.isPublished,
     })
     .from(galleries)

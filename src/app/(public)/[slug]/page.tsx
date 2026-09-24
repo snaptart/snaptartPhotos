@@ -11,6 +11,7 @@ import Link from "@tiptap/extension-link";
 import TextAlign from "@tiptap/extension-text-align";
 import Underline from "@tiptap/extension-underline";
 import PuckRenderer from "@/components/public/PuckRenderer";
+import { loadPickedPhotos } from "@/lib/puck/picked-photos";
 import type { Data } from "@puckeditor/core";
 import type { EmbedPhoto, FieldMapBlockData, GlobalLightboxSettings } from "@/lib/puck/config";
 import siteConfig from "@/lib/site.config";
@@ -114,6 +115,8 @@ export default async function DynamicPage({ params }: Props) {
         }));
     }
 
+    const photosById = await loadPickedPhotos(page.content);
+
     const hasFieldMap = (page.content.content ?? []).some(
       (item: { type: string }) => item.type === "FieldMap"
     );
@@ -137,6 +140,7 @@ export default async function DynamicPage({ params }: Props) {
             galleryPhotos={galleryPhotos}
             globalLightbox={globalLightbox}
             fieldMap={fieldMap}
+            photosById={photosById}
           />
         </div>
       );
@@ -154,6 +158,7 @@ export default async function DynamicPage({ params }: Props) {
           galleryPhotos={galleryPhotos}
           globalLightbox={globalLightbox}
           fieldMap={fieldMap}
+          photosById={photosById}
         />
       </div>
     );

@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import { resolveTheme } from "@/lib/theme/types";
 import { buildGoogleFontsUrl } from "@/lib/theme/fonts";
 import { buildThemeCssVars } from "@/lib/theme/css-vars";
+import { fontRole } from "@/lib/theme/role-style";
 
 export default async function PublicLayout({
   children,
@@ -53,7 +54,7 @@ export default async function PublicLayout({
       <div
         className="flex min-h-dvh flex-col"
         style={{
-          fontFamily: "var(--theme-font-body)",
+          ...fontRole("body"),
           fontSize: "var(--theme-body-font-size)",
           backgroundColor: "var(--theme-color-site-bg)",
           color: "var(--theme-color-text)",

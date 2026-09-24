@@ -22,7 +22,7 @@ export function Field({
 }: FieldProps) {
   if (inline) {
     return (
-      <div className={cn("grid grid-cols-[140px_1fr] gap-4 items-start", className)}>
+      <div className={cn("grid grid-cols-[110px_minmax(0,1fr)] xl:grid-cols-[140px_minmax(0,1fr)] gap-4 items-start", className)}>
         {label && (
           <label
             htmlFor={htmlFor}

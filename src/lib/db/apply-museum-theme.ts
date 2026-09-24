@@ -51,6 +51,17 @@ const MUSEUM_WHITE: ThemeSettings = {
     labels: { weight: 500, italic: false, uppercase: true, size: 11, tracking: 0.18 },
   },
 
+  // The Style board's type scale, plus the phone sizes from the mobile boards.
+  textStyles: {
+    display: { role: "headings", size: 54, mobileSize: 34, lineHeight: 1.08, weight: 300, italic: false, uppercase: false, tracking: -0.02, color: "text" },
+    collectionTitle: { role: "headings", size: 30, mobileSize: 22, lineHeight: 1.13, weight: 400, italic: false, uppercase: false, tracking: 0, color: "text" },
+    photoTitle: { role: "captions", size: 19, mobileSize: 17, lineHeight: 1.26, weight: 400, italic: false, uppercase: false, tracking: 0, color: "text" },
+    lead: { role: "body", size: 18, mobileSize: 16, lineHeight: 1.7, weight: 400, italic: false, uppercase: false, tracking: 0, color: "text" },
+    body: { role: "body", size: 16, mobileSize: 15, lineHeight: 1.75, weight: 400, italic: false, uppercase: false, tracking: 0, color: "textSoft" },
+    label: { role: "labels", size: 12, mobileSize: 11, lineHeight: 1.4, weight: 500, italic: false, uppercase: true, tracking: 0.18, color: "muted" },
+    meta: { role: "labels", size: 11, mobileSize: 10, lineHeight: 1.5, weight: 400, italic: false, uppercase: true, tracking: 0.1, color: "muted" },
+  },
+
   bodyFontSize: 16,
   menuFontSize: 12,
   footerFontSize: 12,
@@ -59,15 +70,24 @@ const MUSEUM_WHITE: ThemeSettings = {
   logoPosition: "left",
   logoSize: 40,
   menuJustify: "right",
+  footerStyle: "bar", // the boards' footer bar
+  // Fraunces 500, tracked capitals — 21px on the desktop boards, 17 on mobile.
+  wordmarkSize: 21,
+  wordmarkWeight: 500,
+  wordmarkUppercase: true,
+  wordmarkTracking: 0.22,
 
   // ── Palette ───────────────────────────────────────────────────────────
   colorSiteBg: "#FBFAF8", // Paper
   colorHeaderBg: "#FBFAF8",
   colorFooterBg: "#FBFAF8",
   colorText: "#1A1917", // Ink
+  colorTextSoft: "#3A3833", // running copy on every board
+  colorMuted: "#63605A", // Muted
   colorAccent: "#A4441F", // Oxide — links only
   colorGalleryCaptions: "#63605A", // Muted
   colorFooterText: "#63605A",
+  colorLightboxBg: "#14130F",
   colorLightboxText: "#FBFAF8",
   colorHeroOverlay: "#FBFAF8",
   colorRule: "#E0DCD3", // hairlines

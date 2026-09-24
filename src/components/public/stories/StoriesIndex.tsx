@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { fontRole } from "@/lib/theme/role-style";
+import { Editable } from "@/components/puck/inline/Editable";
 
 export type IndexStory = {
   title: string;
@@ -81,7 +82,7 @@ function StoriesIndexInner({
             color: "var(--st-ink-soft)",
           }}
         >
-          {volumeLabel}
+          <Editable path="volumeLabel" value={volumeLabel} />
         </div>
         <div
           className="stories-ex__index-headline"
@@ -92,7 +93,7 @@ function StoriesIndexInner({
             letterSpacing: -1.5,
           }}
         >
-          {title}
+          <Editable path="title" value={title} />
         </div>
         <div
           style={{
@@ -104,7 +105,7 @@ function StoriesIndexInner({
             lineHeight: 1.45,
           }}
         >
-          {dek}
+          <Editable path="dek" value={dek} multiline />
         </div>
         <div style={{ height: 1, width: 56, background: "var(--st-accent)", marginTop: 28 }} />
 

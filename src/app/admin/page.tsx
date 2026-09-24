@@ -11,22 +11,24 @@ import {
   Plus,
   Palette,
 } from "lucide-react";
-import { auth } from "@/lib/auth";
 import {
   getDashboardCounts,
   getRecentPhotos,
   getRecentGalleries,
 } from "@/lib/admin/dashboard-queries";
 import siteConfig from "@/lib/site.config";
+import { db } from "@/lib/db";
+import { siteSettings } from "@/lib/db/schema";
 import { Card, Pill, SectionLabel } from "@/components/admin/ui";
 
 export default async function AdminDashboard() {
-  const session = await auth();
-  const [counts, recentPhotos, recentGalleries] = await Promise.all([
+  const [counts, recentPhotos, recentGalleries, settingsRows] = await Promise.all([
     getDashboardCounts(),
     getRecentPhotos(5),
     getRecentGalleries(4),
+    db.select({ siteTitle: siteSettings.siteTitle }).from(siteSettings).limit(1).catch(() => []),
   ]);
+  const siteTitle = settingsRows[0]?.siteTitle || siteConfig.siteName;
 
   const needsAttention =
     counts.photosMissingTitle + counts.photosMissingLocation + counts.draftPages;
@@ -40,12 +42,12 @@ export default async function AdminDashboard() {
             Welcome back
           </div>
           <h1 className="font-serif italic text-[32px] leading-none text-admin-ink">
-            {session?.user?.email ?? "Dashboard"}
+            Dashboard
           </h1>
         </div>
         <div className="hidden md:block text-right">
           <div className="font-mono text-[10px] uppercase tracking-[2px] text-admin-ink-soft">
-            {siteConfig.siteName}
+            {siteTitle}
           </div>
           <div className="font-serif italic text-[15px] text-admin-ink-soft">
             Admin

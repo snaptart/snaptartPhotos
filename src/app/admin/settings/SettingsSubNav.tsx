@@ -15,7 +15,7 @@ const sections = [
 export function SettingsSubNav() {
   const pathname = usePathname();
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="flex flex-wrap gap-1 2xl:flex-col 2xl:flex-nowrap 2xl:gap-0.5">
       {sections.map((s) => {
         const active = s.match.test(pathname);
         const Icon = s.icon;

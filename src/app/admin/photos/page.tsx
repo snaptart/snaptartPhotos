@@ -43,11 +43,12 @@ import { parseFilenameForTakenAt } from "@/lib/photo-metadata";
 import { cn } from "@/lib/utils";
 import {
   Button,
+  EmptyState,
   Field,
   Input,
+  SectionLabel,
   Select,
   Topbar,
-  SectionLabel,
 } from "@/components/admin/ui";
 
 interface Photo {
@@ -75,6 +76,8 @@ interface Gallery {
   id: string;
   title: string;
   slug: string;
+  /** Where it lives on the site (its own page, or /gallery/<slug>). */
+  href?: string;
 }
 
 type Filter = "all" | "needs-title" | "needs-location";
@@ -125,6 +128,9 @@ function sortPhotos(list: Photo[], key: SortKey): Photo[] {
   return sorted;
 }
 
+/** The photo picker's first choice: every photo, whatever gallery it's in (or none). */
+const ALL = "__all__";
+
 export default function PhotosPage() {
   const searchParams = useSearchParams();
   const galleryIdParam = searchParams.get("galleryId");
@@ -132,8 +138,9 @@ export default function PhotosPage() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [galleries, setGalleries] = useState<Gallery[]>([]);
   const [selectedGallery, setSelectedGallery] = useState<string>(
-    galleryIdParam ?? "",
+    galleryIdParam ?? ALL,
   );
+  const isAll = selectedGallery === ALL;
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -206,7 +213,7 @@ export default function PhotosPage() {
     async (photo: Photo) => {
       setEditingId(photo.id);
       setEditingFocal({ x: photo.focalX ?? 50, y: photo.focalY ?? 50 });
-      setEditingGalleryIds(new Set(selectedGallery ? [selectedGallery] : []));
+      setEditingGalleryIds(new Set(selectedGallery && selectedGallery !== ALL ? [selectedGallery] : []));
       setEditingGalleriesDirty(false);
       try {
         const res = await fetch(`/api/photos?id=${photo.id}`);
@@ -229,9 +236,10 @@ export default function PhotosPage() {
       setLoading(false);
       return;
     }
-    const res = await fetch(`/api/photos?galleryId=${selectedGallery}`);
+    const res = await fetch(selectedGallery === ALL ? "/api/photos" : `/api/photos?galleryId=${selectedGallery}`);
     const data = await res.json();
-    setPhotos(data);
+    // The library comes oldest first; show the newest uploads first.
+    setPhotos(Array.isArray(data) ? (selectedGallery === ALL ? [...data].reverse() : data) : []);
     setLoading(false);
   }, [selectedGallery]);
 
@@ -266,7 +274,7 @@ export default function PhotosPage() {
   // the gallery — not just the filtered/searched subset on screen — then drops
   // back to Custom order so drag-reordering works from the new baseline.
   async function handleApplySort() {
-    if (sortKey === "position" || photos.length === 0 || !selectedGallery)
+    if (sortKey === "position" || photos.length === 0 || !selectedGallery || selectedGallery === ALL)
       return;
     if (
       !confirm(
@@ -302,6 +310,8 @@ export default function PhotosPage() {
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     if (!selectedGallery || !e.target.files?.length) return;
+    // From "All photos", uploads go into the library without a gallery.
+    const intoGallery = selectedGallery === ALL ? undefined : selectedGallery;
     setUploading(true);
     const files = Array.from(e.target.files);
     let uploaded = 0;
@@ -331,7 +341,7 @@ export default function PhotosPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          galleryId: selectedGallery,
+          galleryId: intoGallery,
           blobUrl: uploaded_.blobUrl,
           url: uploaded_.url,
           thumbnailUrl: uploaded_.thumbnailUrl,
@@ -395,11 +405,18 @@ export default function PhotosPage() {
       setEditingId(null);
       showSuccess(`${siteConfig.labels.photo} updated.`);
       fetchPhotos();
+    } else {
+      showError(`Couldn't save the ${siteConfig.labels.photo.toLowerCase()}. Your changes are still in the form.`);
     }
   }
 
   async function handleDelete(id: string) {
-    if (!confirm(`Delete this ${siteConfig.labels.photo.toLowerCase()}?`))
+    if (
+      !confirm(
+        `Delete this ${siteConfig.labels.photo.toLowerCase()} from your library? ` +
+          `It's removed from every ${siteConfig.labels.gallery.toLowerCase()} it's in, and can't be undone.`,
+      )
+    )
       return;
     const res = await fetch(`/api/photos?id=${id}`, { method: "DELETE" });
     if (res.ok) {
@@ -564,6 +581,7 @@ export default function PhotosPage() {
 
   // Drag-reorder only makes sense when showing in position order.
   const canReorder =
+    !isAll &&
     sortKey === "position" &&
     filter === "all" &&
     !activeTag &&
@@ -577,8 +595,8 @@ export default function PhotosPage() {
       <Topbar
         title={siteConfig.labels.photos}
         subtitle={
-          currentGallery
-            ? `${photos.length} in ${currentGallery.title}${
+          currentGallery || isAll
+            ? `${photos.length} ${isAll ? "in your library" : `in ${currentGallery?.title}`}${
                 needsTitleCount + needsLocationCount > 0
                   ? ` · ${needsTitleCount + needsLocationCount} need attention`
                   : ""
@@ -619,9 +637,7 @@ export default function PhotosPage() {
               onChange={(e) => setSelectedGallery(e.target.value)}
               className="w-auto min-w-[180px]"
             >
-              <option value="">
-                Select {siteConfig.labels.gallery.toLowerCase()}...
-              </option>
+              <option value={ALL}>All {siteConfig.labels.photos.toLowerCase()}</option>
               {galleries.map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.title}
@@ -630,7 +646,7 @@ export default function PhotosPage() {
             </Select>
             {currentGallery && (
               <Link
-                href={`/${siteConfig.labels.gallerySlug}/${currentGallery.slug}`}
+                href={currentGallery.href ?? `/${siteConfig.labels.gallerySlug}/${currentGallery.slug}`}
                 target="_blank"
                 className="inline-flex items-center gap-1 text-[12px] text-admin-ink-soft hover:text-admin-ink"
               >
@@ -663,7 +679,7 @@ export default function PhotosPage() {
                   </option>
                 ))}
               </Select>
-              {sortKey !== "position" && (
+              {sortKey !== "position" && !isAll && (
                 <Button
                   kind="ghost"
                   size="sm"
@@ -825,9 +841,10 @@ export default function PhotosPage() {
                     key={photo.id}
                     photo={photo}
                     selected={selected.has(photo.id)}
+                    selecting={selected.size > 0}
                     onToggleSelect={() => toggleSelected(photo.id)}
                     onEdit={() => openEdit(photo)}
-                    onSetCover={() => setCover(photo)}
+                    onSetCover={isAll ? undefined : () => setCover(photo)}
                     onDelete={() => handleDelete(photo.id)}
                   />
                 ))}
@@ -841,9 +858,10 @@ export default function PhotosPage() {
                 key={photo.id}
                 photo={photo}
                 selected={selected.has(photo.id)}
+                selecting={selected.size > 0}
                 onToggleSelect={() => toggleSelected(photo.id)}
                 onEdit={() => openEdit(photo)}
-                onSetCover={() => setCover(photo)}
+                onSetCover={isAll ? undefined : () => setCover(photo)}
                 onDelete={() => handleDelete(photo.id)}
               />
             ))}
@@ -884,7 +902,7 @@ export default function PhotosPage() {
             id: p.id,
             thumbnailUrl: p.thumbnailUrl,
           }))}
-          currentGalleryId={selectedGallery}
+          currentGalleryId={isAll ? "" : selectedGallery}
           galleries={galleries.map((g) => ({ id: g.id, title: g.title }))}
           onClose={clearSelection}
           onApply={handleBulkApply}
@@ -957,9 +975,12 @@ function FilterChip({
 interface PhotoTileProps {
   photo: Photo;
   selected: boolean;
+  /** Something is already selected: a click adds to the selection instead of opening the editor. */
+  selecting: boolean;
   onToggleSelect: () => void;
   onEdit: () => void;
-  onSetCover: () => void;
+  /** Absent in "All photos", where there's no gallery to give a cover. */
+  onSetCover?: () => void;
   onDelete: () => void;
 }
 
@@ -986,6 +1007,7 @@ type DragHandle = {
 function PhotoTileInner({
   photo,
   selected,
+  selecting,
   onToggleSelect,
   onEdit,
   onSetCover,
@@ -1004,7 +1026,9 @@ function PhotoTileInner({
         if (isDragging) return;
         if ((e.target as HTMLElement).closest("[data-action]")) return;
         if ((e.target as HTMLElement).closest("[data-drag-handle]")) return;
-        onToggleSelect();
+        // A click opens the photo; once a selection has started, clicks add to it.
+        if (selecting) onToggleSelect();
+        else onEdit();
       }}
       className={cn(
         "group relative aspect-square overflow-hidden rounded-md select-none border-2 transition-[border-color,transform] duration-150",
@@ -1026,16 +1050,23 @@ function PhotoTileInner({
         )}
       />
 
-      <div
+      <button
+        type="button"
+        data-action
+        onClick={onToggleSelect}
+        aria-label={selected ? "Deselect" : "Select"}
+        title={selected ? "Deselect" : "Select for bulk editing"}
         className={cn(
           "absolute top-2 left-2 h-5 w-5 rounded flex items-center justify-center text-[11px] font-bold text-white border transition-colors",
           selected
             ? "bg-admin-accent border-admin-accent"
-            : "bg-black/20 border-white/80 opacity-0 group-hover:opacity-100",
+            : selecting
+              ? "bg-black/20 border-white/80"
+              : "bg-black/20 border-white/80 opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
         )}
       >
         {selected && "✓"}
-      </div>
+      </button>
 
       {/* Drag handle (only rendered when tile is sortable) */}
       {drag && (
@@ -1062,11 +1093,13 @@ function PhotoTileInner({
       )}
 
       <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <IconAction
-          title="Set as gallery cover"
-          onClick={onSetCover}
-          Icon={Star}
-        />
+        {onSetCover && (
+          <IconAction
+            title="Set as gallery cover"
+            onClick={onSetCover}
+            Icon={Star}
+          />
+        )}
         <IconAction title="Edit" onClick={onEdit} Icon={Pencil} />
         <IconAction title="Delete" onClick={onDelete} Icon={Trash2} danger />
       </div>
@@ -1110,17 +1143,6 @@ function IconAction({
     >
       <Icon className="h-3 w-3" />
     </button>
-  );
-}
-
-function EmptyState({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <div className="font-serif italic text-[22px] text-admin-ink mb-2">
-        {title}
-      </div>
-      <p className="text-[13px] text-admin-ink-soft max-w-sm">{body}</p>
-    </div>
   );
 }
 

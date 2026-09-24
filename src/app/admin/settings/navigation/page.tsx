@@ -47,10 +47,6 @@ interface FormState {
   targetId: string | null;
 }
 
-interface FooterDraft {
-  footerText: string;
-}
-
 const emptyForm: FormState = {
   label: "",
   url: "",
@@ -60,19 +56,6 @@ const emptyForm: FormState = {
 
 export default function NavigationSettingsPage() {
   const [loaded, setLoaded] = useState(false);
-
-  // Footer settings
-  const [footer, setFooter] = useState<FooterDraft>({
-    footerText: "",
-  });
-  const [savingFooter, setSavingFooter] = useState(false);
-  const {
-    message: footerMsg,
-    showSuccess: footerOK,
-    showError: footerBad,
-    clear: footerClear,
-    alertClass: footerAlert,
-  } = useMessage();
 
   // Menu items
   const [items, setItems] = useState<MenuItem[]>([]);
@@ -96,21 +79,14 @@ export default function NavigationSettingsPage() {
   });
 
   const fetchEverything = useCallback(async () => {
-    const [settingsRes, itemsRes, pagesRes, galleriesRes] = await Promise.all([
-      fetch("/api/settings"),
+    const [itemsRes, pagesRes, galleriesRes] = await Promise.all([
       fetch("/api/menu-items"),
       fetch("/api/pages"),
       fetch("/api/galleries"),
     ]);
-    const settings = await settingsRes.json();
     const items = await itemsRes.json();
     const pages = await pagesRes.json();
     const galleries = await galleriesRes.json();
-    if (settings) {
-      setFooter({
-        footerText: settings.footerText ?? "",
-      });
-    }
     setItems(items);
     setPageOptions(pages as LinkOption[]);
     setGalleryOptions(galleries as LinkOption[]);
@@ -120,23 +96,6 @@ export default function NavigationSettingsPage() {
   useEffect(() => {
     fetchEverything();
   }, [fetchEverything]);
-
-  // ── Footer save ────────────────────────────────────────────────
-  async function handleFooterSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setSavingFooter(true);
-    footerClear();
-    const res = await fetch("/api/settings", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        footerText: footer.footerText || null,
-      }),
-    });
-    if (res.ok) footerOK("Footer saved.");
-    else footerBad("Failed to save footer.");
-    setSavingFooter(false);
-  }
 
   // ── Menu item handlers ─────────────────────────────────────────
   function openAddForm() {
@@ -416,30 +375,13 @@ export default function NavigationSettingsPage() {
         </div>
       </SettingGroup>
 
-      {/* ── Footer ──────────────────────────────────── */}
-      <form onSubmit={handleFooterSubmit}>
-        <SettingGroup title="Footer" desc="The text at the bottom of every page.">
-          {footerMsg && (
-            <div className={`${footerAlert} mb-2`}>{footerMsg.text}</div>
-          )}
-          <Field label="Footer text" htmlFor="footerText" inline>
-            <Textarea
-              id="footerText"
-              rows={3}
-              value={footer.footerText}
-              onChange={(e) =>
-                setFooter((f) => ({ ...f, footerText: e.target.value }))
-              }
-              placeholder="© Your name, 2026"
-            />
-          </Field>
-        </SettingGroup>
-        <div className="flex justify-end">
-          <Button type="submit" kind="primary" disabled={savingFooter}>
-            {savingFooter ? "Saving..." : "Save footer"}
-          </Button>
-        </div>
-      </form>
+      <p className="text-[12px] text-admin-ink-soft">
+        The footer repeats these links. Its text and its style (a bar, or a floating info button) are set in{" "}
+        <a href="/admin/settings/look#footer" className="text-admin-accent hover:underline">
+          Look and Feel → Footer
+        </a>
+        .
+      </p>
     </div>
   );
 }

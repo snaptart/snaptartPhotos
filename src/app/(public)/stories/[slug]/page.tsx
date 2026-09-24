@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import type { Metadata } from "next";
 import PuckRenderer from "@/components/public/PuckRenderer";
+import { loadPickedPhotos } from "@/lib/puck/picked-photos";
 import type { Data } from "@puckeditor/core";
 import type { EmbedPhoto, GlobalLightboxSettings } from "@/lib/puck/config";
 import StoryPasswordForm from "./StoryPasswordForm";
@@ -194,6 +195,8 @@ export default async function StoryPage({ params }: Props) {
       }));
   }
 
+  const photosById = await loadPickedPhotos(story.content);
+
   return (
     <StoryReadingView
       number={storyIndex + 1}
@@ -207,7 +210,7 @@ export default async function StoryPage({ params }: Props) {
       nextStory={nextStory}
       chrome={chrome}
     >
-      <PuckRenderer data={story.content} galleryPhotos={galleryPhotos} globalLightbox={globalLightbox} />
+      <PuckRenderer data={story.content} galleryPhotos={galleryPhotos} globalLightbox={globalLightbox} photosById={photosById} />
     </StoryReadingView>
   );
 }

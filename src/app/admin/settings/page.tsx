@@ -78,12 +78,9 @@ export default function IdentitySettingsPage() {
       body: JSON.stringify({
         siteTitle: draft.siteTitle,
         tagline: draft.tagline || null,
-        ownerName: draft.ownerName || null,
         logoUrl: draft.logoUrl || null,
-        bio: draft.bio || null,
         contactEmail: draft.contactEmail || null,
         instagramUrl: draft.instagramUrl || null,
-        location: draft.location || null,
       }),
     });
     if (res.ok) showSuccess("Identity saved.");
@@ -134,31 +131,32 @@ export default function IdentitySettingsPage() {
               required
             />
           </Field>
-          <Field label="Tagline" htmlFor="tagline" inline hint="(optional)">
+          <Field
+            label="Tagline"
+            htmlFor="tagline"
+            inline
+            hint="(optional) Shown under the site name in the footer bar."
+          >
             <Input
               id="tagline"
               value={draft.tagline}
               onChange={(e) => update("tagline", e.target.value)}
-              placeholder="A short line about your work"
-            />
-          </Field>
-          <Field label="Owner name" htmlFor="ownerName" inline>
-            <Input
-              id="ownerName"
-              value={draft.ownerName}
-              onChange={(e) => update("ownerName", e.target.value)}
-              placeholder="Your name"
+              placeholder="Photographs by … · Minneapolis, Minnesota"
             />
           </Field>
           <Field label="Logo / avatar" inline>
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 shrink-0 overflow-hidden rounded-md bg-admin-ink text-admin-surface flex items-center justify-center font-serif italic text-2xl">
+              <div
+                className={`w-12 h-12 shrink-0 overflow-hidden rounded-md flex items-center justify-center font-serif italic text-2xl ${
+                  draft.logoUrl ? "border border-admin-border bg-white p-1" : "bg-admin-ink text-admin-surface"
+                }`}
+              >
                 {draft.logoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={draft.logoUrl}
                     alt=""
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain"
                   />
                 ) : (
                   avatarLetter
@@ -168,24 +166,16 @@ export default function IdentitySettingsPage() {
                 <ImagePicker
                   value={draft.logoUrl}
                   onChange={(v) => update("logoUrl", v)}
+                  fit="contain"
                 />
               </div>
             </div>
-          </Field>
-          <Field label="Bio" htmlFor="bio" inline hint="(shown on About page)">
-            <Textarea
-              id="bio"
-              rows={3}
-              value={draft.bio}
-              onChange={(e) => update("bio", e.target.value)}
-              placeholder="A few sentences about who you are."
-            />
           </Field>
         </SettingGroup>
 
         <SettingGroup
           title="Contact"
-          desc="Optional. Shows on the About page and in site footer."
+          desc="Optional. Each one set here is added to the links in the footer bar."
         >
           <Field label="Email" htmlFor="contactEmail" inline>
             <Input
@@ -202,19 +192,6 @@ export default function IdentitySettingsPage() {
               value={draft.instagramUrl}
               onChange={(e) => update("instagramUrl", e.target.value)}
               placeholder="https://instagram.com/..."
-            />
-          </Field>
-          <Field
-            label="Location"
-            htmlFor="location"
-            inline
-            hint="(vague is fine)"
-          >
-            <Input
-              id="location"
-              value={draft.location}
-              onChange={(e) => update("location", e.target.value)}
-              placeholder="Pacific Northwest, USA"
             />
           </Field>
         </SettingGroup>

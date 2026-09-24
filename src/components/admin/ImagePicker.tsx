@@ -19,11 +19,13 @@ interface Photo {
 }
 
 interface ImagePickerProps {
+  /** "contain" shows the whole image (a logo); the default crops to fill the preview. */
+  fit?: "cover" | "contain";
   value: string;
   onChange: (url: string) => void;
 }
 
-export default function ImagePicker({ value, onChange }: ImagePickerProps) {
+export default function ImagePicker({ value, onChange, fit = "cover" }: ImagePickerProps) {
   const [open, setOpen] = useState(false);
   const [galleries, setGalleries] = useState<Gallery[]>([]);
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -74,7 +76,7 @@ export default function ImagePicker({ value, onChange }: ImagePickerProps) {
           <img
             src={value}
             alt=""
-            className="h-24 w-full rounded border border-neutral-200 object-cover"
+            className={`h-24 w-full rounded border border-neutral-200 ${fit === "contain" ? "bg-white object-contain p-2" : "object-cover"}`}
           />
           <button
             type="button"
@@ -92,7 +94,7 @@ export default function ImagePicker({ value, onChange }: ImagePickerProps) {
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="Image URL or browse..."
-          className="flex-1 rounded border border-neutral-300 px-2 py-1.5 text-xs focus:border-neutral-500 focus:outline-none"
+          className="min-w-0 flex-1 rounded border border-neutral-300 px-2 py-1.5 text-xs focus:border-neutral-500 focus:outline-none"
         />
         <button
           type="button"

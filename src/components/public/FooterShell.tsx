@@ -2,15 +2,26 @@
 
 import { useEffect, useRef, useState } from "react";
 import { parseLinks } from "@/lib/parseLinks";
+import { fontRole } from "@/lib/theme/role-style";
 
 interface FooterShellProps {
   footerText: string | null;
   contactEmail: string | null;
+  /** Which bottom corner the button sits in. */
+  alignment?: string;
 }
 
+const CORNER: Record<string, string> = {
+  left: "left-4 items-start",
+  center: "left-1/2 -translate-x-1/2 items-center",
+  right: "right-4 items-end",
+};
+
+/** The footer as a floating "i" button that opens the site info (Look → Footer → Floating). */
 export function FooterShell({
   footerText,
   contactEmail,
+  alignment = "right",
 }: FooterShellProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -56,7 +67,7 @@ export function FooterShell({
   return (
     <div
       ref={containerRef}
-      className="pointer-events-none fixed bottom-4 right-4 z-40 flex flex-col items-end"
+      className={`pointer-events-none fixed bottom-4 z-40 flex flex-col ${CORNER[alignment] ?? CORNER.right}`}
     >
       {open && (
         <div
@@ -66,7 +77,7 @@ export function FooterShell({
           style={{
             borderColor: "var(--theme-color-rule)",
             backgroundColor: "var(--theme-color-footer-bg)",
-            fontFamily: "var(--theme-font-footer-family, var(--theme-font-footer))",
+            ...fontRole("footer"),
             fontSize: "var(--theme-font-footer-size, var(--theme-footer-font-size))",
             color: "var(--theme-color-footer-text)",
           }}

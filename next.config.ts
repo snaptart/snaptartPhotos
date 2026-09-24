@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Lets a phone on the home network use `next dev` (scripts and hot reload); dev-only.
+  allowedDevOrigins: ["192.168.50.17"],
   images: {
     remotePatterns: [
       {
