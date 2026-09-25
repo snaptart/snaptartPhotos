@@ -147,7 +147,7 @@ export default function FieldMap({
   yearBounds,
   filters,
   mapStyle = "modern",
-  siteTitle = "Snaptart",
+  siteTitle = "",
   tagline = "Field Map · Expedition Log",
   mode = "interactive",
   highlightSlug,
@@ -327,7 +327,7 @@ export default function FieldMap({
   yearBoundsRef.current = yearBounds;
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("snaptart-fm-view");
+      const saved = localStorage.getItem("cms-fm-view");
       if (saved) {
         const s = JSON.parse(saved) as { filter?: string; years?: [number, number] };
         if (s.filter) setFilter(s.filter);
@@ -340,7 +340,7 @@ export default function FieldMap({
   }, []);
   useEffect(() => {
     try {
-      localStorage.setItem("snaptart-fm-view", JSON.stringify({ filter, years }));
+      localStorage.setItem("cms-fm-view", JSON.stringify({ filter, years }));
     } catch {}
   }, [filter, years]);
 

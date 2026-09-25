@@ -42,7 +42,7 @@ export default function HallLightbox(props: HallLightboxProps) {
 // ====================================================================
 
 type LightboxMode = "normal" | "focused" | "immersive";
-const MODE_STORAGE_KEY = "snaptart-lightbox-mode";
+const MODE_STORAGE_KEY = "cms-lightbox-mode";
 
 function HallLightboxDesktop({
   galleryTitle,
