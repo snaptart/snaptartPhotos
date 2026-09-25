@@ -1,0 +1,26 @@
+# Tells each site repo that the CMS changed, so its "Sync CMS updates" workflow runs.
+# Lives in the CMS and reaches the sites through merges like everything else; there it is skipped.
+# To add a site, add its repo to the matrix below.
+name: Notify sites of CMS updates
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  notify:
+    if: github.repository == 'snaptart/cms'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        site: [snaptart/snaptartPhotos, snaptart/gardensalacarte]
+    steps:
+      - name: Signal ${{ matrix.site }}
+        env:
+          GH_TOKEN: ${{ secrets.CMS_SYNC_TOKEN }}
+        run: |
+          gh api "repos/${{ matrix.site }}/dispatches" \
+            -f event_type=cms-updated \
+            -f "client_payload[sha]=${{ github.sha }}"
