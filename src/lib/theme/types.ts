@@ -87,6 +87,8 @@ export interface ThemeSettings {
   wordmarkTracking: number;
   menuFontSize: number;
   menuJustify: "left" | "center" | "right";
+  /** scroll: the header scrolls away with the page · pinned: it stays at the top of the window. */
+  headerBehavior: "scroll" | "pinned";
   /** bar: the design's footer across the foot of every page · floating: the "i" button in a corner. */
   footerStyle: "bar" | "floating";
   footerFontSize: number;
@@ -223,6 +225,7 @@ export const THEME_DEFAULTS: ThemeSettings = {
   wordmarkTracking: 0.1,
   menuFontSize: 14,
   menuJustify: "right",
+  headerBehavior: "scroll",
   footerStyle: "bar",
   footerFontSize: 14,
   colorSiteBg: "#ffffff",

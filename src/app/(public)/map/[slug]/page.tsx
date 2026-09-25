@@ -15,6 +15,7 @@ interface Props {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  if (!siteConfig.features.fieldMap) return {};
   const { slug } = await params;
   const [gallery] = await db
     .select()
@@ -33,6 +34,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function FieldMapRegionPage({ params }: Props) {
+  if (!siteConfig.features.fieldMap) notFound();
   const { slug } = await params;
 
   const [gallery] = await db

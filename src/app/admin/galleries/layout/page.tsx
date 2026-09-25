@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { ArrowLeft, Crosshair, MapPin, X } from "lucide-react";
 import { Button, Card, Pill, SectionLabel, Topbar } from "@/components/admin/ui";
 import { useMessage } from "@/lib/hooks/useMessage";
@@ -33,7 +34,12 @@ type Gallery = {
 
 const PIN_FALLBACK = "#5b6470";
 
-export default function FieldMapPlacementEditor() {
+export default function FieldMapPlacementPage() {
+  if (!siteConfig.features.fieldMap) notFound();
+  return <FieldMapPlacementEditor />;
+}
+
+function FieldMapPlacementEditor() {
   const [galleries, setGalleries] = useState<Gallery[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [placingId, setPlacingId] = useState<string | null>(null);

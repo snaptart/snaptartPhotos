@@ -106,9 +106,9 @@ export default async function HomePage() {
 
     const photosById = await loadPickedPhotos(page.content);
 
-    const hasFieldMap = (page.content.content ?? []).some(
-      (item: { type: string }) => item.type === "FieldMap"
-    );
+    const hasFieldMap =
+      siteConfig.features.fieldMap &&
+      (page.content.content ?? []).some((item: { type: string }) => item.type === "FieldMap");
     const fieldMap: FieldMapBlockData | null = hasFieldMap
       ? {
           ...(await getFieldMapData()),

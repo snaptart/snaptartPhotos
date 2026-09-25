@@ -120,6 +120,8 @@ type ImageBlockProps = {
   captionBgColor: string;
   captionBgOpacity: number;
   borderRadius: number;
+  /** 0–100; fades the picture only, never its caption. */
+  imageOpacity: number;
   linkUrl: string;
   linkTarget: "_self" | "_blank";
   focalX: number;
@@ -141,6 +143,35 @@ type SpacerProps = {
 type ContainerProps = {
   paddingLeft: number;
   paddingRight: number;
+  paddingTop: number;
+  paddingBottom: number;
+  marginTop: number;
+  marginBottom: number;
+  bgColor: string;
+  bgOpacity: number;
+  /** Blank inherits the surrounding text colour. */
+  textColor: string;
+  borderWidth: number;
+  borderColor: string;
+  borderRadius: number;
+  /** Width of the contents as a % of the container, centred. */
+  contentMaxWidth: number;
+  /** Background runs edge to edge of the window (in-flow only). */
+  fullBleed: boolean;
+  /** "floating" positions the box freely over its surroundings instead of in the flow. */
+  placement: "flow" | "floating";
+  /** Floating: where the anchor edge sits, as a % of the parent's width. */
+  floatX: number;
+  floatAnchor: "left" | "center" | "right";
+  /** Floating: px down from where the container sits in the flow (negative moves up). */
+  floatY: number;
+  /** Floating: width as a % of the parent (over 100 overhangs it). */
+  floatWidth: number;
+  /** Floating: height kept open in the flow beneath it; 0 takes no space. */
+  floatReserve: number;
+  floatZ: number;
+  /** Floating, below 768px: stack in the flow at full width, or keep floating. */
+  floatMobile: "stack" | "float";
 };
 
 type ColumnsProps = {
@@ -399,10 +430,12 @@ type ButtonProps = {
   hoverBgColor: string;
   hoverTextColor: string;
   hoverBorderColor: string;
-  hoverEffect: "none" | "lift" | "scale-up" | "scale-down";
+  hoverEffect: "none" | "fade" | "lift" | "scale-up" | "scale-down";
   shadow: "none" | "sm" | "md" | "lg";
   hoverShadow: "none" | "sm" | "md" | "lg";
   transitionMs: number;
+  /** Fixed height in px with the label centred; 0 lets the padding decide. */
+  height: number;
 };
 
 export type Components = {
@@ -475,12 +508,21 @@ function stackPositions(order: string | undefined, count: number): number[] | nu
 
 export const puckConfig: Config<Components> = {
   categories: {
-    content: { components: ["RichText", "ImageBlock", "Button", "LinkList", "GalleryEmbed", "GalleriesIndex", "Carousel", "FieldMap"] },
+    content: {
+      components: [
+        "RichText", "ImageBlock", "Button", "LinkList", "GalleryEmbed", "GalleriesIndex", "Carousel",
+        ...(siteConfig.features.fieldMap ? (["FieldMap"] as const) : []),
+      ],
+    },
     layout: { components: ["Columns", "Rows", "Spacer", "Container"] },
     hero: { components: ["Hero", "HeroSlideshow"] },
     stories: { title: "Stories", components: ["StoriesIndexBlock"] },
     sections: { title: "Page sections", components: ["PageIntro", "SectionHeader", "Details", "PhotoPlate", "SelectedWork", "Breadcrumb", "NextCollection"] },
     forms: { components: ["Form", "TextField", "TextArea", "SelectField", "RadioGroup", "CheckboxGroup", "Checkbox"] },
+    // With the Field Map switched off the block stays registered, so a page that already
+    // holds one still loads, but it is kept out of the block list (uncategorised blocks
+    // would otherwise land in "Other").
+    ...(siteConfig.features.fieldMap ? {} : { fieldMap: { components: ["FieldMap" as const], visible: false } }),
   },
   components: {
     RichText: {
@@ -657,6 +699,13 @@ export const puckConfig: Config<Components> = {
             <SliderField value={value} onChange={onChange} min={0} max={48} step={1} unit="px" label="Corner Radius" />
           ),
         },
+        imageOpacity: {
+          type: "custom",
+          label: "Image opacity",
+          render: ({ value, onChange }) => (
+            <SliderField value={value ?? 100} onChange={onChange} min={0} max={100} step={5} unit="%" label="Image Opacity" />
+          ),
+        },
         caption: { type: "text", label: "Caption" },
         captionStyle: {
           type: "custom",
@@ -735,6 +784,7 @@ export const puckConfig: Config<Components> = {
         captionBgColor: "#000000",
         captionBgOpacity: 0,
         borderRadius: 4,
+        imageOpacity: 100,
         linkUrl: "",
         linkTarget: "_self",
         focalX: 50,
@@ -742,7 +792,7 @@ export const puckConfig: Config<Components> = {
       },
       resolveData: ({ props }) => ({ props: migrateImageBlock(props) }),
       render: (raw) => {
-        const { url, alt, aspectRatio, caption, captionStyle, width, captionX, captionY, captionBgColor, captionBgOpacity, borderRadius, linkUrl, linkTarget, focalX, focalY } = migrateImageBlock(raw);
+        const { url, alt, aspectRatio, caption, captionStyle, width, captionX, captionY, captionBgColor, captionBgOpacity, borderRadius, imageOpacity, linkUrl, linkTarget, focalX, focalY } = migrateImageBlock(raw);
         const isPriority = useImagePriority();
         const isOverlay = captionY >= 0 && captionY <= 100;
         const arMap: Record<string, string> = { square: "1/1", "4:3": "4/3", "3:2": "3/2", "16:9": "16/9" };
@@ -812,7 +862,12 @@ export const puckConfig: Config<Components> = {
           <figure className="mx-auto" style={{ width: `${width}%` }}>
             {wrapWithLink(
               <div className="relative overflow-visible">
-                {imageEl}
+                {/* Opacity sits on a wrapper: the <img> animates its own opacity to fade in. */}
+                {(imageOpacity ?? 100) < 100 ? (
+                  <div style={{ opacity: (imageOpacity ?? 100) / 100 }}>{imageEl}</div>
+                ) : (
+                  imageEl
+                )}
                 {caption && (
                   <figcaption style={captionBox}>
                     <Editable path="caption" value={caption} />
@@ -1502,6 +1557,13 @@ export const puckConfig: Config<Components> = {
             <SliderField value={value} onChange={onChange} min={0} max={400} step={4} unit="px" label="Min Width" />
           ),
         },
+        height: {
+          type: "custom",
+          label: "Fixed height (0 = fits the label)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value ?? 0} onChange={onChange} min={0} max={160} step={2} unit="px" label="Height" />
+          ),
+        },
         bgColor: {
           type: "custom",
           label: "Background",
@@ -1622,6 +1684,7 @@ export const puckConfig: Config<Components> = {
           label: "Effect",
           options: [
             { label: "None", value: "none" },
+            { label: "Fade", value: "fade" },
             { label: "Lift", value: "lift" },
             { label: "Scale Up", value: "scale-up" },
             { label: "Scale Down (press)", value: "scale-down" },
@@ -1687,6 +1750,7 @@ export const puckConfig: Config<Components> = {
         shadow: "none",
         hoverShadow: "md",
         transitionMs: 200,
+        height: 0,
       },
       // Blocks saved before text styles: convert the old font settings.
       resolveData: ({ props }) => ({ props: migrateButton(props) }),
@@ -1779,15 +1843,139 @@ export const puckConfig: Config<Components> = {
     Container: {
       label: "Container",
       fields: {
+        bgColor: {
+          type: "custom",
+          label: "Background",
+          render: ({ value, onChange }) => <ColorField value={value} onChange={onChange} />,
+        },
+        bgOpacity: {
+          type: "custom",
+          label: "Background opacity",
+          render: ({ value, onChange }) => (
+            <SliderField value={value ?? 0} onChange={onChange} min={0} max={100} step={5} unit="%" label="Background Opacity" />
+          ),
+        },
+        textColor: {
+          type: "custom",
+          label: "Text color",
+          render: ({ value, onChange }) => <ColorField value={value} onChange={onChange} emptyLabel="Inherit" />,
+        },
+        borderWidth: {
+          type: "custom",
+          label: "Border width",
+          render: ({ value, onChange }) => (
+            <SliderField value={value ?? 0} onChange={onChange} min={0} max={8} step={1} unit="px" label="Border Width" />
+          ),
+        },
+        borderColor: {
+          type: "custom",
+          label: "Border color",
+          render: ({ value, onChange }) => <ColorField value={value} onChange={onChange} />,
+        },
+        borderRadius: {
+          type: "custom",
+          label: "Corner radius",
+          render: ({ value, onChange }) => (
+            <SliderField value={value ?? 0} onChange={onChange} min={0} max={48} step={1} unit="px" label="Corner Radius" />
+          ),
+        },
+        placement: {
+          type: "radio",
+          label: "Placement",
+          options: [
+            { label: "In the flow", value: "flow" },
+            { label: "Floating", value: "floating" },
+          ],
+        },
+        floatX: {
+          type: "custom",
+          label: "Across (% of the parent's width)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value ?? 50} onChange={onChange} min={-100} max={200} step={1} unit="%" label="Across" />
+          ),
+        },
+        floatAnchor: {
+          type: "radio",
+          label: "Edge at that point",
+          options: [
+            { label: "Left", value: "left" },
+            { label: "Center", value: "center" },
+            { label: "Right", value: "right" },
+          ],
+        },
+        floatY: { type: "number", label: "Down (px, negative moves up)", min: -2000, max: 2000 },
+        floatWidth: {
+          type: "custom",
+          label: "Width (% of the parent)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value ?? 50} onChange={onChange} min={5} max={200} step={1} unit="%" label="Width" />
+          ),
+        },
+        floatReserve: { type: "number", label: "Space kept open below (px, 0 = none)", min: 0, max: 2000 },
+        floatZ: { type: "number", label: "Stacking order (higher sits on top)", min: -10, max: 100 },
+        floatMobile: {
+          type: "radio",
+          label: "On phones",
+          options: [
+            { label: "Stack in place", value: "stack" },
+            { label: "Keep floating", value: "float" },
+          ],
+        },
+        contentMaxWidth: {
+          type: "custom",
+          label: "Content width (% of the container)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value ?? 100} onChange={onChange} min={20} max={100} step={5} unit="%" label="Content Width" />
+          ),
+        },
+        fullBleed: {
+          type: "radio",
+          label: "Background edge to edge",
+          options: [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+        },
+        paddingTop: { type: "number", label: "Top padding", min: 0, max: 300 },
+        paddingBottom: { type: "number", label: "Bottom padding", min: 0, max: 300 },
         paddingLeft: { type: "number", label: "Left padding", min: 0, max: 300 },
         paddingRight: { type: "number", label: "Right padding", min: 0, max: 300 },
+        marginTop: {
+          type: "custom",
+          label: "Space above",
+          render: ({ value, onChange }) => <SpacingControl value={value} onChange={onChange} />,
+        },
+        marginBottom: {
+          type: "custom",
+          label: "Space below",
+          render: ({ value, onChange }) => <SpacingControl value={value} onChange={onChange} />,
+        },
       },
-      defaultProps: { paddingLeft: 0, paddingRight: 0 },
-      render: ({ paddingLeft, paddingRight, puck }) => (
-        <div style={{ paddingLeft, paddingRight }}>
-          <DropZone zone="container-content" />
-        </div>
-      ),
+      defaultProps: {
+        paddingLeft: 0,
+        paddingRight: 0,
+        paddingTop: 0,
+        paddingBottom: 0,
+        marginTop: 0,
+        marginBottom: 0,
+        bgColor: "#f5f5f5",
+        bgOpacity: 0,
+        textColor: "",
+        borderWidth: 0,
+        borderColor: "#d4d4d4",
+        borderRadius: 0,
+        contentMaxWidth: 100,
+        fullBleed: false,
+        placement: "flow",
+        floatX: 50,
+        floatAnchor: "center",
+        floatY: 0,
+        floatWidth: 50,
+        floatReserve: 0,
+        floatZ: 10,
+        floatMobile: "stack",
+      },
+      render: ({ puck, ...props }) => <ContainerRender {...props} isEditing={!!puck?.isEditing} />,
     },
 
     Rows: {
@@ -2628,6 +2816,7 @@ export const puckConfig: Config<Components> = {
         backgroundColor: "#ffffff",
       },
       render: ({ mapStyle, height, showBrand, backgroundColor, puck }) => {
+        if (!siteConfig.features.fieldMap) return <></>;
         const injected = (puck?.metadata as Record<string, unknown>)?.fieldMap as
           | FieldMapBlockData
           | undefined
@@ -3267,7 +3456,7 @@ export const puckConfig: Config<Components> = {
           ),
         },
         successMessage: { type: "textarea", label: "Success message" },
-        recipientEmail: { type: "text", label: "Notification email (not used yet)" },
+        recipientEmail: { type: "text", label: "Notification email (defaults to the site's contact email)" },
         fieldTextStyle: {
           type: "custom",
           label: "Text style",
@@ -3801,6 +3990,117 @@ function withCssColors<T extends object>(props: T, keys: (keyof T & string)[]): 
   return out as T;
 }
 
+// ----- Container render -----
+
+// Floating boxes are positioned from CSS variables. Below md they drop back into the flow at
+// full width unless set to keep floating, so these class lists stay whole for Tailwind to find.
+const FLOAT_ALWAYS = "absolute left-[var(--fb-left)] top-[var(--fb-top)] w-[var(--fb-width)] [transform:var(--fb-transform)]";
+const FLOAT_FROM_MD =
+  "static w-full md:absolute md:left-[var(--fb-left)] md:top-[var(--fb-top)] md:w-[var(--fb-width)] md:[transform:var(--fb-transform)]";
+
+// Containers saved before the box and floating settings have none of them, so every value
+// falls back to what a plain container looked like.
+function ContainerRender(props: Partial<ContainerProps> & { isEditing: boolean }) {
+  const {
+    paddingLeft = 0,
+    paddingRight = 0,
+    paddingTop = 0,
+    paddingBottom = 0,
+    marginTop = 0,
+    marginBottom = 0,
+    bgColor = "#f5f5f5",
+    bgOpacity = 0,
+    textColor = "",
+    borderWidth = 0,
+    borderColor = "#d4d4d4",
+    borderRadius = 0,
+    contentMaxWidth = 100,
+    fullBleed = false,
+    placement = "flow",
+    floatX = 50,
+    floatAnchor = "center",
+    floatY = 0,
+    floatWidth = 50,
+    floatReserve = 0,
+    floatZ = 10,
+    floatMobile = "stack",
+    isEditing,
+  } = props;
+
+  const box: React.CSSProperties = {
+    backgroundColor: bgOpacity > 0 ? withAlpha(bgColor, bgOpacity / 100) : undefined,
+    color: cssColor(textColor) || undefined,
+    border: borderWidth > 0 ? `${borderWidth}px solid ${cssColor(borderColor, "#d4d4d4")}` : undefined,
+    borderRadius: borderRadius ? `${borderRadius}px` : undefined,
+  };
+
+  const narrowed = contentMaxWidth < 100;
+  const contents = (
+    <div
+      style={{
+        paddingLeft,
+        paddingRight,
+        paddingTop,
+        paddingBottom,
+        maxWidth: narrowed ? `${contentMaxWidth}%` : undefined,
+        marginLeft: narrowed ? "auto" : undefined,
+        marginRight: narrowed ? "auto" : undefined,
+      }}
+    >
+      <DropZone zone="container-content" />
+    </div>
+  );
+
+  if (placement === "floating") {
+    const keepFloating = floatMobile === "float";
+    const translateX = floatAnchor === "center" ? "-50%" : floatAnchor === "right" ? "-100%" : "0";
+    return (
+      <div
+        className={keepFloating ? "relative h-[var(--fb-reserved)]" : "relative md:h-[var(--fb-reserved)]"}
+        style={
+          {
+            "--fb-reserved": `${floatReserve}px`,
+            marginTop,
+            marginBottom,
+            // Keep a visible, clickable anchor in the editor even when it takes no space.
+            minHeight: isEditing ? 24 : undefined,
+            outline: isEditing ? "1px dashed #cbd5e1" : undefined,
+          } as React.CSSProperties
+        }
+      >
+        <div
+          className={keepFloating ? FLOAT_ALWAYS : FLOAT_FROM_MD}
+          style={
+            {
+              "--fb-left": `${floatX}%`,
+              "--fb-top": `${floatY}px`,
+              "--fb-width": `${floatWidth}%`,
+              "--fb-transform": `translateX(${translateX})`,
+              zIndex: floatZ,
+              ...box,
+            } as React.CSSProperties
+          }
+        >
+          {contents}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        marginTop,
+        marginBottom,
+        ...(fullBleed ? { marginLeft: "calc(-50vw + 50%)", marginRight: "calc(-50vw + 50%)", width: "100vw" } : {}),
+        ...box,
+      }}
+    >
+      {contents}
+    </div>
+  );
+}
+
 // ----- Button render -----
 
 const BUTTON_SHADOWS: Record<string, string> = {
@@ -3812,6 +4112,7 @@ const BUTTON_SHADOWS: Record<string, string> = {
 
 const BUTTON_HOVER_TRANSFORMS: Record<string, string> = {
   none: "none",
+  fade: "none",
   lift: "translateY(-2px)",
   "scale-up": "scale(1.05)",
   "scale-down": "scale(0.97)",
@@ -3852,6 +4153,7 @@ function ButtonRender(props: ButtonProps) {
     shadow,
     hoverShadow,
     transitionMs,
+    height,
   } = withCssColors(props, ["bgColor", "textColor", "borderColor", "hoverBgColor", "hoverTextColor", "hoverBorderColor"]);
 
   const opacity = (bgOpacity ?? 100) / 100;
@@ -3868,6 +4170,18 @@ function ButtonRender(props: ButtonProps) {
         ? { width: `${customWidth}%`, display: "block" }
         : { display: "inline-block" };
 
+  // A fixed height centres the label vertically, so the vertical padding no longer applies.
+  const fixedHeight = (height ?? 0) > 0;
+  const heightStyle: React.CSSProperties = fixedHeight
+    ? {
+        display: widthMode === "auto" ? "inline-flex" : "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        height: `${height}px`,
+        padding: `0 ${paddingX}px`,
+      }
+    : {};
+
   const buttonStyle: React.CSSProperties = {
     ...textStyleCss(labelStyle, "label", { withColor: false }),
     textDecoration: underline ? "underline" : "none",
@@ -3879,12 +4193,14 @@ function ButtonRender(props: ButtonProps) {
     minWidth: minWidth ? `${minWidth}px` : undefined,
     boxShadow: sh,
     transform,
-    transition: `background-color ${transitionMs}ms, color ${transitionMs}ms, border-color ${transitionMs}ms, box-shadow ${transitionMs}ms, transform ${transitionMs}ms`,
+    opacity: hovered && hoverEffect === "fade" ? 0.75 : 1,
+    transition: `background-color ${transitionMs}ms, color ${transitionMs}ms, border-color ${transitionMs}ms, box-shadow ${transitionMs}ms, transform ${transitionMs}ms, opacity ${transitionMs}ms`,
     cursor: link ? "pointer" : "default",
     textAlign: "center",
     lineHeight: labelStyle?.lineHeight ?? 1.2,
     boxSizing: "border-box",
     ...widthStyle,
+    ...heightStyle,
   };
 
   const iconEl = iconText ? (
