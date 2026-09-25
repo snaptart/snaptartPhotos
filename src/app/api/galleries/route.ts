@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { galleries, galleryPhotos, photos } from "@/lib/db/schema";
 import { eq, asc, sql, getTableColumns } from "drizzle-orm";
@@ -12,7 +12,7 @@ export const OPTIONS = corsPreflight;
 
 export async function GET() {
   try {
-    const session = await auth();
+    const session = await getAdminSession();
 
     // photoCount comes from the junction table so the Galleries Index block can show
     // a live count without a second round trip. ::int because Postgres count() is a
@@ -44,7 +44,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const session = await auth();
+  const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
-  const session = await auth();
+  const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
@@ -87,7 +87,7 @@ export async function PUT(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const session = await auth();
+  const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {

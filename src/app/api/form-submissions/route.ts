@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formSubmissions, siteSettings } from "@/lib/db/schema";
 import { eq, desc, and, gte, count } from "drizzle-orm";
 import { sendFormNotification } from "@/lib/resend";
 
 export async function GET(req: NextRequest) {
-  const session = await auth();
+  const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const session = await auth();
+  const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {

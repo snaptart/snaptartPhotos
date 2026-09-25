@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { themes } from "@/lib/db/schema";
 import { asc } from "drizzle-orm";
@@ -20,7 +20,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const session = await auth();
+  const session = await getAdminSession();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

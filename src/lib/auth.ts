@@ -55,3 +55,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
   },
 });
+
+/**
+ * The signed-in admin's session, or null. Use this rather than `auth()` wherever access
+ * depends on being signed in.
+ *
+ * When NextAuth is misconfigured (e.g. AUTH_SECRET missing in production), `auth()` hands
+ * back its error body ({ message: "There was a problem with the server configuration…" })
+ * instead of null. That object is truthy, so a bare `if (!session)` let every request
+ * through. Requiring a user id makes a broken setup fail closed.
+ */
+export async function getAdminSession() {
+  const session = await auth();
+  return session?.user?.id ? session : null;
+}

@@ -1,10 +1,10 @@
-import { auth } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { adminUsers } from "@/lib/db/schema";
 import { hashPassword } from "@/lib/password";
 
 export async function GET() {
-  const session = await auth();
+  const session = await getAdminSession();
   if (!session) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -23,7 +23,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const session = await auth();
+  const session = await getAdminSession();
   if (!session) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }

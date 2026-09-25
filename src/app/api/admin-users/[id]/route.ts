@@ -1,11 +1,11 @@
-import { auth } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { adminUsers } from "@/lib/db/schema";
 import { hashPassword } from "@/lib/password";
 import { eq } from "drizzle-orm";
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
+  const session = await getAdminSession();
   if (!session) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -31,7 +31,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
+  const session = await getAdminSession();
   if (!session) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
