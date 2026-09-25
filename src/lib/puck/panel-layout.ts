@@ -124,7 +124,12 @@ export const PANEL_LAYOUTS: Layouts = {
       { tab: "content", title: "Image", fields: ["url", "alt", "focalX", "focalY"], summary: (p) => p.alt || (p.url ? "No alt text" : "No image") },
       { tab: "content", title: "Caption", fields: ["caption"], summary: (p) => p.caption || "None" },
       { tab: "content", title: "Link", fields: ["linkUrl", "linkTarget"], summary: (p) => p.linkUrl || "None" },
-      { tab: "style", title: "Image", fields: ["borderRadius"], summary: (p) => `Corners ${p.borderRadius ?? 0}px` },
+      {
+        tab: "style",
+        title: "Image",
+        fields: ["borderRadius", "imageOpacity"],
+        summary: (p) => list(`Corners ${p.borderRadius ?? 0}px`, (p.imageOpacity ?? 100) < 100 && `${p.imageOpacity}% opacity`),
+      },
       {
         tab: "style",
         title: "Caption",
@@ -341,8 +346,13 @@ export const PANEL_LAYOUTS: Layouts = {
       {
         tab: "layout",
         title: "Size",
-        fields: ["widthMode", "customWidth", "minWidth", "alignment"],
-        summary: (p) => list(p.widthMode === "custom" ? `${p.customWidth}%` : p.widthMode === "full" ? "Full width" : "Fits label", p.alignment),
+        fields: ["widthMode", "customWidth", "minWidth", "height", "alignment"],
+        summary: (p) =>
+          list(
+            p.widthMode === "custom" ? `${p.customWidth}%` : p.widthMode === "full" ? "Full width" : "Fits label",
+            (p.height ?? 0) > 0 && `${p.height}px tall`,
+            p.alignment,
+          ),
       },
       { tab: "layout", title: "Padding", fields: ["paddingX", "paddingY"], summary: (p) => `${p.paddingX}px × ${p.paddingY}px`, collapsed: true },
       SPACING,
@@ -355,6 +365,58 @@ export const PANEL_LAYOUTS: Layouts = {
       alignment: (p) => p.widthMode !== "full",
       borderStyle: (p) => p.borderWidth > 0,
       borderColor: (p) => p.borderWidth > 0,
+      // A fixed height centres the label, so vertical padding has no effect.
+      paddingY: (p) => !((p.height ?? 0) > 0),
+    },
+  },
+
+  Container: {
+    groups: [
+      {
+        tab: "style",
+        title: "Fill and border",
+        fields: ["bgColor", "bgOpacity", "borderWidth", "borderColor", "borderRadius"],
+        summary: (p) =>
+          list(
+            (p.bgOpacity ?? 0) > 0 ? colorSummary(p.bgColor) : "No fill",
+            (p.borderWidth ?? 0) > 0 ? `${p.borderWidth}px border` : "no border",
+          ),
+      },
+      { tab: "style", title: "Text", fields: ["textColor"], summary: (p) => colorSummary(p.textColor, "Inherited") },
+      {
+        tab: "layout",
+        title: "Placement",
+        fields: ["placement", "floatX", "floatAnchor", "floatY", "floatWidth", "floatReserve", "floatZ", "floatMobile"],
+        summary: (p) =>
+          p.placement === "floating"
+            ? list("Floating", `${p.floatX ?? 50}% across`, `${p.floatY ?? 0}px down`, `${p.floatWidth ?? 50}% wide`)
+            : "In the flow",
+      },
+      {
+        tab: "layout",
+        title: "Width",
+        fields: ["contentMaxWidth", "fullBleed"],
+        summary: (p) => list(`Contents ${p.contentMaxWidth ?? 100}%`, p.fullBleed && p.placement !== "floating" && "edge to edge"),
+      },
+      {
+        tab: "layout",
+        title: "Padding",
+        fields: ["paddingTop", "paddingRight", "paddingBottom", "paddingLeft"],
+        summary: (p) => `${p.paddingTop ?? 0} · ${p.paddingRight ?? 0} · ${p.paddingBottom ?? 0} · ${p.paddingLeft ?? 0}px`,
+        collapsed: true,
+      },
+      SPACING,
+    ],
+    when: {
+      borderColor: (p) => (p.borderWidth ?? 0) > 0,
+      floatX: (p) => p.placement === "floating",
+      floatAnchor: (p) => p.placement === "floating",
+      floatY: (p) => p.placement === "floating",
+      floatWidth: (p) => p.placement === "floating",
+      floatReserve: (p) => p.placement === "floating",
+      floatZ: (p) => p.placement === "floating",
+      floatMobile: (p) => p.placement === "floating",
+      fullBleed: (p) => p.placement !== "floating",
     },
   },
 

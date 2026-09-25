@@ -7,7 +7,7 @@ import { builtCollectionPages, collectionHref } from "@/lib/collections";
 import { generateSlug } from "@/lib/utils";
 import { corsPreflight, withCors } from "@/lib/cors";
 
-// Readable cross-origin so the trip journal can read each station gallery's cover — see @/lib/cors.
+// Readable cross-origin so a separate front end can list galleries — see @/lib/cors.
 export const OPTIONS = corsPreflight;
 
 export async function GET() {

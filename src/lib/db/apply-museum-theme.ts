@@ -70,6 +70,7 @@ const MUSEUM_WHITE: ThemeSettings = {
   logoPosition: "left",
   logoSize: 40,
   menuJustify: "right",
+  headerBehavior: "scroll",
   footerStyle: "bar", // the boards' footer bar
   // Fraunces 500, tracked capitals — 21px on the desktop boards, 17 on mobile.
   wordmarkSize: 21,

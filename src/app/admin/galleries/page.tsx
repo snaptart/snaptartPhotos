@@ -127,6 +127,22 @@ export default function GalleriesPage() {
     };
   }, [editingId, galleries]);
 
+  // The Field Map & Hall and Slide frame inputs only render with the Field Map on. With it
+  // off they are left out of the request, so the API keeps whatever the gallery already has.
+  function fieldMapFields(form: FormData) {
+    if (!siteConfig.features.fieldMap) return {};
+    return {
+      tagline: form.get("tagline") || null,
+      accentColor: accentColor || null,
+      latitude: parseNullableFloat(form.get("latitude")),
+      longitude: parseNullableFloat(form.get("longitude")),
+      roomCaptionFields: captionFields,
+      filmStamp: (form.get("filmStamp") as string)?.trim() || null,
+      handwritingFont: (form.get("handwritingFont") as string) || null,
+      stampFont: (form.get("stampFont") as string) || null,
+    };
+  }
+
   async function handleAdd(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
@@ -136,14 +152,7 @@ export default function GalleriesPage() {
       body: JSON.stringify({
         title: form.get("title"),
         description: form.get("description") || null,
-        tagline: form.get("tagline") || null,
-        accentColor: accentColor || null,
-        latitude: parseNullableFloat(form.get("latitude")),
-        longitude: parseNullableFloat(form.get("longitude")),
-        roomCaptionFields: captionFields,
-        filmStamp: (form.get("filmStamp") as string)?.trim() || null,
-        handwritingFont: (form.get("handwritingFont") as string) || null,
-        stampFont: (form.get("stampFont") as string) || null,
+        ...fieldMapFields(form),
         isPublished: form.get("isPublished") === "on",
         position: galleries.length,
       }),
@@ -167,15 +176,8 @@ export default function GalleriesPage() {
         id: editingId,
         title: form.get("title"),
         description: form.get("description") || null,
-        tagline: form.get("tagline") || null,
-        accentColor: accentColor || null,
-        latitude: parseNullableFloat(form.get("latitude")),
-        longitude: parseNullableFloat(form.get("longitude")),
+        ...fieldMapFields(form),
         previewPhotoIds: previewIds.length > 0 ? previewIds : null,
-        roomCaptionFields: captionFields,
-        filmStamp: (form.get("filmStamp") as string)?.trim() || null,
-        handwritingFont: (form.get("handwritingFont") as string) || null,
-        stampFont: (form.get("stampFont") as string) || null,
         isPublished: form.get("isPublished") === "on",
       }),
     });
@@ -227,12 +229,14 @@ export default function GalleriesPage() {
         subtitle={`${galleries.length} total · drag to reorder`}
         actions={
           <div className="flex items-center gap-2">
-            <Link
-              href="/admin/galleries/layout"
-              className="inline-flex items-center gap-1.5 rounded-md border border-admin-border-strong bg-admin-surface px-3.5 py-2 text-[13px] font-medium text-admin-ink hover:bg-admin-surface-2"
-            >
-              <MapPin className="h-3.5 w-3.5 opacity-80" /> Field Map
-            </Link>
+            {siteConfig.features.fieldMap && (
+              <Link
+                href="/admin/galleries/layout"
+                className="inline-flex items-center gap-1.5 rounded-md border border-admin-border-strong bg-admin-surface px-3.5 py-2 text-[13px] font-medium text-admin-ink hover:bg-admin-surface-2"
+              >
+                <MapPin className="h-3.5 w-3.5 opacity-80" /> Field Map
+              </Link>
+            )}
             <Button
               kind="primary"
               onClick={() => {
@@ -432,6 +436,7 @@ export default function GalleriesPage() {
             />
             Published
           </label>
+          {siteConfig.features.fieldMap && (<>
           <SectionLabel>Field Map &amp; Hall</SectionLabel>
           <Field label="Tagline" htmlFor="g-tagline" hint="Shown as the flavor line on Field Map pins and region view">
             <Textarea
@@ -534,6 +539,7 @@ export default function GalleriesPage() {
               ))}
             </Select>
           </Field>
+          </>)}
 
           {editingId && (
             <PreviewPicker

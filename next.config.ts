@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import siteConfig from "./src/lib/site.config";
 
 const nextConfig: NextConfig = {
   // Lets a phone on the home network use `next dev` (scripts and hot reload); dev-only.
@@ -12,14 +13,9 @@ const nextConfig: NextConfig = {
     ],
   },
   async rewrites() {
-    return [
-      // The 2026 France/Italy trip journal is a separate Expo app (apps/trip-map), exported
-      // to public/2026-france-and-italy by its own `npm run build:site`. Everything under
-      // that path is served straight off disk; only the bare path needs help, since the
-      // directory itself is not a file — what is wanted there is the app's index.html.
-      // (A trailing slash needs no rule: Next redirects /path/ to /path before rewrites.)
-      { source: "/2026-france-and-italy", destination: "/2026-france-and-italy/index.html" },
-    ];
+    // Per-site rewrites live in site.config.ts, so a site can add its own without
+    // editing this file.
+    return siteConfig.rewrites;
   },
 };
 

@@ -1,10 +1,9 @@
 /**
  * Cross-origin reads for the public GET endpoints.
  *
- * The trip journal at /2026-france-and-italy is a separate Expo app: in production it is
- * served from this same origin, but while it is being worked on it runs from its own dev
- * server (localhost:8081, or a LAN address when opened on a phone) and cannot read the API
- * without these headers.
+ * Lets a separate front end (another app, or one served from its own dev server such as
+ * localhost:8081 or a LAN address on a phone) read published galleries and photos from
+ * this site's API. Without these headers the browser blocks those reads.
  *
  * `*` rather than an allowlist is deliberate, and is the safer choice here: the browser
  * refuses to send cookies to a `*` origin, so a signed-in admin's session can never be

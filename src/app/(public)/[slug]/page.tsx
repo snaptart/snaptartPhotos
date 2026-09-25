@@ -117,9 +117,9 @@ export default async function DynamicPage({ params }: Props) {
 
     const photosById = await loadPickedPhotos(page.content);
 
-    const hasFieldMap = (page.content.content ?? []).some(
-      (item: { type: string }) => item.type === "FieldMap"
-    );
+    const hasFieldMap =
+      siteConfig.features.fieldMap &&
+      (page.content.content ?? []).some((item: { type: string }) => item.type === "FieldMap");
     const fieldMap: FieldMapBlockData | null = hasFieldMap
       ? {
           ...(await getFieldMapData()),
