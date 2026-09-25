@@ -440,6 +440,15 @@ export default function LookAndFeelPage() {
             }
           />
         </Field>
+        <Field label="Header" inline hint="Pinned keeps the header at the top of the window while the page scrolls.">
+          <RadioGroup
+            options={["scroll", "pinned"]}
+            value={themeDraft.headerBehavior}
+            onChange={(v) =>
+              updateTheme("headerBehavior", v as ThemeSettings["headerBehavior"])
+            }
+          />
+        </Field>
       </SettingGroup>
 
       {/* Footer */}

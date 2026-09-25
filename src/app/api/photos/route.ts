@@ -12,7 +12,7 @@ import {
 } from "@/lib/db/photo-queries";
 import { corsPreflight, withCors } from "@/lib/cors";
 
-// Readable cross-origin so the trip journal can fetch its photographs — see @/lib/cors.
+// Readable cross-origin so a separate front end can fetch photographs — see @/lib/cors.
 export const OPTIONS = corsPreflight;
 
 export async function GET(req: Request) {

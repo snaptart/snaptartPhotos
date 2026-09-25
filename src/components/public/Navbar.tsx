@@ -93,7 +93,7 @@ export async function Navbar() {
 
   return (
     <header
-      className="relative border-b"
+      className={`border-b ${theme.headerBehavior === "pinned" ? "sticky top-0 z-40" : "relative"}`}
       style={{
         backgroundColor: "var(--theme-color-header-bg)",
         borderColor: "var(--theme-color-rule)",

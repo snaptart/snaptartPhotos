@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { formSubmissions } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { formSubmissions, siteSettings } from "@/lib/db/schema";
+import { eq, desc, and, gte, count } from "drizzle-orm";
+import { sendFormNotification } from "@/lib/resend";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -69,14 +70,49 @@ export async function POST(req: NextRequest) {
       req.headers.get("x-real-ip") ??
       null;
 
+    // Rate limit: max submissions per IP per window, counted against stored
+    // submissions so it holds across serverless instances.
+    if (ip) {
+      const RATE_LIMIT = 5;
+      const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+      const [{ recent }] = await db
+        .select({ recent: count() })
+        .from(formSubmissions)
+        .where(
+          and(
+            eq(formSubmissions.ipAddress, ip),
+            gte(formSubmissions.submittedAt, new Date(Date.now() - RATE_WINDOW_MS))
+          )
+        );
+      if (recent >= RATE_LIMIT) {
+        return NextResponse.json(
+          { error: "Too many submissions. Please try again later." },
+          { status: 429 }
+        );
+      }
+    }
+
     const [row] = await db
       .insert(formSubmissions)
       .values({ formName, data, ipAddress: ip })
       .returning();
 
-    // TODO: Send email via Resend when configured
-    // const recipientEmail = body._recipientEmail;
-    // if (recipientEmail) { ... }
+    // Email notification: form's own recipient, else the site's contact email.
+    // Failures are logged but never fail the request — the submission is stored.
+    try {
+      const [settings] = await db.select().from(siteSettings).limit(1);
+      const recipient = body._recipientEmail || settings?.contactEmail;
+      if (recipient) {
+        await sendFormNotification({
+          to: recipient,
+          formName,
+          data,
+          siteTitle: settings?.siteTitle,
+        });
+      }
+    } catch (err) {
+      console.error("Form notification email failed:", err);
+    }
 
     return NextResponse.json({ success: true, id: row.id });
   } catch {
