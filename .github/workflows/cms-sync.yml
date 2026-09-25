@@ -1,0 +1,35 @@
+# Merges snaptart/cms main into this site's dev on a sync branch and opens a PR for review.
+# Runs only in the site repos (never in the CMS itself), when the CMS signals an update,
+# once a day as a safety net, or by hand from the Actions tab.
+name: Sync CMS updates
+
+on:
+  repository_dispatch:
+    types: [cms-updated]
+  schedule:
+    - cron: "17 11 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: cms-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.repository != 'snaptart/cms'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.CMS_SYNC_TOKEN }}
+      CMS_REPO: snaptart/cms
+      BASE: dev
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+          # The token (not the default one) so the pushed branch can include workflow changes
+          # and the PR it opens triggers Vercel like any other.
+          token: ${{ secrets.CMS_SYNC_TOKEN }}
+
+      - name: Merge the CMS and open a PR
+        run: bash .github/scripts/cms-sync.sh
