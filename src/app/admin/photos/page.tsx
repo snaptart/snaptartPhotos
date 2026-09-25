@@ -88,7 +88,7 @@ type SortKey =
   | "title"
   | "filename";
 
-const KEYWORDS_OPEN_KEY = "snaptart:admin:photos:keywordsOpen";
+const KEYWORDS_OPEN_KEY = "cms:admin:photos:keywordsOpen";
 
 const SORT_LABELS: Record<SortKey, string> = {
   position: "Custom order",
