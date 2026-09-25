@@ -86,7 +86,7 @@ const TEXT_STYLE_SAMPLES: Record<TextStyleKey, string> = {
   display: "Long light",
   collectionTitle: "North Shore",
   photoTitle: "Palisade Head",
-  lead: "I photograph under the name SnaptArt, out of Minneapolis.",
+  lead: "A short introduction that sets the tone before the page begins.",
   body: "Body copy sits at sixteen over one-point-seven-five, never wider than sixty-eight characters.",
   label: "Selected work",
   meta: "Lake Superior · Sept 2020",

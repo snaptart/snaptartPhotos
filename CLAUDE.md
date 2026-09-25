@@ -1,7 +1,7 @@
-# SnaptArt — Custom Photo CMS
+# Custom Photo CMS
 
 ## Project Overview
-A custom photo CMS website rebuilding snaptart.com (previously Squarespace). Photography portfolio for Michael Schroeder featuring galleries, pages, short stories, and a full admin dashboard.
+A custom CMS for photography and portfolio sites: galleries, a page builder, short stories and a full admin dashboard. The shared core lives in `snaptart/cms`; each site (snaptart.com, gardensalacarte.com) is its own repo that merges updates from it and keeps its own `site.config.ts`, content and database. See `PROMOTING.md`.
 
 ## Tech Stack
 - **Framework**: Next.js 16 (App Router) + TypeScript
@@ -159,4 +159,4 @@ with the site's code, dependencies or build: it has its own `package.json`, `nod
 - Next.js 16 renamed `middleware.ts` to `proxy.ts`
 - Fonts: EB Garamond (serif, headings/public) + Inter (sans, admin/body)
 - Old site assets stored in `_old/` directory (logos, images, docs)
-- Admin credentials default: snapmaster@snaptart.com / changeme (change before deploy)
+- Seeded admin login: `ADMIN_EMAIL` (default admin@example.com) / `ADMIN_PASSWORD` (default changeme). Change it before deploying.

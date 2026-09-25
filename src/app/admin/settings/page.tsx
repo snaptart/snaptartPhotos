@@ -141,7 +141,7 @@ export default function IdentitySettingsPage() {
               id="tagline"
               value={draft.tagline}
               onChange={(e) => update("tagline", e.target.value)}
-              placeholder="Photographs by … · Minneapolis, Minnesota"
+              placeholder="A short line, e.g. what you do and where"
             />
           </Field>
           <Field label="Logo / avatar" inline>
