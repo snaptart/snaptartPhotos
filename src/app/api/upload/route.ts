@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
 import { put } from "@vercel/blob";
 import sharp from "sharp";
 import { extractPhotoMetadata } from "@/lib/photo-exif";
@@ -7,7 +7,7 @@ import { extractPhotoMetadata } from "@/lib/photo-exif";
 const THUMBNAIL_WIDTH = 800;
 
 export async function POST(req: Request) {
-  const session = await auth();
+  const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const formData = await req.formData();

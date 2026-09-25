@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { pages } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -15,7 +15,7 @@ export async function GET() {
 }
 
 export async function PUT(req: Request) {
-  const session = await auth();
+  const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {

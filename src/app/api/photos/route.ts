@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { photos, galleries, galleryPhotos } from "@/lib/db/schema";
 import { eq, asc, inArray, and, sql } from "drizzle-orm";
@@ -21,7 +21,7 @@ export async function GET(req: Request) {
 
 async function handleGet(req: Request) {
   try {
-    const session = await auth();
+    const session = await getAdminSession();
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
     const galleryId = searchParams.get("galleryId");
@@ -66,7 +66,7 @@ async function handleGet(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const session = await auth();
+  const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
@@ -98,7 +98,7 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
-  const session = await auth();
+  const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
@@ -188,7 +188,7 @@ export async function PUT(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const session = await auth();
+  const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {

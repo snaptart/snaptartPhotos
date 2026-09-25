@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth";
+import { auth, getAdminSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { AdminSidebar } from "@/components/admin/Sidebar";
@@ -10,7 +10,7 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
+  const session = await getAdminSession();
 
   if (!session) {
     // Only the login page should ever render without a session.
