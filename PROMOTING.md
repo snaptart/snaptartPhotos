@@ -114,8 +114,9 @@ Nothing merges by itself: review the PR, merge it into `dev`, then release
 fine-grained personal access token on the `snaptart` account, limited to
 `snaptart/cms`, `snaptart/snaptartPhotos` and `snaptart/gardensalacarte`,
 with **Contents**, **Pull requests**, **Issues** and **Workflows** set to
-read and write. It expires after a year. When it does, the sync runs fail;
-create a new one and store it again in all three repos:
+read and write. It expires after a year (the current one was created on
+2026-09-25). When it does, the sync runs fail; create a new one and store it
+again in all three repos:
 
 ```
 gh secret set CMS_SYNC_TOKEN -R snaptart/cms
