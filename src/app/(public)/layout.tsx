@@ -52,7 +52,7 @@ export default async function PublicLayout({
       {fontsUrl && <link rel="stylesheet" href={fontsUrl} />}
       <style dangerouslySetInnerHTML={{ __html: cssVars }} />
       <div
-        className="flex min-h-dvh flex-col"
+        className="site-shell relative flex min-h-dvh flex-col"
         style={{
           ...fontRole("body"),
           fontSize: "var(--theme-body-font-size)",

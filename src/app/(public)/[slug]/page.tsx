@@ -12,6 +12,7 @@ import Link from "@tiptap/extension-link";
 import TextAlign from "@tiptap/extension-text-align";
 import Underline from "@tiptap/extension-underline";
 import PuckRenderer from "@/components/public/PuckRenderer";
+import { HeaderOverPhotoMark, opensWithPhoto } from "@/lib/header-over-photo";
 import { loadPickedPhotos } from "@/lib/puck/picked-photos";
 import type { Data } from "@puckeditor/core";
 import type { EmbedPhoto, FieldMapBlockData, GlobalLightboxSettings } from "@/lib/puck/config";
@@ -128,9 +129,12 @@ export default async function DynamicPage({ params }: Props) {
         }
       : null;
 
+    const underHeader = opensWithPhoto(page.content, page);
+
     if (page.isFullBleed) {
       return (
         <div className="fullbleed-puck-host flex flex-1 flex-col">
+          {underHeader && <HeaderOverPhotoMark />}
           {page.showTitle && (
             <h1 className="px-6 pt-16 pb-8 text-4xl md:px-24 md:text-5xl" style={fontRole("headings")}>
               {page.title}
@@ -148,7 +152,8 @@ export default async function DynamicPage({ params }: Props) {
     }
 
     return (
-      <div className={`${PAGE_CONTAINER} py-16`}>
+      <div className={`${PAGE_CONTAINER} ${underHeader ? "pt-0 pb-16" : "py-16"}`}>
+        {underHeader && <HeaderOverPhotoMark />}
         {page.showTitle && (
           <h1 className="mb-10 text-4xl md:text-5xl" style={fontRole("headings")}>
             {page.title}

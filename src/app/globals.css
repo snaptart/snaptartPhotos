@@ -68,6 +68,116 @@ body {
   }
 }
 
+/* ── Site header (components/public/SiteHeader.tsx) ─────────────────────
+   Its values are theme variables (lib/theme/css-vars.ts); the choices are
+   data attributes on <header>. */
+.site-header {
+  position: relative;
+  background-color: var(--theme-color-header-bg);
+  border-bottom: var(--theme-header-rule);
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+  --site-header-scale: 1;
+  --site-menu-color: var(--theme-menu-text);
+}
+.site-header[data-pinned] {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+/* A hanging logo lies over the page below. */
+.site-header[data-logo-overhang]:not([data-pinned]) {
+  z-index: 30;
+}
+.site-header[data-shrink][data-scrolled] {
+  --site-header-scale: 0.72;
+}
+.site-header-bar {
+  padding-block: calc(var(--theme-header-pad) * var(--site-header-scale));
+  transition: padding 0.25s ease;
+}
+.site-header .site-logo-img,
+.site-header .site-wordmark {
+  transition: height 0.25s ease, font-size 0.25s ease, filter 0.25s ease;
+}
+
+.site-menu-link {
+  color: var(--site-menu-color);
+  border-bottom: 1px solid transparent;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+}
+.site-header[data-menu-hover="fade"] .site-menu-link:hover {
+  opacity: 0.7;
+}
+.site-header[data-menu-hover="underline"] .site-menu-link:hover {
+  border-bottom-color: currentColor;
+}
+.site-header[data-menu-hover="color"] .site-menu-link:hover {
+  color: var(--theme-menu-highlight);
+}
+.site-header[data-menu-current="underline"] .site-menu-link[aria-current] {
+  border-bottom-color: currentColor;
+}
+.site-header[data-menu-current="color"] .site-menu-link[aria-current] {
+  color: var(--theme-menu-highlight);
+}
+.site-header[data-menu-current="bold"] .site-menu-link[aria-current] {
+  font-weight: 600;
+}
+
+/* Over a photo: on a page that opens with one (it renders
+   [data-header-over-photo]), the header lies on top of it, transparent, and
+   takes no room. Pinned, it turns solid once the page scrolls. */
+.site-shell:has([data-header-over-photo]) .site-header[data-over-photo] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+}
+.site-shell:has([data-header-over-photo]) .site-header[data-over-photo][data-pinned] {
+  position: fixed;
+}
+.site-shell:has([data-header-over-photo]) .site-header[data-over-photo]:not([data-scrolled]) {
+  background-color: transparent;
+  border-bottom-color: transparent;
+  color: var(--theme-header-photo-text);
+  --site-menu-color: var(--theme-header-photo-text);
+}
+.site-shell:has([data-header-over-photo])
+  .site-header[data-over-photo][data-photo-logo="white"]:not([data-scrolled])
+  .site-logo-img {
+  filter: brightness(0) invert(1);
+}
+
+/* ── Site footer (components/public/SiteFooter.tsx) ───────────────────── */
+.site-footer {
+  background-color: var(--theme-color-footer-bg);
+  border-top: var(--theme-footer-rule);
+}
+.site-footer-inner {
+  padding-block: calc(var(--theme-footer-pad) * 2 / 3);
+}
+@media (min-width: 768px) {
+  .site-footer-inner {
+    padding-top: calc(var(--theme-footer-pad) - 4px);
+    padding-bottom: calc(var(--theme-footer-pad) + 4px);
+  }
+}
+.site-footer .site-footer-link {
+  color: var(--theme-footer-link);
+  text-underline-offset: 4px;
+  transition: opacity 0.15s, color 0.15s;
+}
+.site-footer[data-link-hover="fade"] .site-footer-link:hover {
+  opacity: 0.7;
+}
+.site-footer[data-link-hover="underline"] .site-footer-link:hover {
+  text-decoration: underline;
+}
+.site-footer[data-link-hover="color"] .site-footer-link:hover {
+  color: var(--theme-footer-highlight);
+}
+
 /* Full-bleed Puck pages: make Puck's outer wrapper participate in the
    flex chain so blocks set to fill (e.g. Field Map) get the available
    height instead of overflowing the viewport. */

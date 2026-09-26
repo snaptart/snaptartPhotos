@@ -90,6 +90,7 @@ Tables defined with Drizzle ORM:
 
 **Site icons**: `/favicon.ico`, `/site-icon/[file]` and `/manifest.webmanifest` render the uploaded icon (any size, via sharp) or a first-letter monogram. There are no static icon files in `src/app`; a site sets its icon in the admin.
 **Block defaults**: stored in the active theme preset (`themeSettings.blockDefaults` + `blockDefaultsPast`). New blocks start with them (`useEditorConfig()` in the editors); existing blocks change only via Settings → Block defaults → Apply. Which blocks/props qualify: `src/lib/puck/block-defaults.ts`.
+**Header & footer**: layout and styling live in the active theme preset (`ChromeSettings` in `src/lib/theme/types.ts`, defaults = the original look), edited in Settings → Look → Header & footer. `SiteHeader` / `SiteFooter` draw them for both the public site and the admin preview; their CSS is in `globals.css` (`.site-header`, `.site-footer`), driven by theme variables and data attributes. "Over a photo" applies on pages where `opensWithPhoto()` (`src/lib/header-over-photo.tsx`) is true.
 **Page addresses** never change with the title; `slug` is edited explicitly and checked by `src/lib/page-slugs.ts` (pages and stories share one namespace).
 
 **Reading photos**: use `selectPhotosForGallery(galleryId)` / `selectPhotosForGalleries(ids)` from `src/lib/db/photo-queries.ts`. Returns flat photo rows joined with the junction (`galleryId` and `position` come from `gallery_photos`).
