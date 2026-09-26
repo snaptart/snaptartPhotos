@@ -100,8 +100,8 @@ export function PageIntroRender(p: PageIntroProps) {
           </p>
         )}
         {p.title && (
-          <Title style={{ ...textStyleCss(p.titleStyle, "display"), margin: 0 }}>
-            <Editable path="title" value={p.title} />
+          <Title style={{ ...textStyleCss(p.titleStyle, "display"), margin: 0, whiteSpace: "pre-line" }}>
+            <Editable path="title" value={p.title} multiline />
           </Title>
         )}
         {paras.map((para, i) => (

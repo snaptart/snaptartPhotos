@@ -158,7 +158,7 @@ export function FormWrapperRender({
 
   if (status === "success") {
     return (
-      <div className="alert-success px-6 py-8 text-center">
+      <div className="alert-success px-6 py-8 text-center" style={{ whiteSpace: "pre-line" }}>
         {successMessage || "Thank you! Your submission has been received."}
       </div>
     );

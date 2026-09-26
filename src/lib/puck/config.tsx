@@ -576,7 +576,7 @@ export const puckConfig: Config<Components> = {
             <ImagePicker value={value} onChange={onChange} />
           ),
         },
-        title: { type: "text", label: "Title" },
+        title: { type: "textarea", label: "Title" },
         titleStyle: {
           type: "custom",
           label: "Text style",
@@ -584,7 +584,7 @@ export const puckConfig: Config<Components> = {
             <TextStyleControl value={value} onChange={onChange} fallback="display" withColor={false} />
           ),
         },
-        subtitle: { type: "text", label: "Subtitle" },
+        subtitle: { type: "textarea", label: "Subtitle" },
         subtitleStyle: {
           type: "custom",
           label: "Text style",
@@ -646,13 +646,13 @@ export const puckConfig: Config<Components> = {
           )}
           <div className="relative z-10 text-center px-4">
             {title && (
-              <h1 className="mb-4" style={{ ...textStyleCss(titleStyle, "display", { withColor: false }), color: "var(--theme-color-hero-overlay)" }}>
-                <Editable path="title" value={title} />
+              <h1 className="mb-4" style={{ ...textStyleCss(titleStyle, "display", { withColor: false }), color: "var(--theme-color-hero-overlay)", whiteSpace: "pre-line" }}>
+                <Editable path="title" value={title} multiline />
               </h1>
             )}
             {subtitle && (
-              <p style={{ ...textStyleCss(subtitleStyle, "lead", { withColor: false }), color: "var(--theme-color-hero-overlay)", opacity: 0.9 }}>
-                <Editable path="subtitle" value={subtitle} />
+              <p style={{ ...textStyleCss(subtitleStyle, "lead", { withColor: false }), color: "var(--theme-color-hero-overlay)", opacity: 0.9, whiteSpace: "pre-line" }}>
+                <Editable path="subtitle" value={subtitle} multiline />
               </p>
             )}
             {!imageUrl && !title && (
@@ -2750,7 +2750,7 @@ export const puckConfig: Config<Components> = {
       label: "Stories Contents",
       fields: {
         volumeLabel: { type: "text", label: "Volume label" },
-        title: { type: "text", label: "Masthead title" },
+        title: { type: "textarea", label: "Masthead title" },
         dek: { type: "textarea", label: "Dek (subtitle)" },
       },
       defaultProps: {

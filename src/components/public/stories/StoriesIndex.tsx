@@ -91,9 +91,11 @@ function StoriesIndexInner({
             lineHeight: 0.95,
             marginTop: 18,
             letterSpacing: -1.5,
+            whiteSpace: "pre-line",
+            textWrap: "balance",
           }}
         >
-          <Editable path="title" value={title} />
+          <Editable path="title" value={title} multiline />
         </div>
         <div
           style={{
