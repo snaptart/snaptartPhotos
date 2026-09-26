@@ -342,31 +342,220 @@ export default function LookAndFeelPage() {
 
       {tab === "chrome" && (
       <>
+      {/* Header */}
+      <SettingGroup title="Header" desc="How the header is laid out and how it behaves as the page scrolls.">
+        <Field label="Layout" inline>
+          <RadioGroup
+            options={[
+              { value: "inline", label: "One row" },
+              { value: "stacked", label: "Logo above menu" },
+              { value: "split", label: "Menu either side" },
+            ]}
+            value={themeDraft.headerLayout}
+            onChange={(v) => updateTheme("headerLayout", v as ThemeSettings["headerLayout"])}
+          />
+        </Field>
+        <RangeField
+          label="Height"
+          value={themeDraft.headerPadding}
+          min={4}
+          max={64}
+          unit="px"
+          hint="Space above and below the logo and menu."
+          onChange={(v) => updateTheme("headerPadding", v)}
+        />
+        <Field label="Width" inline>
+          <RadioGroup
+            options={[
+              { value: "page", label: "Page column" },
+              { value: "full", label: "Full window" },
+            ]}
+            value={themeDraft.headerWidth}
+            onChange={(v) => updateTheme("headerWidth", v as ThemeSettings["headerWidth"])}
+          />
+        </Field>
+        <Field label="Line underneath" inline>
+          <div className="space-y-2">
+            <Check checked={themeDraft.headerRule} onChange={(v) => updateTheme("headerRule", v)} label="Show" />
+            {themeDraft.headerRule && (
+              <div className="max-w-xs">
+                <ColorControl
+                  value={themeDraft.colorHeaderRule}
+                  onChange={(v) => updateTheme("colorHeaderRule", v)}
+                  tokens={false}
+                  emptyLabel="Hairline colour"
+                />
+              </div>
+            )}
+          </div>
+        </Field>
+        <Field label="Scrolling" inline hint="Pinned keeps the header at the top of the window while the page scrolls.">
+          <div className="space-y-2">
+            <RadioGroup
+              options={[
+                { value: "scroll", label: "Scrolls away" },
+                { value: "pinned", label: "Pinned" },
+              ]}
+              value={themeDraft.headerBehavior}
+              onChange={(v) => updateTheme("headerBehavior", v as ThemeSettings["headerBehavior"])}
+            />
+            {themeDraft.headerBehavior === "pinned" && (
+              <Check
+                checked={themeDraft.headerShrink}
+                onChange={(v) => updateTheme("headerShrink", v)}
+                label="Shrink once the page scrolls"
+              />
+            )}
+          </div>
+        </Field>
+        <Field
+          label="Over a photo"
+          inline
+          hint="On pages that open with a full-width photo (a Hero Slideshow, or a Hero Banner on a full-bleed page) and don't show their title, the header lies over the photo, transparent. Pinned, it turns solid as the page scrolls."
+        >
+          <div className="space-y-2">
+            <Check
+              checked={themeDraft.headerOverPhoto}
+              onChange={(v) => updateTheme("headerOverPhoto", v)}
+              label="Lay the header over the photo"
+            />
+            {themeDraft.headerOverPhoto && (
+              <>
+                <div className="max-w-xs">
+                  <ColorControl
+                    value={themeDraft.colorHeaderOverPhoto}
+                    onChange={(v) => updateTheme("colorHeaderOverPhoto", v)}
+                    tokens={false}
+                    emptyLabel="Hero overlay text colour"
+                  />
+                </div>
+                {logoUrl && (
+                  <RadioGroup
+                    options={[
+                      { value: "original", label: "Logo as uploaded" },
+                      { value: "white", label: "Logo in white" },
+                    ]}
+                    value={themeDraft.headerOverPhotoLogo}
+                    onChange={(v) => updateTheme("headerOverPhotoLogo", v as ThemeSettings["headerOverPhotoLogo"])}
+                  />
+                )}
+              </>
+            )}
+          </div>
+        </Field>
+      </SettingGroup>
+
       {/* Logo */}
       <SettingGroup
         title="Logo"
         desc="Where your logo sits in the header. Upload the logo itself in Identity."
       >
-        <Field label="Position" inline>
-          <RadioGroup
-            options={["left", "center", "right"]}
-            value={themeDraft.logoPosition}
-            onChange={(v) =>
-              updateTheme("logoPosition", v as ThemeSettings["logoPosition"])
-            }
-          />
+        {themeDraft.headerLayout !== "split" && (
+          <Field label={themeDraft.headerLayout === "stacked" ? "Alignment" : "Position"} inline>
+            <RadioGroup
+              options={["left", "center", "right"]}
+              value={themeDraft.logoPosition}
+              onChange={(v) =>
+                updateTheme("logoPosition", v as ThemeSettings["logoPosition"])
+              }
+            />
+          </Field>
+        )}
+        <RangeField
+          label="Size"
+          value={themeDraft.logoSize}
+          min={20}
+          max={400}
+          step={2}
+          unit="px"
+          onChange={(v) => updateTheme("logoSize", v)}
+        />
+        <Field
+          label="Size on phones"
+          inline
+          hint="Automatic is a third of the size for a logo image, and a little smaller for a wordmark."
+        >
+          <div className="space-y-2">
+            <Check
+              checked={themeDraft.mobileLogoScale == null}
+              onChange={(v) => updateTheme("mobileLogoScale", v ? null : 50)}
+              label="Automatic"
+            />
+            {themeDraft.mobileLogoScale != null && (
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min={10}
+                  max={100}
+                  step={5}
+                  value={themeDraft.mobileLogoScale}
+                  onChange={(e) => updateTheme("mobileLogoScale", Number(e.target.value))}
+                  className="w-full accent-admin-accent"
+                />
+                <span className="w-12 shrink-0 text-right text-[12px] text-admin-ink-soft">
+                  {themeDraft.mobileLogoScale}%
+                </span>
+              </div>
+            )}
+          </div>
         </Field>
-        <Field label={`Size — ${themeDraft.logoSize}px`} inline>
-          <input
-            type="range"
-            min={20}
-            max={400}
-            step={2}
-            value={themeDraft.logoSize}
-            onChange={(e) => updateTheme("logoSize", Number(e.target.value))}
-            className="w-full accent-admin-accent"
-          />
+        <Field
+          label="Nudge"
+          inline
+          hint="Moves the logo a few pixels without moving anything else: for a logo file with uneven space around it. Right and down are positive."
+        >
+          <div className="space-y-1.5">
+            <OffsetInputs
+              label="Wider screens"
+              x={themeDraft.logoOffsetX}
+              y={themeDraft.logoOffsetY}
+              onChange={(x, y) => setThemeDraft((d) => ({ ...d, logoOffsetX: x, logoOffsetY: y }))}
+            />
+            <OffsetInputs
+              label="Phones"
+              x={themeDraft.mobileLogoOffsetX}
+              y={themeDraft.mobileLogoOffsetY}
+              onChange={(x, y) => setThemeDraft((d) => ({ ...d, mobileLogoOffsetX: x, mobileLogoOffsetY: y }))}
+            />
+          </div>
         </Field>
+        {themeDraft.headerLayout !== "stacked" && (
+          <Field
+            label="Hang below the header"
+            inline
+            hint="The header keeps the menu's height and the logo hangs down over the top of the page, like a badge. Nudge it up or down to set how far."
+          >
+            <Check
+              checked={themeDraft.logoOverhang}
+              onChange={(v) => updateTheme("logoOverhang", v)}
+              label="Let the logo hang below"
+            />
+          </Field>
+        )}
+        {themeDraft.headerLayout !== "stacked" && !themeDraft.logoOverhang && (
+          <Field label="Line up with menu" inline hint="Which edge of the logo the menu lines up with.">
+            <RadioGroup
+              options={[
+                { value: "top", label: "Top" },
+                { value: "center", label: "Middle" },
+                { value: "bottom", label: "Bottom" },
+              ]}
+              value={themeDraft.logoAlign}
+              onChange={(v) => updateTheme("logoAlign", v as ThemeSettings["logoAlign"])}
+            />
+          </Field>
+        )}
+        {(themeDraft.headerLayout === "stacked" ||
+          (themeDraft.headerLayout === "inline" && themeDraft.logoPosition === themeDraft.menuJustify)) && (
+          <RangeField
+            label="Space to the menu"
+            value={themeDraft.logoGap}
+            min={0}
+            max={80}
+            unit="px"
+            onChange={(v) => updateTheme("logoGap", v)}
+          />
+        )}
         <Field
           label="Wordmark"
           inline
@@ -429,24 +618,80 @@ export default function LookAndFeelPage() {
         </Field>
       </SettingGroup>
 
-      {/* Menu layout */}
-      <SettingGroup title="Menu" desc="How the navigation menu appears in the header. Size is set in Typography.">
-        <Field label="Position" inline>
+      {/* Menu */}
+      <SettingGroup title="Menu" desc="How the navigation menu looks in the header. Its font and size are set in Typography.">
+        {themeDraft.headerLayout === "inline" && (
+          <Field label="Position" inline>
+            <RadioGroup
+              options={["left", "center", "right"]}
+              value={themeDraft.menuJustify}
+              onChange={(v) =>
+                updateTheme("menuJustify", v as ThemeSettings["menuJustify"])
+              }
+            />
+          </Field>
+        )}
+        <RangeField
+          label="Space between items"
+          value={themeDraft.menuGap}
+          min={8}
+          max={80}
+          unit="px"
+          onChange={(v) => updateTheme("menuGap", v)}
+        />
+        <ColorField
+          label="Text colour"
+          value={themeDraft.colorMenuText}
+          onChange={(v) => updateTheme("colorMenuText", v)}
+          emptyLabel="Text colour"
+        />
+        <Field label="On hover" inline>
           <RadioGroup
-            options={["left", "center", "right"]}
-            value={themeDraft.menuJustify}
-            onChange={(v) =>
-              updateTheme("menuJustify", v as ThemeSettings["menuJustify"])
-            }
+            options={LINK_HOVER_OPTIONS}
+            value={themeDraft.menuHover}
+            onChange={(v) => updateTheme("menuHover", v as ThemeSettings["menuHover"])}
           />
         </Field>
-        <Field label="Header" inline hint="Pinned keeps the header at the top of the window while the page scrolls.">
+        <Field label="Current page" inline>
           <RadioGroup
-            options={["scroll", "pinned"]}
-            value={themeDraft.headerBehavior}
-            onChange={(v) =>
-              updateTheme("headerBehavior", v as ThemeSettings["headerBehavior"])
-            }
+            options={[
+              { value: "underline", label: "Underline" },
+              { value: "color", label: "Colour" },
+              { value: "bold", label: "Bold" },
+              { value: "none", label: "Not marked" },
+            ]}
+            value={themeDraft.menuCurrent}
+            onChange={(v) => updateTheme("menuCurrent", v as ThemeSettings["menuCurrent"])}
+          />
+        </Field>
+        {(themeDraft.menuHover === "color" || themeDraft.menuCurrent === "color") && (
+          <ColorField
+            label="Highlight colour"
+            value={themeDraft.colorMenuHighlight}
+            onChange={(v) => updateTheme("colorMenuHighlight", v)}
+            emptyLabel="Accent colour"
+          />
+        )}
+      </SettingGroup>
+
+      {/* Phones */}
+      <SettingGroup title="Phones" desc="The header on small screens: the logo in the middle and a menu button beside it.">
+        <Field label="Menu button" inline>
+          <RadioGroup
+            options={["left", "right"]}
+            value={themeDraft.mobileMenuSide}
+            onChange={(v) => updateTheme("mobileMenuSide", v as ThemeSettings["mobileMenuSide"])}
+          />
+        </Field>
+        <Field label="Menu opens as" inline>
+          <RadioGroup
+            options={[
+              { value: "dropdown", label: "Panel under the header" },
+              { value: "overlay", label: "Full screen" },
+              { value: "drawer", label: "Drawer from the side" },
+            ]}
+            value={themeDraft.mobileMenuStyle}
+            onChange={(v) => updateTheme("mobileMenuStyle", v as ThemeSettings["mobileMenuStyle"])}
           />
         </Field>
       </SettingGroup>
@@ -455,7 +700,7 @@ export default function LookAndFeelPage() {
       <div id="footer" className="scroll-mt-8" />
       <SettingGroup
         title="Footer"
-        desc="A bar across the foot of every page, or a small info button in a corner. Its links are your menu (Navigation); its type size is in Typography."
+        desc="Across the foot of every page, or a small info button in a corner. Its links are your menu (Navigation); its type size is in Typography."
       >
         <Field label="Text" htmlFor="footerText" inline>
           <div className="space-y-1">
@@ -467,13 +712,19 @@ export default function LookAndFeelPage() {
               placeholder="© 2026 Your Name"
             />
             <p className="text-[11px] text-admin-ink-soft">
-              Links: [text](address). With a tagline set in Identity, this is the © line at the right of the bar.
+              Links: [text](address). The © line. In the bar without a tagline (set in Identity), it sits under the site name.
             </p>
           </div>
         </Field>
-        <Field label="Style" inline>
+        <Field label="Layout" inline>
           <RadioGroup
-            options={["bar", "floating"]}
+            options={[
+              { value: "bar", label: "Bar" },
+              { value: "centered", label: "Centred" },
+              { value: "columns", label: "Columns" },
+              { value: "minimal", label: "© line only" },
+              { value: "floating", label: "Info button" },
+            ]}
             value={themeDraft.footerStyle}
             onChange={(v) => updateTheme("footerStyle", v as ThemeSettings["footerStyle"])}
           />
@@ -486,6 +737,117 @@ export default function LookAndFeelPage() {
               onChange={(v) => setFooterAlignment(v)}
             />
           </Field>
+        )}
+        {themeDraft.footerStyle !== "floating" && (
+          <>
+            {themeDraft.footerStyle !== "minimal" && (
+              <>
+                <Field label="Heading" inline>
+                  <div className="space-y-2">
+                    <RadioGroup
+                      options={[
+                        { value: "name", label: "Site name" },
+                        { value: "logo", label: "Logo image" },
+                        { value: "none", label: "None" },
+                      ]}
+                      value={themeDraft.footerBrand}
+                      onChange={(v) => updateTheme("footerBrand", v as ThemeSettings["footerBrand"])}
+                    />
+                    {themeDraft.footerBrand === "logo" && !logoUrl && (
+                      <p className="text-[12px] text-admin-ink-soft">No logo uploaded yet, so the site name shows.</p>
+                    )}
+                  </div>
+                </Field>
+                {themeDraft.footerBrand === "logo" && logoUrl ? (
+                  <RangeField
+                    label="Logo height"
+                    value={themeDraft.footerLogoHeight}
+                    min={12}
+                    max={160}
+                    unit="px"
+                    onChange={(v) => updateTheme("footerLogoHeight", v)}
+                  />
+                ) : themeDraft.footerBrand !== "none" ? (
+                  <RangeField
+                    label="Name size"
+                    value={themeDraft.footerNameSize}
+                    min={10}
+                    max={48}
+                    unit="px"
+                    onChange={(v) => updateTheme("footerNameSize", v)}
+                  />
+                ) : null}
+                <Field label="Show" inline>
+                  <div className="flex flex-col gap-1.5">
+                    <Check checked={themeDraft.footerShowTagline} onChange={(v) => updateTheme("footerShowTagline", v)} label="Tagline" />
+                    <Check checked={themeDraft.footerShowMenu} onChange={(v) => updateTheme("footerShowMenu", v)} label="Menu links" />
+                    <Check checked={themeDraft.footerShowEmail} onChange={(v) => updateTheme("footerShowEmail", v)} label="Email link" />
+                    <Check checked={themeDraft.footerShowSocial} onChange={(v) => updateTheme("footerShowSocial", v)} label="Instagram link" />
+                    <Check checked={themeDraft.footerShowText} onChange={(v) => updateTheme("footerShowText", v)} label="Footer text (© line)" />
+                  </div>
+                </Field>
+              </>
+            )}
+            <RangeField
+              label="Height"
+              value={themeDraft.footerPadding}
+              min={12}
+              max={120}
+              unit="px"
+              hint="Space above and below the footer. Phones get two thirds of it."
+              onChange={(v) => updateTheme("footerPadding", v)}
+            />
+            <Field label="Width" inline>
+              <RadioGroup
+                options={[
+                  { value: "page", label: "Page column" },
+                  { value: "full", label: "Full window" },
+                ]}
+                value={themeDraft.footerWidth}
+                onChange={(v) => updateTheme("footerWidth", v as ThemeSettings["footerWidth"])}
+              />
+            </Field>
+            <Field label="Line on top" inline>
+              <div className="space-y-2">
+                <Check checked={themeDraft.footerRule} onChange={(v) => updateTheme("footerRule", v)} label="Show" />
+                {themeDraft.footerRule && (
+                  <div className="max-w-xs">
+                    <ColorControl
+                      value={themeDraft.colorFooterRule}
+                      onChange={(v) => updateTheme("colorFooterRule", v)}
+                      tokens={false}
+                      emptyLabel="Hairline colour"
+                    />
+                  </div>
+                )}
+              </div>
+            </Field>
+            {themeDraft.footerStyle !== "minimal" && (
+              <>
+                <ColorField
+                  label="Link colour"
+                  value={themeDraft.colorFooterLink}
+                  onChange={(v) => updateTheme("colorFooterLink", v)}
+                  emptyLabel="Footer text colour"
+                />
+                <Field label="Links on hover" inline>
+                  <RadioGroup
+                    options={LINK_HOVER_OPTIONS}
+                    value={themeDraft.footerLinkHover}
+                    onChange={(v) => updateTheme("footerLinkHover", v as ThemeSettings["footerLinkHover"])}
+                  />
+                </Field>
+                {themeDraft.footerLinkHover === "color" && (
+                  <ColorField
+                    label="Hover colour"
+                    value={themeDraft.colorFooterHighlight}
+                    onChange={(v) => updateTheme("colorFooterHighlight", v)}
+                    emptyLabel="Accent colour"
+                  />
+                )}
+              </>
+            )}
+          </>
         )}
       </SettingGroup>
 
@@ -667,7 +1029,7 @@ export default function LookAndFeelPage() {
 
   const pagePreview = (
     <PreviewCard key="pages" label="Public pages">
-      <ThemePreview theme={themeDraft} siteTitle={siteTitle} logoUrl={logoUrl} />
+      <ThemePreview theme={themeDraft} siteTitle={siteTitle} logoUrl={logoUrl} footerText={footerText} />
     </PreviewCard>
   );
   const lightboxPreview = (
@@ -694,32 +1056,125 @@ export default function LookAndFeelPage() {
   );
 }
 
+type Option = string | { value: string; label: string };
+
 function RadioGroup({
   options,
   value,
   onChange,
 }: {
-  options: string[];
+  options: Option[];
   value: string;
   onChange: (v: string) => void;
 }) {
   return (
-    <div className="flex gap-4">
-      {options.map((opt) => (
-        <label
-          key={opt}
-          className="flex items-center gap-1.5 text-[13px] text-admin-ink capitalize cursor-pointer"
-        >
-          <input
-            type="radio"
-            checked={value === opt}
-            onChange={() => onChange(opt)}
-            className="accent-admin-accent"
-          />
-          {opt}
-        </label>
-      ))}
+    <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+      {options.map((o) => {
+        const opt = typeof o === "string" ? { value: o, label: o } : o;
+        return (
+          <label
+            key={opt.value}
+            className={`flex items-center gap-1.5 text-[13px] text-admin-ink cursor-pointer ${typeof o === "string" ? "capitalize" : ""}`}
+          >
+            <input
+              type="radio"
+              checked={value === opt.value}
+              onChange={() => onChange(opt.value)}
+              className="accent-admin-accent"
+            />
+            {opt.label}
+          </label>
+        );
+      })}
     </div>
+  );
+}
+
+const LINK_HOVER_OPTIONS = [
+  { value: "fade", label: "Fade" },
+  { value: "underline", label: "Underline" },
+  { value: "color", label: "Colour" },
+  { value: "none", label: "No change" },
+];
+
+function Check({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <label className="flex items-center gap-2 text-[13px] text-admin-ink cursor-pointer">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="accent-admin-accent"
+      />
+      {label}
+    </label>
+  );
+}
+
+function OffsetInputs({
+  label,
+  x,
+  y,
+  onChange,
+}: {
+  label: string;
+  x: number;
+  y: number;
+  onChange: (x: number, y: number) => void;
+}) {
+  const num = (v: string) => Math.max(-200, Math.min(200, Math.round(Number(v) || 0)));
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-admin-ink-soft">
+      <span className="w-24">{label}</span>
+      <label className="flex items-center gap-1.5">
+        X
+        <Input type="number" step={1} value={x} onChange={(e) => onChange(num(e.target.value), y)} className="w-20" />
+      </label>
+      <label className="flex items-center gap-1.5">
+        Y
+        <Input type="number" step={1} value={y} onChange={(e) => onChange(x, num(e.target.value))} className="w-20" />
+      </label>
+      px
+      {(x !== 0 || y !== 0) && (
+        <button type="button" onClick={() => onChange(0, 0)} className="text-admin-accent hover:underline">
+          Reset
+        </button>
+      )}
+    </div>
+  );
+}
+
+function RangeField({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  unit,
+  hint,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  unit: string;
+  hint?: string;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <Field label={`${label} — ${value}${unit}`} inline hint={hint}>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full accent-admin-accent"
+      />
+    </Field>
   );
 }
 
@@ -728,11 +1183,14 @@ function ColorField({
   value,
   onChange,
   allowTransparent,
+  emptyLabel,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   allowTransparent?: boolean;
+  /** Offer "follow another colour" under this name; stores "". */
+  emptyLabel?: string;
 }) {
   // These *are* the theme colours, so no theme swatches here.
   return (
@@ -743,6 +1201,7 @@ function ColorField({
           onChange={onChange}
           tokens={false}
           allowTransparent={allowTransparent}
+          emptyLabel={emptyLabel}
         />
       </div>
     </Field>

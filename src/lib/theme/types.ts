@@ -66,7 +66,125 @@ export interface TextStyle {
 
 export type TextStylesMap = Record<TextStyleKey, TextStyle>;
 
-export interface ThemeSettings {
+/** How a header or footer link reacts to the pointer. */
+export type LinkHover = "fade" | "underline" | "color" | "none";
+
+/**
+ * Header and footer layout and styling (Look → Header & footer). Colours left
+ * "" follow another theme colour, named on each field.
+ */
+export interface ChromeSettings {
+  /** inline: logo and menu on one row · stacked: logo above the menu · split: menu either side of a centred logo. */
+  headerLayout: "inline" | "stacked" | "split";
+  /** px above and below the header's contents, on wider screens. */
+  headerPadding: number;
+  headerWidth: "page" | "full";
+  headerRule: boolean;
+  /** "" = the hairline colour. */
+  colorHeaderRule: string;
+  /** Pinned headers only: smaller once the page scrolls. */
+  headerShrink: boolean;
+  /** On pages that open with a full-width photo, the header sits over it, transparent. */
+  headerOverPhoto: boolean;
+  /** The header's text over the photo. "" = the hero overlay text colour. */
+  colorHeaderOverPhoto: string;
+  /** A logo image over the photo: as uploaded, or turned white. */
+  headerOverPhotoLogo: "original" | "white";
+  /** px the logo is nudged right / down from where the layout puts it, without moving anything else. */
+  logoOffsetX: number;
+  logoOffsetY: number;
+  /** The same on phones, where the logo is smaller. */
+  mobileLogoOffsetX: number;
+  mobileLogoOffsetY: number;
+  /** One-row and split layouts: which edge of the logo the menu lines up with. */
+  logoAlign: "top" | "center" | "bottom";
+  /** The header keeps its own height and the logo hangs below it, over the page. */
+  logoOverhang: boolean;
+  /** px between the logo and the menu, stacked or side by side. */
+  logoGap: number;
+  /** px between menu items. */
+  menuGap: number;
+  /** "" = the text colour. */
+  colorMenuText: string;
+  /** Hover and current-page colour. "" = the accent colour. */
+  colorMenuHighlight: string;
+  menuHover: LinkHover;
+  menuCurrent: "underline" | "color" | "bold" | "none";
+  /** Logo size on phones, % of the desktop size. null = a third for an image, 80% for a wordmark. */
+  mobileLogoScale: number | null;
+  mobileMenuSide: "left" | "right";
+  /** dropdown: a panel under the header · overlay: the whole screen · drawer: a panel sliding in from the side. */
+  mobileMenuStyle: "dropdown" | "overlay" | "drawer";
+
+  /** What sits at the head of the footer. */
+  footerBrand: "name" | "logo" | "none";
+  /** px, the site name as text. */
+  footerNameSize: number;
+  /** px, the logo image's height. */
+  footerLogoHeight: number;
+  footerShowTagline: boolean;
+  footerShowMenu: boolean;
+  footerShowEmail: boolean;
+  footerShowSocial: boolean;
+  /** The footer text (the © line). */
+  footerShowText: boolean;
+  /** px above and below the footer's contents, on wider screens. */
+  footerPadding: number;
+  footerWidth: "page" | "full";
+  footerRule: boolean;
+  /** "" = the hairline colour. */
+  colorFooterRule: string;
+  /** "" = the footer text colour. */
+  colorFooterLink: string;
+  /** "" = the accent colour. */
+  colorFooterHighlight: string;
+  footerLinkHover: LinkHover;
+}
+
+/** Today's header and footer, so a preset saved before these settings looks the same. */
+export const CHROME_DEFAULTS: ChromeSettings = {
+  headerLayout: "inline",
+  headerPadding: 20,
+  headerWidth: "page",
+  headerRule: true,
+  colorHeaderRule: "",
+  headerShrink: false,
+  headerOverPhoto: false,
+  colorHeaderOverPhoto: "",
+  headerOverPhotoLogo: "original",
+  logoOffsetX: 0,
+  logoOffsetY: 0,
+  mobileLogoOffsetX: 0,
+  mobileLogoOffsetY: 0,
+  logoAlign: "center",
+  logoOverhang: false,
+  logoGap: 16,
+  menuGap: 32,
+  colorMenuText: "",
+  colorMenuHighlight: "",
+  menuHover: "fade",
+  menuCurrent: "underline",
+  mobileLogoScale: null,
+  mobileMenuSide: "left",
+  mobileMenuStyle: "dropdown",
+  footerBrand: "name",
+  footerNameSize: 16,
+  footerLogoHeight: 32,
+  footerShowTagline: true,
+  footerShowMenu: true,
+  footerShowEmail: true,
+  footerShowSocial: true,
+  footerShowText: true,
+  footerPadding: 48,
+  footerWidth: "page",
+  footerRule: true,
+  colorFooterRule: "",
+  colorFooterLink: "",
+  colorFooterHighlight: "",
+  footerLinkHover: "fade",
+};
+
+export interface ThemeSettings extends ChromeSettings {
   fontHeadings: string;
   fontBody: string;
   fontNavMenu: string;
@@ -89,8 +207,12 @@ export interface ThemeSettings {
   menuJustify: "left" | "center" | "right";
   /** scroll: the header scrolls away with the page · pinned: it stays at the top of the window. */
   headerBehavior: "scroll" | "pinned";
-  /** bar: the design's footer across the foot of every page · floating: the "i" button in a corner. */
-  footerStyle: "bar" | "floating";
+  /**
+   * bar: name and tagline, links, and the © line in a row · centered: the same, stacked and centred ·
+   * columns: name, links and contact in columns over the © line · minimal: the © line alone ·
+   * floating: the "i" button in a corner.
+   */
+  footerStyle: "bar" | "centered" | "columns" | "minimal" | "floating";
   footerFontSize: number;
   colorSiteBg: string;
   colorHeaderBg: string;
@@ -198,6 +320,7 @@ export function colorTokenVar(key: ColorTokenKey): string {
 }
 
 export const THEME_DEFAULTS: ThemeSettings = {
+  ...CHROME_DEFAULTS,
   fontHeadings: "EB Garamond",
   fontBody: "EB Garamond",
   fontNavMenu: "EB Garamond",

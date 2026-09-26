@@ -21,6 +21,7 @@ export function NavLink({
   href,
   sectionPaths,
   external,
+  current: forced,
   className,
   onClick,
   children,
@@ -28,12 +29,14 @@ export function NavLink({
   href: string;
   sectionPaths?: string[];
   external?: boolean;
+  /** Mark it current whatever the address (the admin's preview). */
+  current?: boolean;
   className?: string;
   onClick?: () => void;
   children: ReactNode;
 }) {
   const pathname = usePathname() ?? "/";
-  const current = external ? null : currentState(pathname, href, sectionPaths);
+  const current = forced ? "page" : external ? null : currentState(pathname, href, sectionPaths);
   return (
     <Link
       href={href}

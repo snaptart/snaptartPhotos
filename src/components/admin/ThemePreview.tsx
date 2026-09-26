@@ -1,21 +1,25 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TEXT_STYLE_LABELS, type TextStyleKey, type ThemeSettings } from "@/lib/theme/types";
 import { buildGoogleFontsUrl } from "@/lib/theme/fonts";
 import { buildThemeCssVars } from "@/lib/theme/css-vars";
 import { fontRole } from "@/lib/theme/role-style";
-import { parseLinks } from "@/lib/parseLinks";
+import { SiteHeader } from "@/components/public/SiteHeader";
+import { SiteFooter } from "@/components/public/SiteFooter";
+import { HeaderOverPhotoMark } from "@/lib/header-over-photo";
 
 interface ThemePreviewProps {
   theme: ThemeSettings;
   siteTitle: string;
   logoUrl: string;
+  /** The footer text as being edited, before it's saved. */
+  footerText?: string;
   /** Text styles to point out: outlined and labelled wherever they appear. */
   highlight?: TextStyleKey[];
 }
 
-type MenuItem = { id: string; label: string };
+type MenuItem = { id: string; label: string; url: string; targetType: string };
 type Collection = { id: string; title: string; photoCount?: number; coverImageUrl: string | null; firstPhotoUrl?: string | null };
 type SiteBits = { tagline: string | null; footerText: string | null; contactEmail: string | null; instagramUrl: string | null };
 
@@ -29,7 +33,7 @@ const SCOPE = "theme-preview-scope";
  * the preview shows is what the site does: your menu, your collections, your
  * header and footer settings, the seven text styles and every colour.
  */
-export default function ThemePreview({ theme, siteTitle, logoUrl, highlight = [] }: ThemePreviewProps) {
+export default function ThemePreview({ theme, siteTitle, logoUrl, footerText, highlight = [] }: ThemePreviewProps) {
   const boxRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.3);
   const [menu, setMenu] = useState<MenuItem[]>([]);
@@ -103,59 +107,21 @@ export default function ThemePreview({ theme, siteTitle, logoUrl, highlight = []
     theme.fontLabels,
   ]);
 
-  const menuItems = menu.length ? menu : [{ id: "a", label: "Collections" }, { id: "b", label: "About" }, { id: "c", label: "Contact" }];
-  const wordmark = theme.wordmarkSize ?? Math.round(theme.logoSize * 0.6);
-  const logo = logoUrl ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={logoUrl} alt="" style={{ height: theme.logoSize, width: "auto", display: "block" }} />
-  ) : (
-    <span
-      style={{
-        fontFamily: "var(--theme-font-headings)",
-        fontSize: wordmark,
-        fontWeight: theme.wordmarkWeight,
-        textTransform: theme.wordmarkUppercase ? "uppercase" : "none",
-        letterSpacing: `${theme.wordmarkTracking}em`,
-      }}
-    >
-      {siteTitle || "Site name"}
-    </span>
-  );
-  const menuEl = (
-    <div
-      style={{
-        display: "flex",
-        gap: 32,
-        ...fontRole("navMenu", { tracking: "0.025em" }),
-        fontSize: `var(--theme-font-nav-menu-size, ${theme.menuFontSize}px)`,
-      }}
-    >
-      {menuItems.map((m, i) => (
-        // The first item shows how the current page is marked.
-        <span key={m.id} style={{ padding: "6px 0", borderBottom: `1px solid ${i === 0 ? "currentColor" : "transparent"}` }}>
-          {m.label}
-        </span>
-      ))}
-    </div>
-  );
-  const slots: Record<"left" | "center" | "right", React.ReactNode[]> = { left: [], center: [], right: [] };
-  slots[theme.logoPosition].push(<div key="logo">{logo}</div>);
-  slots[theme.menuJustify].push(<div key="menu">{menuEl}</div>);
-
-  const pad = "0 64px";
-  const footerText: CSSProperties = {
-    ...fontRole("footer"),
-    fontSize: "var(--theme-font-footer-size, var(--theme-footer-font-size))",
-    color: "var(--theme-color-footer-text)",
-  };
-  const footerLinks = [...menuItems.map((m) => m.label), ...(site.contactEmail ? ["Email"] : []), ...(site.instagramUrl ? ["Instagram"] : [])];
+  const menuItems: MenuItem[] = menu.length
+    ? menu
+    : [
+        { id: "a", label: "Collections", url: "/", targetType: "page" },
+        { id: "b", label: "About", url: "/", targetType: "page" },
+        { id: "c", label: "Contact", url: "/", targetType: "page" },
+      ];
+  const photo = collections.map((c) => c.coverImageUrl || c.firstPhotoUrl).find(Boolean) ?? null;
 
   return (
     <div ref={boxRef} className="overflow-hidden rounded-lg border border-neutral-300 shadow-sm">
       {fontsUrl && <link rel="stylesheet" href={fontsUrl} />}
       <style dangerouslySetInnerHTML={{ __html: buildThemeCssVars(theme, { scope: `.${SCOPE}` }) + highlightCss }} />
       <div
-        className={SCOPE}
+        className={`${SCOPE} site-shell`}
         style={{
           width: PAGE_WIDTH,
           zoom: scale,
@@ -167,14 +133,28 @@ export default function ThemePreview({ theme, siteTitle, logoUrl, highlight = []
           textAlign: "left",
         }}
       >
-        {/* Header */}
-        <header style={{ backgroundColor: "var(--theme-color-header-bg)", borderBottom: "1px solid var(--theme-color-rule)" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "20px 64px" }}>
-            <div style={{ justifySelf: "start", display: "flex", gap: 16, alignItems: "center" }}>{slots.left}</div>
-            <div style={{ justifySelf: "center", display: "flex", gap: 16, alignItems: "center" }}>{slots.center}</div>
-            <div style={{ justifySelf: "end", display: "flex", gap: 16, alignItems: "center" }}>{slots.right}</div>
-          </div>
-        </header>
+        {/* Header, drawn by the site's own component */}
+        <SiteHeader
+          theme={theme}
+          siteTitle={siteTitle || "Site name"}
+          logoUrl={logoUrl || null}
+          items={menuItems}
+          instagramUrl={site.instagramUrl}
+          preview
+        />
+
+        {/* With "Over a photo" on, the page opens with one, as a Hero Slideshow would. */}
+        {theme.headerOverPhoto && (
+          <>
+            <HeaderOverPhotoMark />
+            <div
+              style={{
+                height: 360,
+                background: photo ? `center / cover no-repeat url(${JSON.stringify(photo)})` : "linear-gradient(135deg, #8a8274, #3f3b33)",
+              }}
+            />
+          </>
+        )}
 
         {/* A page intro and a collection index, in the text styles */}
         <main style={{ padding: "64px 64px 72px" }}>
@@ -268,34 +248,16 @@ export default function ThemePreview({ theme, siteTitle, logoUrl, highlight = []
             </div>
           </div>
         ) : (
-          <footer style={{ borderTop: "1px solid var(--theme-color-rule)", backgroundColor: "var(--theme-color-footer-bg)" }}>
-            <div style={{ padding: "40px 64px 48px", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 40 }}>
-              <div>
-                <div
-                  style={{
-                    fontFamily: "var(--theme-font-headings)",
-                    fontSize: 16,
-                    fontWeight: theme.wordmarkWeight,
-                    textTransform: theme.wordmarkUppercase ? "uppercase" : "none",
-                    letterSpacing: `${theme.wordmarkTracking}em`,
-                  }}
-                >
-                  {siteTitle || "Site name"}
-                </div>
-                {(site.tagline || site.footerText) && (
-                  <p style={{ ...footerText, margin: "10px 0 0" }}>{parseLinks(site.tagline || site.footerText || "")}</p>
-                )}
-              </div>
-              <div style={{ display: "flex", gap: 32 }}>
-                {footerLinks.map((l) => (
-                  <span key={l} className="theme-text-label" data-text-style="label" style={{ color: "var(--theme-color-footer-text)" }}>
-                    {l}
-                  </span>
-                ))}
-              </div>
-              {site.tagline && site.footerText && <p style={{ ...footerText, margin: 0 }}>{parseLinks(site.footerText)}</p>}
-            </div>
-          </footer>
+          <SiteFooter
+            theme={theme}
+            siteTitle={siteTitle || "Site name"}
+            logoUrl={logoUrl || null}
+            tagline={site.tagline}
+            footerText={footerText ?? site.footerText}
+            contactEmail={site.contactEmail}
+            instagramUrl={site.instagramUrl}
+            items={menuItems}
+          />
         )}
         {/* Nothing in a preview is a real link. */}
         <div style={{ position: "absolute", inset: 0 }} aria-hidden="true" />
