@@ -85,6 +85,12 @@ Tables defined with Drizzle ORM:
 - **photos** — id, blob_url, url, thumbnail_url, title, description, location, latitude/longitude, camera_settings (jsonb), tags (text[]), width, height, focal_x/y, taken_at, created_at, updated_at — *standalone; no gallery FK on the photo itself*
 - **gallery_photos** *(junction)* — gallery_id (FK→galleries, cascade), photo_id (FK→photos, cascade), position, created_at; composite PK on (gallery_id, photo_id), index on photo_id. A photo can belong to many galleries; per-gallery ordering lives here.
 - **page_elements** — id, page_id (FK→pages), element_type, content (jsonb), position, created_at
+- **page_revisions** — id, page_id (FK→pages, cascade), content (jsonb), reason, batch_id, created_at. A page's content saved just before a change made outside its editor (a block copied in, block defaults applied); `batch_id` groups one action's revisions so it can be undone as a whole. Last 20 per page kept. See `src/lib/page-revisions.ts`.
+- **site_settings** also has `favicon_url`, `favicon_dark_url`, `favicon_shape` ("square" | "round"; null = square), `share_image_url` (Settings → Identity → Browser icon & sharing).
+
+**Site icons**: `/favicon.ico`, `/site-icon/[file]` and `/manifest.webmanifest` render the uploaded icon (any size, via sharp) or a first-letter monogram. There are no static icon files in `src/app`; a site sets its icon in the admin.
+**Block defaults**: stored in the active theme preset (`themeSettings.blockDefaults` + `blockDefaultsPast`). New blocks start with them (`useEditorConfig()` in the editors); existing blocks change only via Settings → Block defaults → Apply. Which blocks/props qualify: `src/lib/puck/block-defaults.ts`.
+**Page addresses** never change with the title; `slug` is edited explicitly and checked by `src/lib/page-slugs.ts` (pages and stories share one namespace).
 
 **Reading photos**: use `selectPhotosForGallery(galleryId)` / `selectPhotosForGalleries(ids)` from `src/lib/db/photo-queries.ts`. Returns flat photo rows joined with the junction (`galleryId` and `position` come from `gallery_photos`).
 **Writing memberships**: `addPhotoToGallery`, `setPhotoGalleries`, `selectGalleryIdsForPhoto` in the same module.
@@ -107,7 +113,10 @@ Tables defined with Drizzle ORM:
 - Menu items API: GET (public) / POST+PUT+DELETE (auth required), PUT supports bulk reorder via `{ items: [{ id, position }] }`
 - Galleries API: GET (public) / POST+PUT+DELETE (auth required), PUT supports bulk reorder, auto-generates slug from title
 - Photos API: GET (public, filterable by `galleryId` or `gallerySlug`; admin-only `?id=X` returns photo + galleryIds) / POST+PUT+DELETE (auth required). POST accepts `galleryIds: string[]` (or legacy single `galleryId`). PUT single accepts `galleryIds` to replace memberships; PUT bulk patch accepts `galleryId` (move = replace) or `addToGalleryId` (add). DELETE without `galleryId` deletes the photo and its blob; DELETE with `galleryId` removes only that membership and garbage-collects the photo if it has no remaining memberships.
-- Upload API: POST (auth required) — accepts multipart file, uploads to Vercel Blob, returns blobUrl/url
+- Upload API: POST (auth required) — accepts multipart file, uploads to Vercel Blob, returns blobUrl/url. `kind=asset` (site icons) skips the thumbnail/EXIF step and also accepts SVG.
+- Pages/Stories API: POST `{ duplicateId }` copies a page/story (unpublished, unique slug). PUT changes `slug` only when sent (409 with a message if taken/reserved).
+- `/api/pages/copy-blocks` POST `{ targetId, fragment }` appends blocks (with nested zones, fresh ids) to another page; `/api/pages/revisions` GET `?pageId=` / POST `{ revisionId | batchId }` restores.
+- `/api/block-defaults` GET/PUT; `/api/block-defaults/apply` POST (dry run or apply, returns `batchId` for undo). All admin-only.
 
 ## Implementation Progress
 - [x] Phase 1: Project scaffold, auth, DB schema, admin login, sidebar

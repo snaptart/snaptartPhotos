@@ -31,6 +31,7 @@ export const CURATED_FONTS: CuratedFont[] = [
   { name: "Merriweather", category: "serif" },
   { name: "Libre Baskerville", category: "serif" },
   // Sans-Serif
+  { name: "Geist", category: "sans-serif", axes: "wght@100..900" },
   { name: "Instrument Sans", category: "sans-serif", axes: italWght(400, 700) },
   { name: "Inter", category: "sans-serif", axes: italWght(100, 900) },
   { name: "Montserrat", category: "sans-serif" },
@@ -44,6 +45,7 @@ export const CURATED_FONTS: CuratedFont[] = [
   { name: "Bebas Neue", category: "display" },
   { name: "Archivo Black", category: "display" },
   // Monospace
+  { name: "Geist Mono", category: "mono", axes: "wght@100..900" },
   { name: "JetBrains Mono", category: "mono", axes: italWght(100, 800) },
   { name: "IBM Plex Mono", category: "mono" },
   { name: "Space Mono", category: "mono" },

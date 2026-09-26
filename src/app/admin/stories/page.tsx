@@ -8,8 +8,9 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { ExternalLink, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
+import { Copy, ExternalLink, Eye, EyeOff, History, Plus, Trash2 } from "lucide-react";
 import { SortableItem } from "@/components/admin/SortableItem";
+import { PageHistoryDrawer } from "@/components/admin/PageHistoryDrawer";
 import { useSortableList } from "@/lib/hooks/useSortableList";
 import { useMessage } from "@/lib/hooks/useMessage";
 import { ColorControl } from "@/components/admin/controls";
@@ -97,6 +98,8 @@ export default function StoriesPage() {
   const [showNextStory, setShowNextStory] = useState(true);
   const [bodyMaxWidth, setBodyMaxWidth] = useState<string>("");
   const [paginate, setPaginate] = useState(false);
+  const [historyFor, setHistoryFor] = useState<Story | null>(null);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
   const { message, showSuccess, showError, alertClass } = useMessage();
   const router = useRouter();
 
@@ -198,6 +201,7 @@ export default function StoriesPage() {
     const payload: Record<string, unknown> = {
       id: editSettings,
       title: form.get("title"),
+      slug: form.get("slug"),
       showTitle: form.get("showTitle") === "on",
       metaTitle: form.get("metaTitle") || null,
       metaDescription: form.get("metaDescription") || null,
@@ -220,7 +224,22 @@ export default function StoriesPage() {
       showSuccess("Story updated.");
       fetchStories();
     } else {
-      showError("Couldn't save the story. Your changes are still in the form.");
+      const data = await res.json().catch(() => ({}));
+      setSettingsError(data.error || "Couldn't save the story. Your changes are still in the form.");
+    }
+  }
+
+  async function handleDuplicate(id: string) {
+    const res = await fetch("/api/stories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ duplicateId: id, position: stories.length }),
+    });
+    if (res.ok) {
+      showSuccess("Story duplicated.");
+      fetchStories();
+    } else {
+      showError("Failed to duplicate.");
     }
   }
 
@@ -336,6 +355,7 @@ export default function StoriesPage() {
                           size="sm"
                           onClick={() => {
                             setEditSettings(story.id);
+                            setSettingsError(null);
                             setShowNewForm(false);
                           }}
                         >
@@ -344,6 +364,8 @@ export default function StoriesPage() {
                         <RowMenu
                           items={[
                             { label: "View on site", icon: <ExternalLink className="h-3.5 w-3.5" />, href: `/stories/${story.slug}`, external: true },
+                            { label: "Duplicate", icon: <Copy className="h-3.5 w-3.5" />, onSelect: () => handleDuplicate(story.id) },
+                            { label: "History…", icon: <History className="h-3.5 w-3.5" />, onSelect: () => setHistoryFor(story) },
                             {
                               label: story.isPublished ? "Unpublish" : "Publish",
                               icon: story.isPublished ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />,
@@ -405,6 +427,7 @@ export default function StoriesPage() {
       >
         {editingStory && (
         <form id="story-settings-form" key={editingStory.id} onSubmit={handleUpdateSettings} className="space-y-4">
+          {settingsError && <div className="text-[13px] text-admin-danger">{settingsError}</div>}
           <Field label="Title" htmlFor="es-title">
             <Input
               id="es-title"
@@ -412,6 +435,20 @@ export default function StoriesPage() {
               defaultValue={editingStory.title}
               required
             />
+          </Field>
+          <Field
+            label="Address"
+            htmlFor="es-slug"
+            hint={
+              editingStory.isPublished
+                ? "Changing it breaks links and bookmarks that use the old address."
+                : "Lowercase letters, numbers and dashes."
+            }
+          >
+            <div className="flex items-center gap-1.5">
+              <span className="text-[13px] text-admin-ink-soft whitespace-nowrap">/stories/</span>
+              <Input id="es-slug" name="slug" defaultValue={editingStory.slug} required />
+            </div>
           </Field>
           <label className="flex items-center gap-2 text-[13px] text-admin-ink cursor-pointer">
             <input
@@ -658,6 +695,7 @@ export default function StoriesPage() {
         </form>
         )}
       </Drawer>
+      <PageHistoryDrawer page={historyFor} onClose={() => setHistoryFor(null)} onRestored={fetchStories} />
     </div>
   );
 }

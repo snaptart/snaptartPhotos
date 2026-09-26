@@ -7,14 +7,24 @@ type Status = "idle" | "saving" | "saved" | "error";
 
 /** How long after the editor opens its own tidy-ups (block migrations) still count as the starting point. */
 const SETTLE_MS = 2000;
-const LEAVE_WARNING = "You have changes that aren't published yet. Leave and lose them?";
+
+/** What the status badge and leave warning call a save; the block-defaults editor "saves" rather than "publishes". */
+export type EditorSaveWords = { pending: string; saving: string; saved: string; failed: string; leave: string };
+
+const PUBLISH_WORDS: EditorSaveWords = {
+  pending: "Unpublished changes",
+  saving: "Publishing…",
+  saved: "Published",
+  failed: "Couldn't publish. Your changes are still here — try again.",
+  leave: "You have changes that aren't published yet. Leave and lose them?",
+};
 
 /**
  * Publishing for the page editors: reports whether the save worked, and warns
  * before a visitor leaves (closing the tab, or following a link out of the
  * editor) with changes that aren't published.
  */
-export function useEditorSave(save: (data: Data) => Promise<Response>) {
+export function useEditorSave(save: (data: Data) => Promise<Response>, words: EditorSaveWords = PUBLISH_WORDS) {
   const [status, setStatus] = useState<Status>("idle");
   const [dirty, setDirty] = useState(false);
   const saved = useRef<string | null>(null);
@@ -69,7 +79,7 @@ export function useEditorSave(save: (data: Data) => Promise<Response>) {
       const a = (e.target as HTMLElement | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
       if (!a || a.target === "_blank" || a.origin !== window.location.origin) return;
       if (a.pathname === window.location.pathname) return;
-      if (!window.confirm(LEAVE_WARNING)) {
+      if (!window.confirm(words.leave)) {
         e.preventDefault();
         e.stopPropagation();
       }
@@ -80,26 +90,36 @@ export function useEditorSave(save: (data: Data) => Promise<Response>) {
       window.removeEventListener("beforeunload", onBeforeUnload);
       document.removeEventListener("click", onClick, true);
     };
-  }, [dirty]);
+  }, [dirty, words.leave]);
 
   useEffect(() => () => {
     if (doneTimer.current) clearTimeout(doneTimer.current);
   }, []);
 
-  const statusEl = <EditorStatus status={status} dirty={dirty} onDismiss={() => setStatus("idle")} />;
+  const statusEl = <EditorStatus status={status} dirty={dirty} words={words} onDismiss={() => setStatus("idle")} />;
   return { begin, onChange, onPublish, status, dirty, statusEl };
 }
 
-function EditorStatus({ status, dirty, onDismiss }: { status: Status; dirty: boolean; onDismiss: () => void }) {
+function EditorStatus({
+  status,
+  dirty,
+  words,
+  onDismiss,
+}: {
+  status: Status;
+  dirty: boolean;
+  words: EditorSaveWords;
+  onDismiss: () => void;
+}) {
   if (status === "idle") {
     if (!dirty) return null;
     return (
       <div className="pointer-events-none fixed bottom-4 right-4 z-50 rounded border border-neutral-300 bg-white px-3 py-1.5 font-sans text-xs text-neutral-600 shadow">
-        Unpublished changes
+        {words.pending}
       </div>
     );
   }
-  const text = status === "saving" ? "Publishing…" : status === "saved" ? "Published" : "Couldn't publish. Your changes are still here — try again.";
+  const text = status === "saving" ? words.saving : status === "saved" ? words.saved : words.failed;
   return (
     <div
       role={status === "error" ? "alert" : "status"}

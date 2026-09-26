@@ -7,8 +7,10 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Copy, ExternalLink, Eye, EyeOff, Home, Plus, Trash2 } from "lucide-react";
+import { Copy, ExternalLink, Eye, EyeOff, History, Home, Plus, Trash2 } from "lucide-react";
 import { SortableItem } from "@/components/admin/SortableItem";
+import ImagePicker from "@/components/admin/ImagePicker";
+import { PageHistoryDrawer } from "@/components/admin/PageHistoryDrawer";
 import { useSortableList } from "@/lib/hooks/useSortableList";
 import { useMessage } from "@/lib/hooks/useMessage";
 import {
@@ -36,6 +38,7 @@ interface Page {
   position: number;
   metaTitle: string | null;
   metaDescription: string | null;
+  ogImageUrl: string | null;
 }
 
 const TYPE_OPTIONS = (
@@ -52,6 +55,9 @@ export default function PagesPage() {
   const [showNewForm, setShowNewForm] = useState(false);
   const [editMeta, setEditMeta] = useState<string | null>(null);
   const [homepageId, setHomepageId] = useState<string | null>(null);
+  const [historyFor, setHistoryFor] = useState<Page | null>(null);
+  const [ogImage, setOgImage] = useState("");
+  const [metaError, setMetaError] = useState<string | null>(null);
   // Pages that share a gallery's slug are that collection's page.
   const [collectionSlugs, setCollectionSlugs] = useState<Set<string>>(new Set());
   const { message, showSuccess, showError, alertClass } = useMessage();
@@ -128,6 +134,8 @@ export default function PagesPage() {
         isFullBleed: form.get("isFullBleed") === "on",
         metaTitle: form.get("metaTitle") || null,
         metaDescription: form.get("metaDescription") || null,
+        ogImageUrl: ogImage || null,
+        slug: form.get("slug"),
       }),
     });
     if (res.ok) {
@@ -135,7 +143,8 @@ export default function PagesPage() {
       showSuccess("Page updated.");
       fetchPages();
     } else {
-      showError("Failed to save.");
+      const data = await res.json().catch(() => ({}));
+      setMetaError(data.error || "Failed to save.");
     }
   }
 
@@ -260,6 +269,8 @@ export default function PagesPage() {
                           size="sm"
                           onClick={() => {
                             setEditMeta(page.id);
+                            setOgImage(page.ogImageUrl ?? "");
+                            setMetaError(null);
                             setShowNewForm(false);
                           }}
                         >
@@ -269,6 +280,7 @@ export default function PagesPage() {
                           items={[
                             { label: "View on site", icon: <ExternalLink className="h-3.5 w-3.5" />, href: publicPath(page), external: true },
                             { label: "Duplicate", icon: <Copy className="h-3.5 w-3.5" />, onSelect: () => handleDuplicate(page.id) },
+                            { label: "History…", icon: <History className="h-3.5 w-3.5" />, onSelect: () => setHistoryFor(page) },
                             {
                               label: homepageId === page.id ? "Stop using as homepage" : "Use as homepage",
                               icon: <Home className="h-3.5 w-3.5" />,
@@ -343,8 +355,28 @@ export default function PagesPage() {
       >
         {editingPage && (
           <form id="page-settings-form" key={editingPage.id} onSubmit={handleUpdateMeta} className="space-y-4">
+            {metaError && <div className="text-[13px] text-admin-danger">{metaError}</div>}
             <Field label="Title" htmlFor="ep-title">
               <Input id="ep-title" name="title" defaultValue={editingPage.title} required />
+            </Field>
+            <Field
+              label="Address"
+              htmlFor="ep-slug"
+              hint={
+                <>
+                  {homepageId === editingPage.id && "This is the homepage, so visitors see it at “/” too. "}
+                  {collectionSlugs.has(editingPage.slug) &&
+                    "This address makes it its collection’s page; changing it unlinks the two. "}
+                  {editingPage.isPublished
+                    ? "Changing it breaks links and bookmarks that use the old address."
+                    : "Lowercase letters, numbers and dashes."}
+                </>
+              }
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="text-[13px] text-admin-ink-soft">/</span>
+                <Input id="ep-slug" name="slug" defaultValue={editingPage.slug} required />
+              </div>
             </Field>
             <Field label="Type" htmlFor="ep-type">
               <Select id="ep-type" name="pageType" defaultValue={editingPage.pageType}>
@@ -393,10 +425,18 @@ export default function PagesPage() {
                   placeholder="Optional"
                 />
               </Field>
+              <Field
+                label="Share image"
+                hint="Shown when a link to this page is shared. Without one, the site’s share image (Settings → Identity) is used."
+              >
+                <ImagePicker value={ogImage} onChange={setOgImage} />
+              </Field>
             </div>
           </form>
         )}
       </Drawer>
+
+      <PageHistoryDrawer page={historyFor} onClose={() => setHistoryFor(null)} onRestored={fetchPages} />
     </div>
   );
 }
