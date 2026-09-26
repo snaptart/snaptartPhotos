@@ -156,6 +156,17 @@ ${perRoleVars}  --theme-body-font-size: ${theme.bodyFontSize}px;
   --theme-menu-font-size: ${theme.menuFontSize}px;
   --theme-menu-justify: ${JUSTIFY_MAP[theme.menuJustify] ?? "flex-end"};
   --theme-footer-font-size: ${theme.footerFontSize}px;
+  /* Header and footer (components/public/SiteHeader.tsx, SiteFooter.tsx) */
+  --theme-header-pad: ${theme.headerPadding}px;
+  --theme-header-rule: ${theme.headerRule ? `1px solid ${theme.colorHeaderRule || "var(--theme-color-rule)"}` : "0 solid transparent"};
+  --theme-header-photo-text: ${theme.colorHeaderOverPhoto || "var(--theme-color-hero-overlay)"};
+  --theme-menu-gap: ${theme.menuGap}px;
+  --theme-menu-text: ${theme.colorMenuText || "var(--theme-color-text)"};
+  --theme-menu-highlight: ${theme.colorMenuHighlight || "var(--theme-color-accent)"};
+  --theme-footer-pad: ${theme.footerPadding}px;
+  --theme-footer-rule: ${theme.footerRule ? `1px solid ${theme.colorFooterRule || "var(--theme-color-rule)"}` : "0 solid transparent"};
+  --theme-footer-link: ${theme.colorFooterLink || "var(--theme-color-footer-text)"};
+  --theme-footer-highlight: ${theme.colorFooterHighlight || "var(--theme-color-accent)"};
   --theme-color-site-bg: ${theme.colorSiteBg};
   --theme-color-header-bg: ${theme.colorHeaderBg};
   --theme-color-footer-bg: ${theme.colorFooterBg};
