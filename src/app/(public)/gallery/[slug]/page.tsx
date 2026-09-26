@@ -10,7 +10,7 @@ import { DEFAULT_LIGHTBOX_SETTINGS, type LightboxSettings } from "@/components/p
 import GalleryGrid from "./GalleryGrid";
 import siteConfig from "@/lib/site.config";
 import { fontRole } from "@/lib/theme/role-style";
-import { PAGE_CONTAINER } from "@/lib/theme/layout";
+import { PAGE_CONTAINER, PAGE_SPACE } from "@/lib/theme/layout";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -65,7 +65,7 @@ export default async function GalleryPage({ params }: Props) {
   };
 
   return (
-    <div className={`${PAGE_CONTAINER} py-16`}>
+    <div className={`${PAGE_CONTAINER} ${PAGE_SPACE}`}>
       <div
         className="mb-12 border-b pb-8"
         style={{ borderColor: "var(--theme-color-rule)" }}

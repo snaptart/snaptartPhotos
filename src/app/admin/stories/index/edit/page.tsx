@@ -55,7 +55,7 @@ export default function StoriesIndexEditorPage() {
   );
   const editor = useEditorSave(save);
   // New blocks start with the site’s block defaults (Settings → Block defaults).
-  const config = useEditorConfig();
+  const config = useEditorConfig({ pageSettings: false });
   const { begin } = editor;
 
   // What was loaded is the starting point for "unpublished changes".

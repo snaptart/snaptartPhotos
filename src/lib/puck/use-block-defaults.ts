@@ -42,17 +42,22 @@ export async function fetchBlockDefaults(): Promise<BlockDefaultsState> {
 /**
  * The editor's Puck config: new blocks start with the site's block defaults.
  * null while they load (a few ms; the editors wait for their page anyway).
+ *
+ * `pageSettings: false` leaves out the Page settings (the config's root), for
+ * stories, which lay themselves out (StoryReadingView).
  */
-export function useEditorConfig(): Config | null {
+export function useEditorConfig({ pageSettings = true }: { pageSettings?: boolean } = {}): Config | null {
   const [config, setConfig] = useState<Config | null>(null);
   useEffect(() => {
     let cancelled = false;
     fetchBlockDefaults().then(({ defaults }) => {
-      if (!cancelled) setConfig(withBlockDefaults(defaults));
+      if (cancelled) return;
+      const withDefaults = withBlockDefaults(defaults);
+      setConfig(pageSettings ? withDefaults : { ...withDefaults, root: undefined });
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [pageSettings]);
   return config;
 }

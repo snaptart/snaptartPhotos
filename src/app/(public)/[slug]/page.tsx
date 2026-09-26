@@ -18,7 +18,9 @@ import type { Data } from "@puckeditor/core";
 import type { EmbedPhoto, FieldMapBlockData, GlobalLightboxSettings } from "@/lib/puck/config";
 import siteConfig from "@/lib/site.config";
 import { fontRole } from "@/lib/theme/role-style";
-import { PAGE_CONTAINER, PROSE_CONTAINER } from "@/lib/theme/layout";
+import { PAGE_SPACE, PROSE_CONTAINER } from "@/lib/theme/layout";
+import { PageFrame } from "@/components/public/PageFrame";
+import { pageLayoutOf } from "@/lib/page-layout";
 import { getFieldMapData } from "@/lib/fieldmap/query";
 
 interface Props {
@@ -131,34 +133,14 @@ export default async function DynamicPage({ params }: Props) {
 
     const underHeader = opensWithPhoto(page.content, page);
 
-    if (page.isFullBleed) {
-      return (
-        <div className="fullbleed-puck-host flex flex-1 flex-col">
-          {underHeader && <HeaderOverPhotoMark />}
-          {page.showTitle && (
-            <h1 className="px-6 pt-16 pb-8 text-4xl md:px-24 md:text-5xl" style={fontRole("headings")}>
-              {page.title}
-            </h1>
-          )}
-          <PuckRenderer
-            data={page.content}
-            galleryPhotos={galleryPhotos}
-            globalLightbox={globalLightbox}
-            fieldMap={fieldMap}
-            photosById={photosById}
-          />
-        </div>
-      );
-    }
-
     return (
-      <div className={`${PAGE_CONTAINER} ${underHeader ? "pt-0 pb-16" : "py-16"}`}>
+      <PageFrame
+        layout={pageLayoutOf(page.content)}
+        isFullBleed={page.isFullBleed}
+        flushTop={underHeader}
+        title={page.showTitle ? page.title : null}
+      >
         {underHeader && <HeaderOverPhotoMark />}
-        {page.showTitle && (
-          <h1 className="mb-10 text-4xl md:text-5xl" style={fontRole("headings")}>
-            {page.title}
-          </h1>
-        )}
         <PuckRenderer
           data={page.content}
           galleryPhotos={galleryPhotos}
@@ -166,7 +148,7 @@ export default async function DynamicPage({ params }: Props) {
           fieldMap={fieldMap}
           photosById={photosById}
         />
-      </div>
+      </PageFrame>
     );
   }
 
@@ -176,7 +158,7 @@ export default async function DynamicPage({ params }: Props) {
     : "";
 
   return (
-    <div className={`${PROSE_CONTAINER} py-16`}>
+    <div className={`${PROSE_CONTAINER} ${PAGE_SPACE}`}>
       {page.showTitle && (
         <h1 className="mb-10 text-4xl md:text-5xl" style={fontRole("headings")}>
           {page.title}

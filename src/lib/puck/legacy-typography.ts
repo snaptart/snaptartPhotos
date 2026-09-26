@@ -90,6 +90,26 @@ export function migrateForm<T extends object>(props: T): T {
   return { ...props, ...FORM_LEGACY_LOOK };
 }
 
+// The Hero Banner's overlay was on (40% black) or off, and its text always sat
+// in the middle. A saved banner gets that written in as the new settings.
+export function migrateHero<T extends object>(props: T): T {
+  const p = props as Legacy;
+  if (p.overlayOpacity !== undefined) return props;
+  return {
+    ...clearKeys(props, ["overlay"]),
+    imageAlt: p.imageAlt ?? "",
+    phoneHeight: p.phoneHeight ?? "",
+    overlayOpacity: p.overlay === false ? 0 : 40,
+    overlayStyle: "even",
+    textPosition: "center",
+    phoneTextPosition: "",
+    textWidth: 100,
+    phoneFocal: false,
+    phoneFocalX: num(p.focalX) ?? 50,
+    phoneFocalY: num(p.focalY) ?? 50,
+  };
+}
+
 const GINDEX_LEGACY = [
   "titleFontRole", "titleSize", "titleColor", "titleWeight", "titleTransform",
   "listTitleFontRole", "listTitleSize", "listTitleWeight", "listTitleColor", "listTitleTransform", "listTitleTracking", "listTitleItalic",

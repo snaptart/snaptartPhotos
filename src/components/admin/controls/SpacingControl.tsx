@@ -31,6 +31,37 @@ export function SpacingControl({
   );
 }
 
+/** The same, with "Auto" first: null, which follows a setting elsewhere. */
+export function AutoSpacingControl({
+  value,
+  onChange,
+  max = 240,
+  autoTitle,
+}: {
+  value: number | null | undefined;
+  onChange: (v: number | null) => void;
+  max?: number;
+  /** What Auto means, as the button's tooltip. */
+  autoTitle?: string;
+}) {
+  const auto = typeof value !== "number";
+  return (
+    <div className="flex items-center gap-2">
+      <SegmentedControl
+        options={[
+          { label: "Auto", value: null, title: autoTitle },
+          ...SPACE_SCALE.map((s) => ({ label: s.label, value: s.value, title: `${s.value}px` })),
+        ]}
+        value={auto ? null : value}
+        onChange={(v) => onChange(v as number | null)}
+        compact
+        className="min-w-0 flex-1"
+      />
+      {!auto && <NumberBox value={value} onChange={onChange} min={0} max={max} unit="px" />}
+    </div>
+  );
+}
+
 export function SegmentedControl({
   options,
   value,

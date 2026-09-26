@@ -3,7 +3,7 @@
 import { Children, isValidElement, useEffect, useState, type ReactElement, type ReactNode } from "react";
 import { createUsePuck } from "@puckeditor/core";
 import { ChevronRight } from "lucide-react";
-import { PANEL_LAYOUTS, PANEL_TABS, type PanelGroup, type PanelLayout, type PanelTab } from "@/lib/puck/panel-layout";
+import { PANEL_LAYOUTS, PANEL_TABS, ROOT_PANEL_LAYOUT, type PanelGroup, type PanelLayout, type PanelTab } from "@/lib/puck/panel-layout";
 import { hideOnSummary, type Breakpoint } from "@/lib/puck/responsive";
 import { sameValue } from "./fieldTypes";
 
@@ -50,15 +50,26 @@ function writeOpenState(state: Record<string, boolean>) {
 }
 
 export function PanelFields({ children }: { children: ReactNode; isLoading: boolean; itemSelector?: unknown }) {
-  const item = usePuckSelector((s) => s.selectedItem);
+  const selected = usePuckSelector((s) => s.selectedItem);
+  // With no block selected the panel shows the page's own settings, when the editor has them.
+  const rootProps = usePuckSelector((s) =>
+    s.config.root?.fields?.width ? ((s.appState.data.root.props ?? {}) as Props) : undefined
+  );
   const defaults = usePuckSelector((s) =>
-    s.selectedItem ? (s.config.components[s.selectedItem.type]?.defaultProps as Props | undefined) : undefined
+    s.selectedItem
+      ? (s.config.components[s.selectedItem.type]?.defaultProps as Props | undefined)
+      : (s.config.root?.defaultProps as Props | undefined)
   );
   const [preferredTab, setPreferredTab] = useState<PanelTab>("content");
   const [openState, setOpenState] = useState<Record<string, boolean>>({});
   useEffect(() => setOpenState(readOpenState()), []);
 
-  const layout = item ? (PANEL_LAYOUTS as Record<string, PanelLayout<Props> | undefined>)[item.type] : undefined;
+  const item = selected ?? (rootProps ? { type: "Page", props: rootProps } : null);
+  const layout = selected
+    ? (PANEL_LAYOUTS as Record<string, PanelLayout<Props> | undefined>)[selected.type]
+    : rootProps
+      ? (ROOT_PANEL_LAYOUT as unknown as PanelLayout<Props>)
+      : undefined;
   if (!item || !layout) return <>{children}</>;
 
   const props = item.props as Props;
