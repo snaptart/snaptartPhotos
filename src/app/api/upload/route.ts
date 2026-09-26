@@ -14,13 +14,29 @@ export async function POST(req: Request) {
   const file = formData.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
 
+  // "asset" uploads (site icons, share images) skip the thumbnail and photo metadata, and may be SVG.
+  const isAsset = formData.get("kind") === "asset";
   const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"];
+  if (isAsset) ALLOWED_TYPES.push("image/svg+xml");
   const MAX_SIZE = 20 * 1024 * 1024; // 20MB
   if (!ALLOWED_TYPES.includes(file.type)) {
-    return NextResponse.json({ error: "Invalid file type. Only JPEG, PNG, WebP, GIF, and AVIF are allowed." }, { status: 400 });
+    return NextResponse.json({ error: `Invalid file type. Only JPEG, PNG, WebP, GIF${isAsset ? ", AVIF and SVG" : " and AVIF"} are allowed.` }, { status: 400 });
   }
   if (file.size > MAX_SIZE) {
     return NextResponse.json({ error: "File too large (max 20MB)" }, { status: 400 });
+  }
+
+  if (isAsset) {
+    try {
+      const folder = (formData.get("folder") as string) || "site";
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const blob = await put(`${folder}/${Date.now()}-${safeName}`, buffer, { access: "public", contentType: file.type });
+      const { width = null, height = null } = await sharp(buffer).metadata().catch(() => ({ width: null, height: null }));
+      return NextResponse.json({ url: blob.url, width, height });
+    } catch {
+      return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+    }
   }
 
   try {

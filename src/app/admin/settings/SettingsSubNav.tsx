@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { User, Palette, Type, Navigation as NavIcon, Users as UsersIcon } from "lucide-react";
+import { User, Palette, Type, LayoutTemplate, Navigation as NavIcon, Users as UsersIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const sections = [
   { href: "/admin/settings", label: "Identity", icon: User, match: /^\/admin\/settings\/?$/ },
   { href: "/admin/settings/look", label: "Look and Feel", icon: Palette, match: /^\/admin\/settings\/look/ },
   { href: "/admin/settings/typography", label: "Typography", icon: Type, match: /^\/admin\/settings\/typography/ },
+  { href: "/admin/settings/blocks", label: "Block defaults", icon: LayoutTemplate, match: /^\/admin\/settings\/blocks/ },
   { href: "/admin/settings/navigation", label: "Navigation", icon: NavIcon, match: /^\/admin\/settings\/navigation/ },
   { href: "/admin/settings/users", label: "Users", icon: UsersIcon, match: /^\/admin\/settings\/users/ },
 ];

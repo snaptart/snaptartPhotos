@@ -3,7 +3,7 @@ import { getAdminSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { pages } from "@/lib/db/schema";
 import { eq, and, asc } from "drizzle-orm";
-import { generateSlug } from "@/lib/utils";
+import { checkPageSlug, uniquePageSlug } from "@/lib/page-slugs";
 import { hashPassword } from "@/lib/password";
 
 export async function GET() {
@@ -39,7 +39,29 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const slug = generateSlug(body.title);
+
+    // Duplicate an existing story (as an unpublished copy)
+    if (body.duplicateId) {
+      const [source] = await db
+        .select()
+        .from(pages)
+        .where(and(eq(pages.id, body.duplicateId), eq(pages.pageType, "story")));
+      if (!source) return NextResponse.json({ error: "Source story not found" }, { status: 404 });
+      const { id, createdAt, updatedAt, ...rest } = source;
+      const [item] = await db
+        .insert(pages)
+        .values({
+          ...rest,
+          title: `Copy of ${source.title}`,
+          slug: await uniquePageSlug(`${source.slug}-copy`),
+          isPublished: false,
+          position: body.position ?? 0,
+        })
+        .returning();
+      return NextResponse.json(item);
+    }
+
+    const slug = await uniquePageSlug(body.title);
 
     let passwordHash: string | undefined;
     if (body.isPasswordProtected && body.password) {
@@ -84,7 +106,14 @@ export async function PUT(req: Request) {
     if (!body.id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
     const { id, password, ...data } = body;
 
-    if (data.title) data.slug = generateSlug(data.title);
+    // The address only changes when it's edited, never with the title, so links keep working.
+    if (typeof data.slug === "string") {
+      const checked = await checkPageSlug(data.slug, id);
+      if (checked.error) return NextResponse.json({ error: checked.error }, { status: 409 });
+      data.slug = checked.slug;
+    } else {
+      delete data.slug;
+    }
     data.updatedAt = new Date();
 
     // Handle password changes
