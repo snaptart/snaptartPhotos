@@ -22,6 +22,7 @@ import {
 
 const TABS = [
   { key: "chrome", label: "Header & footer" },
+  { key: "pages", label: "Pages" },
   { key: "colors", label: "Colours" },
   { key: "lightbox", label: "Lightbox" },
 ] as const;
@@ -851,6 +852,70 @@ export default function LookAndFeelPage() {
         )}
       </SettingGroup>
 
+      </>
+      )}
+
+      {/* Pages */}
+      {tab === "pages" && (
+      <>
+      <SettingGroup
+        title="Page column"
+        desc="The column pages, galleries and the header and footer (set to Page column) line up in."
+      >
+        <RangeField
+          label="Widest"
+          value={themeDraft.pageMaxWidth}
+          min={960}
+          max={1920}
+          step={20}
+          unit="px"
+          hint="On screens wider than this, the column stays centred with space either side. Margins included."
+          onChange={(v) => updateTheme("pageMaxWidth", v)}
+        />
+        <RangeField
+          label="Side margins"
+          value={themeDraft.pageMargin}
+          min={0}
+          max={200}
+          step={4}
+          unit="px"
+          hint="Each side, on tablets and wider."
+          onChange={(v) => updateTheme("pageMargin", v)}
+        />
+        <RangeField
+          label="Side margins on phones"
+          value={themeDraft.pageMarginPhone}
+          min={0}
+          max={48}
+          unit="px"
+          hint="Each side, on screens narrower than 768px."
+          onChange={(v) => updateTheme("pageMarginPhone", v)}
+        />
+      </SettingGroup>
+      <SettingGroup
+        title="Space around content"
+        desc="Between the header and a page's first block, and between its last block and the footer. A page can set its own in the editor (click an empty spot to see Page settings)."
+      >
+        <RangeField
+          label="Above"
+          value={themeDraft.pageSpaceTop}
+          min={0}
+          max={200}
+          step={4}
+          unit="px"
+          hint="Pages that open with a full-width photo start right under the header regardless, as do full-width pages."
+          onChange={(v) => updateTheme("pageSpaceTop", v)}
+        />
+        <RangeField
+          label="Below"
+          value={themeDraft.pageSpaceBottom}
+          min={0}
+          max={200}
+          step={4}
+          unit="px"
+          onChange={(v) => updateTheme("pageSpaceBottom", v)}
+        />
+      </SettingGroup>
       </>
       )}
 

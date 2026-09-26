@@ -1,7 +1,9 @@
 "use client";
 
 import type { Config } from "@puckeditor/core";
-import { DropZone, usePuck } from "@puckeditor/core";
+import { DropZone, createUsePuck, usePuck } from "@puckeditor/core";
+import { PageFrame } from "@/components/public/PageFrame";
+import { PAGE_LAYOUT_DEFAULTS, opensFlush, type PageLayout, type PageMargins, type PageWidth } from "@/lib/page-layout";
 import type { ComponentConfig } from "@puckeditor/core";
 import {
   BreakpointVisibility,
@@ -25,9 +27,10 @@ import GalleryPhotoMultiPicker from "@/components/admin/GalleryPhotoMultiPicker"
 import NextLink from "next/link";
 import { parseLinks } from "@/lib/parseLinks";
 import siteConfig from "@/lib/site.config";
-import { ColorControl, ListControl, ListItemField, PhotoControl, PhotoListControl, SegmentedControl, SliderControl, SpacingControl, TextStyleControl } from "@/components/admin/controls";
+import { AutoSpacingControl, ColorControl, ListControl, ListItemField, PhotoControl, PhotoListControl, PositionControl, SegmentedControl, SliderControl, SpacingControl, TextStyleControl, type Position } from "@/components/admin/controls";
 import { textStyleCss, type TextStyleValue } from "@/lib/theme/text-style-value";
-import { migrateButton, migrateForm, migrateGalleriesIndex, migrateImageBlock, migrateLinkList } from "@/lib/puck/legacy-typography";
+import { migrateButton, migrateForm, migrateGalleriesIndex, migrateHero, migrateImageBlock, migrateLinkList } from "@/lib/puck/legacy-typography";
+import { optimizedSource } from "@/lib/optimized-image";
 import { cssColor, withAlpha } from "@/lib/theme/color";
 import {
   GALLERY_ASPECT_CSS,
@@ -98,14 +101,29 @@ type RichTextProps = {
 
 type HeroProps = {
   imageUrl: string;
+  imageAlt: string;
   title: string;
   titleStyle: TextStyleValue;
   subtitle: string;
   subtitleStyle: TextStyleValue;
   height: string;
-  overlay: boolean;
+  /** Phones (under 640px); "" = same as height. */
+  phoneHeight: string;
+  /** 0–90; how dark the overlay gets (at its darkest, for "text"). */
+  overlayOpacity: number;
+  /** even: the same all over; text: a gradient from the side the text sits on. */
+  overlayStyle: "even" | "text";
+  textPosition: Position;
+  /** Phones (under 640px); "" = same as textPosition. */
+  phoneTextPosition: Position | "";
+  /** Widest the text runs, as a % of the banner (phones always use the full width). */
+  textWidth: number;
   focalX: number;
   focalY: number;
+  /** Phones crop a wide photo to a tall one, so they can centre on another spot. */
+  phoneFocal: boolean;
+  phoneFocalX: number;
+  phoneFocalY: number;
 };
 
 type ImageBlockProps = {
@@ -506,7 +524,89 @@ function stackPositions(order: string | undefined, count: number): number[] | nu
   return Array.from({ length: count }, (_, i) => seq.indexOf(i + 1) + 1);
 }
 
-export const puckConfig: Config<Components> = {
+export type PageRootProps = Required<PageLayout>;
+
+export const puckConfig: Config<Components, PageRootProps> = {
+  // Page settings: shown in the panel while no block is selected. Pages only;
+  // the story editors leave them out (useEditorConfig).
+  root: {
+    fields: {
+      width: {
+        type: "custom",
+        label: "Width",
+        render: ({ value, onChange }) => (
+          <SegmentedControl
+            options={[
+              { label: "Standard", value: "standard", title: "The site's page column (Look → Pages)" },
+              { label: "Reading", value: "reading", title: "A narrow column, for text" },
+              { label: "Full width", value: "full", title: "Edge to edge, no side margins (Full bleed)" },
+            ]}
+            value={value ?? "standard"}
+            onChange={(v) => onChange(v as PageWidth)}
+          />
+        ),
+      },
+      sideMargins: {
+        type: "custom",
+        label: "Side margins",
+        render: ({ value, onChange }) => (
+          <SegmentedControl
+            options={[
+              { label: "Site", value: "site", title: "The site's margins (Look → Pages)" },
+              { label: "Narrow", value: "narrow", title: "Half the site's margins" },
+              { label: "None", value: "none" },
+            ]}
+            value={value ?? "site"}
+            onChange={(v) => onChange(v as PageMargins)}
+          />
+        ),
+      },
+      spaceTop: {
+        type: "custom",
+        label: "Space above",
+        render: ({ value, onChange }) => (
+          <AutoSpacingControl value={value} onChange={onChange} autoTitle="The site's space under the header, or none when the page opens with a full-width photo" />
+        ),
+      },
+      spaceBottom: {
+        type: "custom",
+        label: "Space below",
+        render: ({ value, onChange }) => (
+          <AutoSpacingControl value={value} onChange={onChange} autoTitle="The site's space above the footer" />
+        ),
+      },
+      phoneSpace: { type: "radio", label: "On phones", options: [
+        { label: "Same space", value: false },
+        { label: "Their own", value: true },
+      ]},
+      spaceTopPhone: {
+        type: "custom",
+        label: "Space above on phones",
+        render: ({ value, onChange }) => <AutoSpacingControl value={value} onChange={onChange} />,
+      },
+      spaceBottomPhone: {
+        type: "custom",
+        label: "Space below on phones",
+        render: ({ value, onChange }) => <AutoSpacingControl value={value} onChange={onChange} />,
+      },
+      background: {
+        type: "custom",
+        label: "Background",
+        render: ({ value, onChange }) => <ColorField value={value} onChange={onChange} emptyLabel="Site background" />,
+      },
+    },
+    defaultProps: PAGE_LAYOUT_DEFAULTS,
+    // The site draws its pages' frame itself (components/public/PageFrame); the
+    // editor's preview gets the same one here.
+    render: ({ children, puck, ...props }) =>
+      puck?.isEditing ? (
+        <EditorPageFrame layout={props} page={(puck.metadata as { page?: EditorPageInfo }).page}>
+          {children}
+        </EditorPageFrame>
+      ) : (
+        <>{children}</>
+      ),
+  },
   categories: {
     content: {
       components: [
@@ -592,6 +692,7 @@ export const puckConfig: Config<Components> = {
             <TextStyleControl value={value} onChange={onChange} fallback="lead" withColor={false} />
           ),
         },
+        imageAlt: { type: "text", label: "Alt text" },
         height: {
           type: "select",
           label: "Height",
@@ -602,10 +703,60 @@ export const puckConfig: Config<Components> = {
             { label: "Full Screen", value: "100vh" },
           ],
         },
-        overlay: { type: "radio", label: "Dark overlay", options: [
-          { label: "Yes", value: true },
-          { label: "No", value: false },
-        ]},
+        phoneHeight: {
+          type: "select",
+          label: "Height on phones",
+          options: [
+            { label: "Same as desktop", value: "" },
+            { label: "Small (300px)", value: "300px" },
+            { label: "Medium (500px)", value: "500px" },
+            { label: "Large (700px)", value: "700px" },
+            { label: "Most of the screen (70%)", value: "70vh" },
+            { label: "Full Screen", value: "100vh" },
+          ],
+        },
+        overlayOpacity: {
+          type: "custom",
+          label: "Darken",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={90} step={5} unit="%" />
+          ),
+        },
+        overlayStyle: {
+          type: "custom",
+          label: "Spread",
+          render: ({ value, onChange }) => (
+            <SegmentedControl
+              options={[
+                { label: "Even", value: "even", title: "The same all over the photo" },
+                { label: "Behind the text", value: "text", title: "A gradient from the side the text sits on" },
+              ]}
+              value={value ?? "even"}
+              onChange={(v) => onChange(v as HeroProps["overlayStyle"])}
+            />
+          ),
+        },
+        textPosition: {
+          type: "custom",
+          label: "Text position",
+          render: ({ value, onChange }) => (
+            <PositionControl value={value} onChange={(v) => onChange((v || "center") as Position)} />
+          ),
+        },
+        phoneTextPosition: {
+          type: "custom",
+          label: "On phones",
+          render: ({ value, onChange }) => (
+            <PositionControl value={value} onChange={onChange} inheritLabel="Same as desktop" />
+          ),
+        },
+        textWidth: {
+          type: "custom",
+          label: "Text width",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={30} max={100} step={5} unit="%" />
+          ),
+        },
         focalX: {
           type: "custom",
           label: "Focal point (horizontal)",
@@ -620,47 +771,105 @@ export const puckConfig: Config<Components> = {
             <SliderField value={value} onChange={onChange} min={0} max={100} step={1} unit="%" label="Vertical" />
           ),
         },
+        phoneFocal: { type: "radio", label: "On phones", options: [
+          { label: "Same focal point", value: false },
+          { label: "Its own", value: true },
+        ]},
+        phoneFocalX: {
+          type: "custom",
+          label: "Phone focal point (horizontal)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={100} step={1} unit="%" />
+          ),
+        },
+        phoneFocalY: {
+          type: "custom",
+          label: "Phone focal point (vertical)",
+          render: ({ value, onChange }) => (
+            <SliderField value={value} onChange={onChange} min={0} max={100} step={1} unit="%" />
+          ),
+        },
       },
       defaultProps: {
         imageUrl: "",
+        imageAlt: "",
         title: "",
         titleStyle: { style: "display" },
         subtitle: "",
         subtitleStyle: { style: "lead" },
         height: "500px",
-        overlay: true,
+        phoneHeight: "",
+        overlayOpacity: 40,
+        overlayStyle: "even",
+        textPosition: "center",
+        phoneTextPosition: "",
+        textWidth: 100,
         focalX: 50,
         focalY: 50,
+        phoneFocal: false,
+        phoneFocalX: 50,
+        phoneFocalY: 50,
       },
-      render: ({ imageUrl, title, titleStyle, subtitle, subtitleStyle, height, overlay, focalX, focalY }) => (
-        <div
-          className="relative flex items-center justify-center bg-neutral-200 bg-cover"
-          style={{
-            backgroundImage: imageUrl ? `url(${imageUrl})` : undefined,
-            backgroundPosition: `${focalX ?? 50}% ${focalY ?? 50}%`,
-            minHeight: height,
-          }}
-        >
-          {overlay && imageUrl && (
-            <div className="absolute inset-0 bg-black/40" />
-          )}
-          <div className="relative z-10 text-center px-4">
-            {title && (
-              <h1 className="mb-4" style={{ ...textStyleCss(titleStyle, "display", { withColor: false }), color: "var(--theme-color-hero-overlay)", whiteSpace: "pre-line" }}>
-                <Editable path="title" value={title} multiline />
-              </h1>
+      resolveData: ({ props }) => ({ props: migrateHero(props) }),
+      render: (raw) => {
+        const { imageUrl, imageAlt, title, titleStyle, subtitle, subtitleStyle, height, phoneHeight, overlayOpacity, overlayStyle, textPosition, phoneTextPosition, textWidth, focalX, focalY, phoneFocal, phoneFocalX, phoneFocalY } = migrateHero(raw);
+        const isPriority = useImagePriority();
+        const source = imageUrl ? optimizedSource(imageUrl, "100vw") : null;
+        const desktop = heroPlacement(textPosition, overlayStyle, overlayOpacity);
+        const phone = heroPlacement(phoneTextPosition || textPosition, overlayStyle, overlayOpacity);
+        const vars = {
+          "--hero-focal": `${focalX ?? 50}% ${focalY ?? 50}%`,
+          "--hero-focal-phone": phoneFocal ? `${phoneFocalX}% ${phoneFocalY}%` : `${focalX ?? 50}% ${focalY ?? 50}%`,
+          "--hero-justify": desktop.justify,
+          "--hero-justify-phone": phone.justify,
+          "--hero-align": desktop.align,
+          "--hero-align-phone": phone.align,
+          "--hero-text-align": desktop.textAlign,
+          "--hero-text-align-phone": phone.textAlign,
+          "--hero-shade": desktop.shade,
+          "--hero-shade-phone": phone.shade,
+          "--hero-text-width": `${textWidth}%`,
+          "--hero-height": screenHeight(height),
+          "--hero-height-phone": screenHeight(phoneHeight || height),
+        } as React.CSSProperties;
+        return (
+          <div
+            className="relative flex flex-col overflow-hidden bg-neutral-200 p-[clamp(1.5rem,5vw,4rem)] [min-height:var(--hero-height)] max-sm:[min-height:var(--hero-height-phone)] [justify-content:var(--hero-justify)] [align-items:var(--hero-align)] max-sm:[justify-content:var(--hero-justify-phone)] max-sm:[align-items:var(--hero-align-phone)]"
+            style={vars}
+          >
+            {source && (
+              <img
+                src={source.src}
+                srcSet={source.srcSet}
+                sizes={source.sizes}
+                alt={imageAlt ?? ""}
+                className="absolute inset-0 h-full w-full object-cover [object-position:var(--hero-focal)] max-sm:[object-position:var(--hero-focal-phone)]"
+                loading={isPriority ? "eager" : "lazy"}
+                fetchPriority={isPriority ? "high" : undefined}
+                decoding="async"
+              />
             )}
-            {subtitle && (
-              <p style={{ ...textStyleCss(subtitleStyle, "lead", { withColor: false }), color: "var(--theme-color-hero-overlay)", opacity: 0.9, whiteSpace: "pre-line" }}>
-                <Editable path="subtitle" value={subtitle} multiline />
-              </p>
+            {source && overlayOpacity > 0 && (
+              <div className="absolute inset-0 [background:var(--hero-shade)] max-sm:[background:var(--hero-shade-phone)]" />
             )}
-            {!imageUrl && !title && (
-              <p className="text-neutral-400 italic">Set an image URL and title</p>
-            )}
+            <div className="relative z-10 [text-align:var(--hero-text-align)] max-sm:[text-align:var(--hero-text-align-phone)] sm:[max-width:var(--hero-text-width)]">
+              {title && (
+                <h1 className="mb-4" style={{ ...textStyleCss(titleStyle, "display", { withColor: false }), color: "var(--theme-color-hero-overlay)", whiteSpace: "pre-line" }}>
+                  <Editable path="title" value={title} multiline />
+                </h1>
+              )}
+              {subtitle && (
+                <p style={{ ...textStyleCss(subtitleStyle, "lead", { withColor: false }), color: "var(--theme-color-hero-overlay)", opacity: 0.9, whiteSpace: "pre-line" }}>
+                  <Editable path="subtitle" value={subtitle} multiline />
+                </p>
+              )}
+              {!imageUrl && !title && (
+                <p className="text-neutral-400 italic">Set an image URL and title</p>
+              )}
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
 
     ImageBlock: {
@@ -5116,6 +5325,61 @@ function MetadataFieldsPicker({ value, onChange }: { value: string[]; onChange: 
       ))}
     </div>
   );
+}
+
+// ----- Page frame in the editor -----
+
+/** What the page editor tells the preview about the page (Puck `metadata.page`). */
+export type EditorPageInfo = { title: string; showTitle: boolean; isHome: boolean };
+
+const usePuckSelector = createUsePuck();
+
+/** The page's frame on the editor's canvas, following the Page settings as they change. */
+function EditorPageFrame({ layout, page, children }: { layout: PageLayout; page?: EditorPageInfo; children: React.ReactNode }) {
+  const first = usePuckSelector((s) => s.appState.data.content?.[0]) as { type: string; props?: Record<string, unknown> } | undefined;
+  const isFullBleed = layout.width === "full";
+  const showTitle = page?.showTitle ?? false;
+  const flushTop = opensFlush({ content: first ? [first] : [] }, { isFullBleed, showTitle }, page?.isHome ?? false);
+  return (
+    <PageFrame layout={layout} isFullBleed={isFullBleed} flushTop={flushTop} title={showTitle ? page?.title : null}>
+      {children}
+    </PageFrame>
+  );
+}
+
+// ----- Hero banner placement -----
+
+/** Screen heights as what's left once a phone's browser bars are showing ("100vh" → "100svh"). */
+function screenHeight(h: string | undefined): string {
+  return (h || "500px").replace(/vh$/, "svh");
+}
+
+const EDGE = { top: "flex-start", center: "center", bottom: "flex-end", left: "flex-start", right: "flex-end" } as const;
+
+/**
+ * Where a Hero Banner's text sits, and its overlay: even all over, or a
+ * gradient that is darkest at the text's side and clears across the photo.
+ */
+function heroPlacement(position: Position | undefined, style: HeroProps["overlayStyle"] | undefined, opacity: number) {
+  const pos = position ?? "center";
+  // "top-left" → row top, column left; "center" alone is both.
+  const [row, col] = pos === "center" ? ["center", "center"] : pos.split("-");
+  const a = Math.max(0, Math.min(90, opacity ?? 0)) / 100;
+  const dark = (f: number) => `rgba(0,0,0,${+(a * f).toFixed(3)})`;
+  let shade = `linear-gradient(${dark(1)}, ${dark(1)})`;
+  if (style === "text") {
+    const from = row !== "center" ? row : col !== "center" ? col : null;
+    const toward = { top: "bottom", bottom: "top", left: "right", right: "left" } as const;
+    shade = from
+      ? `linear-gradient(to ${toward[from as keyof typeof toward]}, ${dark(1)} 0%, ${dark(0.6)} 35%, transparent 80%)`
+      : `radial-gradient(ellipse at center, ${dark(1)} 0%, ${dark(0.5)} 45%, transparent 80%)`;
+  }
+  return {
+    justify: EDGE[row as keyof typeof EDGE] ?? "center",
+    align: EDGE[col as keyof typeof EDGE] ?? "center",
+    textAlign: col === "center" ? "center" : col,
+    shade,
+  };
 }
 
 // ----- Hero slideshow client -----

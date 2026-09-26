@@ -1,9 +1,10 @@
-import type { Components } from "@/lib/puck/config";
+import type { Components, PageRootProps } from "@/lib/puck/config";
 import { COLOR_TOKENS, TEXT_STYLE_LABELS, type TextStyleKey } from "@/lib/theme/types";
 import { SPACE_SCALE } from "@/lib/theme/layout";
 import { colorTokenOf } from "@/lib/theme/color";
 import { hasAdjustments, type TextStyleValue } from "@/lib/theme/text-style-value";
 import { columnsSummary } from "@/lib/puck/responsive";
+import { positionLabel } from "@/components/admin/controls/PositionControl";
 
 /**
  * How each block's settings are laid out in the properties panel: which tab
@@ -85,6 +86,12 @@ function capitalise(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+function heroHeightLabel(h: string): string {
+  if (h === "100vh") return "Full screen";
+  if (h.endsWith("vh")) return `${parseInt(h, 10)}% of the screen`;
+  return h;
+}
+
 function onOff(value: boolean | undefined, on: string, off: string): string {
   return value ? on : off;
 }
@@ -102,20 +109,79 @@ const LINK_LIST_LAYOUTS: Record<string, string> = {
   "card-grid": "Card grid",
 };
 
+function spaceSummary(v: number | null | undefined): string {
+  return typeof v === "number" ? space(v) : "Auto";
+}
+
+/** Page settings: the panel while no block is selected. */
+export const ROOT_PANEL_LAYOUT: PanelLayout<PageRootProps> = {
+  groups: [
+    {
+      tab: "layout",
+      title: "Width",
+      fields: ["width", "sideMargins"],
+      summary: (p) =>
+        list(
+          { standard: "Standard", reading: "Reading", full: "Full width" }[p.width ?? "standard"],
+          p.width !== "full" && p.sideMargins && p.sideMargins !== "site" && `${p.sideMargins} margins`,
+        ),
+    },
+    {
+      tab: "layout",
+      title: "Spacing",
+      fields: ["spaceTop", "spaceBottom", "phoneSpace", "spaceTopPhone", "spaceBottomPhone"],
+      summary: (p) => list(`Above ${spaceSummary(p.spaceTop)}`, `Below ${spaceSummary(p.spaceBottom)}`, p.phoneSpace && "own on phones"),
+    },
+    { tab: "layout", title: "Background", fields: ["background"], summary: (p) => colorSummary(p.background, "Site background") },
+  ],
+  when: {
+    sideMargins: (p) => p.width !== "full",
+    spaceTopPhone: (p) => !!p.phoneSpace,
+    spaceBottomPhone: (p) => !!p.phoneSpace,
+  },
+};
+
 export const PANEL_LAYOUTS: Layouts = {
   Hero: {
     groups: [
-      { tab: "content", title: "Image", fields: ["imageUrl", "focalX", "focalY"], summary: (p) => onOff(!!p.imageUrl, "Image set", "No image") },
+      { tab: "content", title: "Image", fields: ["imageUrl", "imageAlt"], summary: (p) => onOff(!!p.imageUrl, "Image set", "No image") },
+      {
+        tab: "content",
+        title: "Focal point",
+        fields: ["focalX", "focalY", "phoneFocal", "phoneFocalX", "phoneFocalY"],
+        summary: (p) => list(`${p.focalX ?? 50}% / ${p.focalY ?? 50}%`, p.phoneFocal && "own on phones"),
+      },
       { tab: "content", title: "Text", fields: ["title", "subtitle"], summary: (p) => p.title || "No title" },
       { tab: "style", title: "Title", fields: ["titleStyle"], summary: (p) => textStyleSummary(p.titleStyle, "display") },
       { tab: "style", title: "Subtitle", fields: ["subtitleStyle"], summary: (p) => textStyleSummary(p.subtitleStyle, "lead") },
-      { tab: "style", title: "Overlay", fields: ["overlay"], summary: (p) => onOff(p.overlay, "Dark overlay", "None") },
-      { tab: "layout", title: "Size", fields: ["height"], summary: (p) => p.height },
+      {
+        tab: "style",
+        title: "Overlay",
+        fields: ["overlayOpacity", "overlayStyle"],
+        summary: (p) => (p.overlayOpacity > 0 ? list(`${p.overlayOpacity}%`, p.overlayStyle === "text" ? "behind the text" : "even") : "None"),
+      },
+      {
+        tab: "layout",
+        title: "Text position",
+        fields: ["textPosition", "phoneTextPosition", "textWidth"],
+        summary: (p) => list(positionLabel(p.textPosition), p.phoneTextPosition && `${positionLabel(p.phoneTextPosition)} on phones`, p.textWidth < 100 && `${p.textWidth}% wide`),
+      },
+      {
+        tab: "layout",
+        title: "Size",
+        fields: ["height", "phoneHeight"],
+        summary: (p) => list(heroHeightLabel(p.height), p.phoneHeight && `${heroHeightLabel(p.phoneHeight)} on phones`),
+      },
     ],
     when: {
+      imageAlt: (p) => !!p.imageUrl,
       focalX: (p) => !!p.imageUrl,
       focalY: (p) => !!p.imageUrl,
-      overlay: (p) => !!p.imageUrl,
+      phoneFocal: (p) => !!p.imageUrl,
+      phoneFocalX: (p) => !!p.imageUrl && p.phoneFocal,
+      phoneFocalY: (p) => !!p.imageUrl && p.phoneFocal,
+      overlayOpacity: (p) => !!p.imageUrl,
+      overlayStyle: (p) => !!p.imageUrl && p.overlayOpacity > 0,
     },
   },
 

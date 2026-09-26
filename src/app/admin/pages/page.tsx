@@ -402,7 +402,7 @@ export default function PagesPage() {
               <span>
                 Full bleed
                 <span className="block text-[12px] text-admin-ink-soft">
-                  Drops the centered max-width wrapper — for big blocks like Field Map.
+                  Drops the centered max-width wrapper — for big blocks like Field Map. The same as Width → Full width in the editor&apos;s Page settings.
                 </span>
               </span>
             </label>
