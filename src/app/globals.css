@@ -23,6 +23,16 @@
   --color-admin-warn: #b88c2a;
 }
 
+/* Headings wrap into lines of even length at every screen width, rather
+   than leaving a single word on the last line. */
+@layer base {
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+}
+
 /* Prevent 100vw from causing horizontal scroll due to scrollbar width */
 body {
   overflow-x: clip;
