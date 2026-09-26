@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { shareImagesOr } from "@/lib/site-icon";
 import { galleries, siteSettings } from "@/lib/db/schema";
 import { selectPhotosForGallery } from "@/lib/db/photo-queries";
 import { and, eq } from "drizzle-orm";
@@ -28,7 +29,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title: `${gallery.title} · ${siteConfig.siteName}`,
       description: gallery.description ?? undefined,
-      images: gallery.coverImageUrl ? [gallery.coverImageUrl] : undefined,
+      images: await shareImagesOr(gallery.coverImageUrl),
     },
   };
 }

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Puck } from "@puckeditor/core";
 import type { Data } from "@puckeditor/core";
-import { puckConfig } from "@/lib/puck/config";
+import { useEditorConfig } from "@/lib/puck/use-block-defaults";
 import PuckThemeStyles from "@/components/admin/PuckThemeStyles";
 import { puckOverrides } from "@/components/puck/overrides";
 import { useEditorSave } from "@/components/puck/useEditorSave";
@@ -54,14 +54,16 @@ export default function StoriesIndexEditorPage() {
     [],
   );
   const editor = useEditorSave(save);
+  // New blocks start with the site’s block defaults (Settings → Block defaults).
+  const config = useEditorConfig();
   const { begin } = editor;
 
   // What was loaded is the starting point for "unpublished changes".
   useEffect(() => {
-    if (initialData) begin(initialData);
-  }, [initialData, begin]);
+    if (initialData && config) begin(initialData);
+  }, [initialData, config, begin]);
 
-  if (!initialData) {
+  if (!initialData || !config) {
     return (
       <div className="flex h-64 items-center justify-center text-neutral-500">
         Loading editor...
@@ -73,7 +75,7 @@ export default function StoriesIndexEditorPage() {
     <div className="-m-8">
       <PuckThemeStyles />
       <Puck
-        config={puckConfig}
+        config={config}
         data={initialData}
         onPublish={editor.onPublish}
         onChange={editor.onChange}

@@ -3,7 +3,7 @@ import { getAdminSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { pages } from "@/lib/db/schema";
 import { eq, asc, ne, and } from "drizzle-orm";
-import { generateSlug } from "@/lib/utils";
+import { checkPageSlug, uniquePageSlug } from "@/lib/page-slugs";
 
 export async function GET() {
   try {
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
       if (!source) return NextResponse.json({ error: "Source page not found" }, { status: 404 });
 
       const title = `Copy of ${source.title}`;
-      const slug = generateSlug(title);
+      const slug = await uniquePageSlug(`${source.slug}-copy`);
       const { id, createdAt, updatedAt, ...rest } = source;
       const [item] = await db.insert(pages).values({
         ...rest,
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
       return NextResponse.json(item);
     }
 
-    const slug = generateSlug(body.title);
+    const slug = await uniquePageSlug(body.title);
     const [item] = await db.insert(pages).values({ ...body, slug }).returning();
     return NextResponse.json(item);
   } catch {
@@ -69,7 +69,14 @@ export async function PUT(req: Request) {
     // Single update
     if (!body.id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
     const { id, ...data } = body;
-    if (data.title) data.slug = generateSlug(data.title);
+    // The address only changes when it's edited, never with the title, so links keep working.
+    if (typeof data.slug === "string") {
+      const checked = await checkPageSlug(data.slug, id);
+      if (checked.error) return NextResponse.json({ error: checked.error }, { status: 409 });
+      data.slug = checked.slug;
+    } else {
+      delete data.slug;
+    }
     data.updatedAt = new Date();
 
     const [updated] = await db.update(pages).set(data).where(eq(pages.id, id)).returning();

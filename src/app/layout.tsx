@@ -11,8 +11,7 @@ import {
   Courier_Prime,
 } from "next/font/google";
 import "./globals.css";
-import { db } from "@/lib/db";
-import { siteSettings } from "@/lib/db/schema";
+import { loadSiteIconSettings } from "@/lib/site-icon";
 import siteConfig from "@/lib/site.config";
 
 const ebGaramond = EB_Garamond({
@@ -72,17 +71,24 @@ const courierPrime = Courier_Prime({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
-  let title = siteConfig.siteName;
-  let description = siteConfig.siteDescription;
+  const site = await loadSiteIconSettings();
+  const v = `?v=${site.version}`;
 
-  try {
-    const [settings] = await db.select().from(siteSettings).limit(1);
-    if (settings?.siteTitle) title = settings.siteTitle;
-  } catch {
-    // DB not available — use config defaults
-  }
-
-  return { title, description };
+  return {
+    title: site.siteTitle,
+    description: siteConfig.siteDescription,
+    icons: {
+      icon: [
+        { url: `/favicon.ico${v}`, sizes: "48x48" },
+        { url: `/site-icon/icon-32.png${v}`, sizes: "32x32", type: "image/png" },
+        { url: `/site-icon/icon-192.png${v}`, sizes: "192x192", type: "image/png" },
+        // Swaps to the dark icon with the browser's colour scheme
+        ...(site.faviconDarkUrl ? [{ url: `/site-icon/icon.svg${v}`, type: "image/svg+xml" }] : []),
+      ],
+      apple: [{ url: `/site-icon/apple-icon.png${v}`, sizes: "180x180", type: "image/png" }],
+    },
+    openGraph: site.shareImageUrl ? { images: [site.shareImageUrl] } : undefined,
+  };
 }
 
 export default function RootLayout({

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Puck } from "@puckeditor/core";
 import type { Data } from "@puckeditor/core";
-import { puckConfig } from "@/lib/puck/config";
+import { useEditorConfig } from "@/lib/puck/use-block-defaults";
 import PuckThemeStyles from "@/components/admin/PuckThemeStyles";
 import { puckOverrides } from "@/components/puck/overrides";
 import { useEditorSave } from "@/components/puck/useEditorSave";
@@ -58,14 +58,16 @@ export default function PuckEditorPage() {
     [pageId],
   );
   const editor = useEditorSave(save);
+  // New blocks start with the site’s block defaults (Settings → Block defaults).
+  const config = useEditorConfig();
   const { begin } = editor;
 
   // What was loaded is the starting point for "unpublished changes".
   useEffect(() => {
-    if (page) begin(page.content && "root" in page.content ? (page.content as Data) : EMPTY_DATA);
-  }, [page, begin]);
+    if (page && config) begin(page.content && "root" in page.content ? (page.content as Data) : EMPTY_DATA);
+  }, [page, config, begin]);
 
-  if (loading) {
+  if (!config || loading) {
     return (
       <div className="flex h-64 items-center justify-center text-neutral-500">
         Loading editor...
@@ -97,7 +99,7 @@ export default function PuckEditorPage() {
     <div className="-m-8">
       <PuckThemeStyles />
       <Puck
-        config={puckConfig}
+        config={config}
         data={initialData}
         onPublish={editor.onPublish}
         onChange={editor.onChange}

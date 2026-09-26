@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import ImagePicker from "@/components/admin/ImagePicker";
+import AssetUpload from "@/components/admin/AssetUpload";
 import { useMessage } from "@/lib/hooks/useMessage";
 import { Button, Field, Input, Textarea } from "@/components/admin/ui";
 import { SettingGroup } from "@/components/admin/settings/SettingGroup";
+import { SegmentedControl } from "@/components/admin/controls";
 import siteConfig from "@/lib/site.config";
 
 interface IdentityDraft {
@@ -16,6 +18,10 @@ interface IdentityDraft {
   contactEmail: string;
   instagramUrl: string;
   location: string;
+  faviconUrl: string;
+  faviconDarkUrl: string;
+  faviconShape: "square" | "round";
+  shareImageUrl: string;
 }
 
 const DEFAULT_DRAFT: IdentityDraft = {
@@ -27,12 +33,17 @@ const DEFAULT_DRAFT: IdentityDraft = {
   contactEmail: "",
   instagramUrl: "",
   location: "",
+  faviconUrl: "",
+  faviconDarkUrl: "",
+  faviconShape: "square",
+  shareImageUrl: "",
 };
 
 export default function IdentitySettingsPage() {
   const [loaded, setLoaded] = useState(false);
   const [draft, setDraft] = useState<IdentityDraft>(DEFAULT_DRAFT);
   const [saving, setSaving] = useState(false);
+  const [iconWarning, setIconWarning] = useState<string | null>(null);
   const { message, showSuccess, showError, clear, alertClass } = useMessage();
 
   const [pwSaving, setPwSaving] = useState(false);
@@ -58,6 +69,10 @@ export default function IdentitySettingsPage() {
             contactEmail: data.contactEmail ?? "",
             instagramUrl: data.instagramUrl ?? "",
             location: data.location ?? "",
+            faviconUrl: data.faviconUrl ?? "",
+            faviconDarkUrl: data.faviconDarkUrl ?? "",
+            faviconShape: data.faviconShape === "round" ? "round" : "square",
+            shareImageUrl: data.shareImageUrl ?? "",
           });
         }
         setLoaded(true);
@@ -81,6 +96,10 @@ export default function IdentitySettingsPage() {
         logoUrl: draft.logoUrl || null,
         contactEmail: draft.contactEmail || null,
         instagramUrl: draft.instagramUrl || null,
+        faviconUrl: draft.faviconUrl || null,
+        faviconDarkUrl: draft.faviconDarkUrl || null,
+        faviconShape: draft.faviconShape,
+        shareImageUrl: draft.shareImageUrl || null,
       }),
     });
     if (res.ok) showSuccess("Identity saved.");
@@ -174,6 +193,81 @@ export default function IdentitySettingsPage() {
         </SettingGroup>
 
         <SettingGroup
+          title="Browser icon & sharing"
+          desc="The icon in browser tabs and on phone home screens, and the picture shown when a link to the site is shared."
+        >
+          <Field
+            label="Site icon"
+            inline
+            hint={
+              iconWarning ??
+              "A square PNG or SVG, 512 × 512 px or larger. Until you add one, the site uses its first letter."
+            }
+          >
+            <AssetUpload
+              value={draft.faviconUrl}
+              onChange={(v) => {
+                update("faviconUrl", v);
+                if (!v) setIconWarning(null);
+              }}
+              accept="image/png,image/svg+xml,image/webp,image/jpeg"
+              onDimensions={(w, h) =>
+                setIconWarning(
+                  w && h && w !== h
+                    ? `This image is ${w} × ${h} px. It will be fitted into a square with see-through edges; a square image looks better.`
+                    : w && w < 180
+                      ? `This image is only ${w} px wide, so it will look soft on phone home screens. 512 px or larger works best.`
+                      : null,
+                )
+              }
+              preview={(url) => <IconPreview url={url} title={draft.siteTitle} round={draft.faviconShape === "round"} />}
+            />
+            {!draft.faviconUrl && (
+              <div className="mt-2">
+                <IconPreview letter={avatarLetter} title={draft.siteTitle} round={draft.faviconShape === "round"} />
+              </div>
+            )}
+          </Field>
+          <Field
+            label="Dark-mode icon"
+            inline
+            hint="(optional) Used in browser tabs when the browser has a dark theme, e.g. a light version of a dark logo. Safari always shows the main icon."
+          >
+            <AssetUpload
+              value={draft.faviconDarkUrl}
+              onChange={(v) => update("faviconDarkUrl", v)}
+              accept="image/png,image/svg+xml,image/webp,image/jpeg"
+              preview={(url) => <IconPreview url={url} title={draft.siteTitle} round={draft.faviconShape === "round"} dark />}
+            />
+          </Field>
+          <Field
+            label="Icon shape"
+            inline
+            hint={
+              draft.faviconShape === "round"
+                ? "The icon fills a circle; its edges are cropped. Suits a photo."
+                : "The whole image, fitted into a square. Suits a logo."
+            }
+          >
+            <SegmentedControl
+              options={[
+                { label: "Square", value: "square" },
+                { label: "Round", value: "round" },
+              ]}
+              value={draft.faviconShape}
+              onChange={(v) => update("faviconShape", v as IdentityDraft["faviconShape"])}
+            />
+          </Field>
+          <Field
+            label="Share image"
+            inline
+            hint="(optional) Shown in link previews (messages, social posts) for pages without their own image. Landscape, about 1200 × 630 px, works best."
+          >
+            <ImagePicker value={draft.shareImageUrl} onChange={(v) => update("shareImageUrl", v)} />
+          </Field>
+        </SettingGroup>
+
+        <SettingGroup
           title="Contact"
           desc="Optional. Each one set here is added to the links in the footer bar."
         >
@@ -229,6 +323,53 @@ export default function IdentitySettingsPage() {
           </Button>
         </div>
       </form>
+    </div>
+  );
+}
+
+/** The icon as it looks in a browser tab and as a phone home-screen tile. */
+function IconPreview({
+  url,
+  letter,
+  title,
+  dark = false,
+  round = false,
+}: {
+  url?: string;
+  letter?: string;
+  title: string;
+  dark?: boolean;
+  round?: boolean;
+}) {
+  const mark = (px: number) =>
+    url ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={url} alt="" style={{ width: px, height: px }} className={`shrink-0 ${round ? "rounded-full object-cover" : "object-contain"}`} />
+    ) : (
+      <span
+        style={{ width: px, height: px, fontSize: px * 0.7 }}
+        className={`shrink-0 flex items-center justify-center bg-[#171717] text-white leading-none ${round ? "rounded-full" : ""}`}
+      >
+        {letter}
+      </span>
+    );
+  return (
+    <div className="flex items-end gap-3 shrink-0">
+      <div
+        className={`flex items-center gap-2 rounded-t-lg px-3 py-1.5 text-[12px] w-[150px] ${
+          dark
+            ? "bg-[#35363a] text-neutral-100"
+            : "bg-admin-surface-2 text-admin-ink border border-b-0 border-admin-border"
+        }`}
+      >
+        {mark(16)}
+        <span className="truncate">{title || "Site name"}</span>
+      </div>
+      {!dark && (
+        <div className="rounded-[10px] overflow-hidden bg-white shadow-sm border border-admin-border">
+          {mark(44)}
+        </div>
+      )}
     </div>
   );
 }
