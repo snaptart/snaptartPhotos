@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect, type CSSProperties } from "react";
-import { getImageProps } from "next/image";
+import { optimizedSource, type ImageSource } from "@/lib/optimized-image";
 import { parseLinks } from "@/lib/parseLinks";
 
 export interface LightboxPhoto {
@@ -56,17 +56,11 @@ const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
 
 /** Roughly the width the photograph gets: the screen, less the arrow gutters above the phone breakpoint. */
 const LIGHTBOX_SIZES = "(min-width: 640px) calc(100vw - 248px), 100vw";
-const OPTIMIZABLE = /^https:\/\/[^/]+\.public\.blob\.vercel-storage\.com\//;
 
-/**
- * The photograph through the image optimizer, sized to the screen: a phone gets a
- * few hundred KB of WebP instead of the multi-MB original. Hosts the optimizer
- * isn't configured for (next.config.ts) get the original.
- */
-function lightboxSource(p: LightboxPhoto): { src: string; srcSet?: string; sizes?: string } {
-  if (!OPTIMIZABLE.test(p.url) || !(p.width > 0 && p.height > 0)) return { src: p.url };
-  const { props } = getImageProps({ src: p.url, alt: "", width: p.width, height: p.height, sizes: LIGHTBOX_SIZES });
-  return { src: props.src, srcSet: props.srcSet, sizes: props.sizes };
+/** The photograph sized to the screen; without its dimensions, the original. */
+function lightboxSource(p: LightboxPhoto): ImageSource {
+  if (!(p.width > 0 && p.height > 0)) return { src: p.url };
+  return optimizedSource(p.url, LIGHTBOX_SIZES, p);
 }
 
 /** How far a double tap enlarges the photograph, and the most a pinch may. */

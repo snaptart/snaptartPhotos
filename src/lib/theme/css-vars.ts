@@ -167,6 +167,12 @@ ${perRoleVars}  --theme-body-font-size: ${theme.bodyFontSize}px;
   --theme-footer-rule: ${theme.footerRule ? `1px solid ${theme.colorFooterRule || "var(--theme-color-rule)"}` : "0 solid transparent"};
   --theme-footer-link: ${theme.colorFooterLink || "var(--theme-color-footer-text)"};
   --theme-footer-highlight: ${theme.colorFooterHighlight || "var(--theme-color-accent)"};
+  /* The page column and the space around page content (lib/theme/layout.ts, components/public/PageFrame.tsx) */
+  --theme-page-max: ${theme.pageMaxWidth}px;
+  --theme-page-margin: ${theme.pageMargin}px;
+  --theme-page-margin-phone: ${theme.pageMarginPhone}px;
+  --theme-page-space-top: ${theme.pageSpaceTop}px;
+  --theme-page-space-bottom: ${theme.pageSpaceBottom}px;
   --theme-color-site-bg: ${theme.colorSiteBg};
   --theme-color-header-bg: ${theme.colorHeaderBg};
   --theme-color-footer-bg: ${theme.colorFooterBg};

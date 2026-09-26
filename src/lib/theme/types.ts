@@ -184,7 +184,34 @@ export const CHROME_DEFAULTS: ChromeSettings = {
   footerLinkHover: "fade",
 };
 
-export interface ThemeSettings extends ChromeSettings {
+/**
+ * The page column and the space around a page's content (Look → Pages). The
+ * header and footer's "Page column" follow the same width and margins; each
+ * page can change its own spacing in the editor (Page settings).
+ */
+export interface PageFrameSettings {
+  /** px, the widest the page column gets, margins included. */
+  pageMaxWidth: number;
+  /** px each side, from 768px wide. */
+  pageMargin: number;
+  /** px each side, below 768px. */
+  pageMarginPhone: number;
+  /** px between the header and a page's content. */
+  pageSpaceTop: number;
+  /** px between a page's content and the footer. */
+  pageSpaceBottom: number;
+}
+
+/** Today's page column (layout.ts) and py-16, so a preset saved before these settings looks the same. */
+export const PAGE_FRAME_DEFAULTS: PageFrameSettings = {
+  pageMaxWidth: 1440,
+  pageMargin: 96,
+  pageMarginPhone: 24,
+  pageSpaceTop: 64,
+  pageSpaceBottom: 64,
+};
+
+export interface ThemeSettings extends ChromeSettings, PageFrameSettings {
   fontHeadings: string;
   fontBody: string;
   fontNavMenu: string;
@@ -321,6 +348,7 @@ export function colorTokenVar(key: ColorTokenKey): string {
 
 export const THEME_DEFAULTS: ThemeSettings = {
   ...CHROME_DEFAULTS,
+  ...PAGE_FRAME_DEFAULTS,
   fontHeadings: "EB Garamond",
   fontBody: "EB Garamond",
   fontNavMenu: "EB Garamond",

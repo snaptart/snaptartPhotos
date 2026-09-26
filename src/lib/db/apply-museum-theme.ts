@@ -18,7 +18,7 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { eq } from "drizzle-orm";
 import { siteSettings, themes } from "./schema";
-import { CHROME_DEFAULTS, type ThemeSettings } from "../theme/types";
+import { CHROME_DEFAULTS, PAGE_FRAME_DEFAULTS, type ThemeSettings } from "../theme/types";
 
 const PRESET_NAME = "Museum White";
 
@@ -31,6 +31,7 @@ const PRESET_NAME = "Museum White";
  */
 const MUSEUM_WHITE: ThemeSettings = {
   ...CHROME_DEFAULTS,
+  ...PAGE_FRAME_DEFAULTS,
   // ── Type ──────────────────────────────────────────────────────────────
   fontHeadings: "Fraunces",
   fontBody: "Instrument Sans",

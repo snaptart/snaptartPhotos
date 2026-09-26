@@ -157,7 +157,12 @@ export default function ThemePreview({ theme, siteTitle, logoUrl, footerText, hi
         )}
 
         {/* A page intro and a collection index, in the text styles */}
-        <main style={{ padding: "64px 64px 72px" }}>
+        <main
+          style={{
+            padding:
+              "var(--theme-page-space-top) var(--theme-page-margin) var(--theme-page-space-bottom)",
+          }}
+        >
           <div className="theme-text-label" data-text-style="label">Collections</div>
           <h1 className="theme-text-display" data-text-style="display" style={{ margin: "18px 0 0", maxWidth: 640 }}>
             Photographs, grouped by place.
