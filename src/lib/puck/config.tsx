@@ -329,9 +329,14 @@ type CarouselProps = {
   slideLinkOverrides: Record<string, string>;
 };
 
+/** Where a hand-picked collection goes instead of its own page. */
+type GalleryLink = { url: string; newTab?: boolean };
+
 type GalleriesIndexProps = {
   sourceMode: "all" | "manual";
   selectedSlugs: string[];
+  /** Hand-Picked only, by slug; a collection left out links as usual (collectionHref). */
+  linkOverrides?: Record<string, GalleryLink>;
   maxItems: number;
   sortOrder: "manual" | "position" | "newest" | "oldest" | "title-asc" | "title-desc";
   layout: "grid" | "list";
@@ -602,7 +607,7 @@ export const puckConfig: Config<Components, PageRootProps> = {
     // editor's preview gets the same one here.
     render: ({ children, puck, ...props }) =>
       puck?.isEditing ? (
-        <EditorPageFrame layout={props} page={(puck.metadata as { page?: EditorPageInfo }).page}>
+        <EditorPageFrame layout={props} page={(puck.metadata as { page?: EditorPageInfo } | undefined)?.page}>
           {children}
         </EditorPageFrame>
       ) : (
@@ -1109,6 +1114,11 @@ export const puckConfig: Config<Components, PageRootProps> = {
             <GalleriesMultiSelect value={value} onChange={onChange} />
           ),
         },
+        linkOverrides: {
+          type: "custom",
+          label: "Goes to",
+          render: ({ value, onChange }) => <GalleryLinksEditor value={value} onChange={onChange} />,
+        },
         sortOrder: {
           type: "select",
           label: "Sort order",
@@ -1335,6 +1345,7 @@ export const puckConfig: Config<Components, PageRootProps> = {
       defaultProps: {
         sourceMode: "all",
         selectedSlugs: [],
+        linkOverrides: {},
         maxItems: 0,
         sortOrder: "position",
         layout: "grid",
@@ -4138,7 +4149,7 @@ const PICKER_INPUT =
 
 type LinkOption = { label: string; value: string };
 
-function LinkPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function LinkPicker({ value, onChange, noneLabel = "— None —" }: { value: string; onChange: (v: string) => void; noneLabel?: string }) {
   const [options, setOptions] = useState<LinkOption[]>([]);
   const [mode, setMode] = useState<"internal" | "external">(
     value && !value.startsWith("/") && value !== "" ? "external" : "internal"
@@ -4146,7 +4157,7 @@ function LinkPicker({ value, onChange }: { value: string; onChange: (v: string) 
 
   useEffect(() => {
     async function load() {
-      const items: LinkOption[] = [{ label: "— None —", value: "" }];
+      const items: LinkOption[] = [{ label: noneLabel, value: "" }];
       try {
         const [pagesRes, galleriesRes] = await Promise.all([
           fetch("/api/pages"),
@@ -4587,6 +4598,89 @@ function GalleriesMultiSelect({ value, onChange }: { value: string[]; onChange: 
   );
 }
 
+/**
+ * Galleries Index → Goes to: each hand-picked collection can link somewhere of
+ * its own (a page, another collection, a web address) instead of its own page.
+ */
+function GalleryLinksEditor({
+  value,
+  onChange,
+}: {
+  value: Record<string, GalleryLink> | undefined;
+  onChange: (v: Record<string, GalleryLink>) => void;
+}) {
+  const puck = usePuck();
+  const slugs = ((puck.selectedItem?.props as Partial<GalleriesIndexProps> | undefined)?.selectedSlugs ?? []) as string[];
+  const [galleries, setGalleries] = useState<GalleryRow[]>([]);
+  const [open, setOpen] = useState<string | null>(null);
+  const links = value ?? {};
+
+  useEffect(() => {
+    fetch("/api/galleries")
+      .then((r) => r.json())
+      .then((data: GalleryRow[]) => setGalleries(data))
+      .catch(() => setGalleries([]));
+  }, []);
+
+  if (slugs.length === 0) {
+    return <p className="text-xs text-admin-ink-faint">Pick {siteConfig.labels.gallery.toLowerCase()}s above, then choose where each one goes.</p>;
+  }
+
+  const bySlug = new Map(galleries.map((g) => [g.slug, g]));
+  const set = (slug: string, link: GalleryLink | null) => {
+    const next = { ...links };
+    if (link?.url.trim()) next[slug] = link;
+    else delete next[slug];
+    onChange(next);
+  };
+
+  return (
+    <div className="divide-y divide-admin-border rounded-md border border-admin-border-strong">
+      {slugs.map((slug) => {
+        const g = bySlug.get(slug);
+        const link = links[slug];
+        const automatic = g ? collectionHref(g) : `/${siteConfig.labels.gallerySlug}/${slug}`;
+        const isOpen = open === slug;
+        return (
+          <div key={slug} className="px-2.5 py-2">
+            <button
+              type="button"
+              onClick={() => setOpen(isOpen ? null : slug)}
+              aria-expanded={isOpen}
+              className="flex w-full items-baseline gap-2 text-left"
+            >
+              <span className="min-w-0 flex-1 truncate text-[13px] text-admin-ink">{g?.title ?? slug}</span>
+              <span className={`min-w-0 max-w-[55%] shrink-0 truncate text-[12px] ${link ? "text-admin-accent" : "text-admin-ink-faint"}`}>
+                {link ? `${link.url}${link.newTab ? " ↗" : ""}` : `Automatic (${automatic})`}
+              </span>
+            </button>
+            {isOpen && (
+              <div className="mt-2 space-y-2">
+                <LinkPicker
+                  value={link?.url ?? ""}
+                  onChange={(url) => set(slug, { url, newTab: link?.newTab })}
+                  noneLabel={`— Automatic (${automatic}) —`}
+                />
+                {link && (
+                  <label className="flex items-center gap-2 text-[12px] text-admin-ink-soft">
+                    <input
+                      type="checkbox"
+                      checked={!!link.newTab}
+                      onChange={(e) => set(slug, { ...link, newTab: e.target.checked })}
+                      className="accent-admin-accent"
+                    />
+                    Open in a new tab
+                  </label>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ----- Galleries index render -----
 
 const GALLERY_AR_MAP = GALLERY_ASPECT_CSS;
@@ -4676,6 +4770,15 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
 
   const limited = maxItems > 0 ? sorted.slice(0, maxItems) : sorted;
 
+  // Hand-picked collections can go somewhere of their own (Goes to).
+  const linkProps = (g: GalleryRow) => {
+    const own = sourceMode === "manual" ? props.linkOverrides?.[g.slug] : undefined;
+    if (!own?.url) return { href: collectionHref(g) };
+    return own.newTab
+      ? { href: own.url, target: "_blank", rel: "noopener noreferrer" }
+      : { href: own.url };
+  };
+
   const colCount = parseInt(columns, 10) || 3;
   const descriptionCss = textStyleCss(descriptionStyle, "body");
   const arValue = GALLERY_AR_MAP[aspectRatio];
@@ -4705,11 +4808,10 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
       <div style={wrapperStyle}>
         {limited.map((g, i) => {
           const hovered = hoveredId === g.id;
-          const href = collectionHref(g);
           return (
             <a
               key={g.id}
-              href={href}
+              {...linkProps(g)}
               onMouseEnter={() => setHoveredId(g.id)}
               onMouseLeave={() => setHoveredId(null)}
               style={{
@@ -4767,7 +4869,6 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
       <div className={grid.className} style={{ ...grid.style, gap: `${gap}px` }}>
         {limited.map((g) => {
           const hovered = hoveredId === g.id;
-          const href = collectionHref(g);
           const cover = g.coverImageUrl || g.firstPhotoUrl;
           const count =
             showCount && typeof g.photoCount === "number"
@@ -4840,7 +4941,7 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
           return (
             <a
               key={g.id}
-              href={href}
+              {...linkProps(g)}
               style={{ display: "block", textDecoration: "none", color: "inherit" }}
               onMouseEnter={() => setHoveredId(g.id)}
               onMouseLeave={() => setHoveredId(null)}
