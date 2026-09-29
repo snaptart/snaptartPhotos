@@ -229,6 +229,15 @@ export const PANEL_LAYOUTS: Layouts = {
       },
       {
         tab: "content",
+        title: "Links",
+        fields: ["linkOverrides"],
+        summary: (p) => {
+          const n = Object.keys(p.linkOverrides ?? {}).filter((s) => p.selectedSlugs?.includes(s)).length;
+          return n ? `${n} with their own link` : "Automatic";
+        },
+      },
+      {
+        tab: "content",
         title: "Show",
         fields: ["showTitle", "showDescription", "showCount", "countLabel"],
         summary: (p) =>
@@ -281,6 +290,7 @@ export const PANEL_LAYOUTS: Layouts = {
     ],
     when: {
       selectedSlugs: (p) => p.sourceMode === "manual",
+      linkOverrides: (p) => p.sourceMode === "manual",
       showTitle: (p) => p.layout !== "list",
       // The list shows a bare number; covers can add a word after it.
       countLabel: (p) => p.showCount && p.layout !== "list",
