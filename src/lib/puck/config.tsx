@@ -259,6 +259,8 @@ type HeroSlideshowProps = {
   gallerySlug: string;
   maxPhotos: number;
   height: string;
+  /** Phones (under 640px): a height ("70dvh", "400px") or a shape ("4:5"); "" = as on desktop. */
+  phoneHeight: string;
   aspectRatio: "none" | "16:9" | "3:2" | "4:3" | "1:1";
   autoPlay: boolean;
   interval: number;
@@ -2376,6 +2378,22 @@ export const puckConfig: Config<Components, PageRootProps> = {
             { label: "300px", value: "300px" },
           ],
         },
+        phoneHeight: {
+          type: "select",
+          label: "On phones",
+          options: [
+            { label: "Same as desktop", value: "" },
+            { label: "Full Screen (100dvh)", value: "100dvh" },
+            { label: "80%", value: "80dvh" },
+            { label: "70%", value: "70dvh" },
+            { label: "60%", value: "60dvh" },
+            { label: "Shape 4:5 (tall)", value: "4:5" },
+            { label: "Shape 1:1 (square)", value: "1:1" },
+            { label: "Shape 3:2 (the whole photo)", value: "3:2" },
+            { label: "500px", value: "500px" },
+            { label: "400px", value: "400px" },
+          ],
+        },
         aspectRatio: {
           type: "select",
           label: "Aspect ratio",
@@ -2473,6 +2491,7 @@ export const puckConfig: Config<Components, PageRootProps> = {
         gallerySlug: "",
         maxPhotos: 5,
         height: "100dvh",
+        phoneHeight: "",
         aspectRatio: "none",
         autoPlay: true,
         interval: 5,
@@ -2485,7 +2504,7 @@ export const puckConfig: Config<Components, PageRootProps> = {
         objectFit: "cover",
         overlayOpacity: 0,
       },
-      render: ({ gallerySlug, maxPhotos, height, aspectRatio, autoPlay, interval, pauseOnHover, transitionDuration, showArrows, showDots, fullBleed, maxWidth, objectFit, overlayOpacity, puck }) => {
+      render: ({ gallerySlug, maxPhotos, height, phoneHeight, aspectRatio, autoPlay, interval, pauseOnHover, transitionDuration, showArrows, showDots, fullBleed, maxWidth, objectFit, overlayOpacity, puck }) => {
         if (!gallerySlug) {
           return (
             <div className="rounded border-2 border-dashed border-neutral-300 p-8 text-center text-neutral-400">
@@ -2500,6 +2519,7 @@ export const puckConfig: Config<Components, PageRootProps> = {
             maxPhotos={maxPhotos}
             serverPhotos={serverPhotos?.[gallerySlug]}
             height={height}
+            phoneHeight={phoneHeight ?? ""}
             aspectRatio={aspectRatio}
             autoPlay={autoPlay}
             interval={interval}
@@ -5384,11 +5404,70 @@ function heroPlacement(position: Position | undefined, style: HeroProps["overlay
 
 // ----- Hero slideshow client -----
 
+/** The slideshow's box on one kind of screen, as CSS, plus what its image sizes are worked out from. */
+type SlideBox = {
+  height: string;
+  aspect: string;
+  minHeight: string;
+  widthVw: number;
+  /** A fixed shape (width / height), or null when the height sets the size. */
+  ratio: number | null;
+  /** The height as a number: px, or % of the screen's height (any vh unit). */
+  len: { n: number; unit: "px" | "vh" } | null;
+};
+
+/**
+ * `height` is a length ("100dvh", "500px") or, for phones, a shape ("4:5");
+ * `shape` sets a fixed aspect ratio, with `height` then the least it may be.
+ */
+function slideshowBox(height: string, shape: string, widthVw: number): SlideBox {
+  // Legacy vh values become dvh, the height a phone shows with its browser bars.
+  const css = height.replace(/(\d+)vh$/, "$1dvh");
+  const m = /^(\d+(?:\.\d+)?)(px|dvh|svh|vh)$/.exec(css);
+  const len = m ? { n: Number(m[1]), unit: m[2] === "px" ? ("px" as const) : ("vh" as const) } : null;
+  const s = /^(\d+):(\d+)$/.exec(shape);
+  if (s) {
+    return { height: "auto", aspect: `${s[1]}/${s[2]}`, minHeight: len ? css : "0px", widthVw, ratio: Number(s[1]) / Number(s[2]), len };
+  }
+  return { height: css, aspect: "auto", minHeight: "0px", widthVw, ratio: null, len };
+}
+
+/** The width a photo of aspect `a` shows at when it covers the box, as `sizes` entries (last one unconditional). */
+function coverSizes(a: number, box: SlideBox): { when?: string; size: string }[] {
+  const w = box.widthVw;
+  const r = (n: number) => Math.round(n * 10) / 10;
+  if (box.ratio) return [{ size: `${r(w * Math.max(1, a / box.ratio))}vw` }];
+  if (!box.len) return [{ size: `${w}vw` }];
+  if (box.len.unit === "px") {
+    // Narrower than this, the box is taller than the photo's shape and the photo overhangs its sides.
+    const need = box.len.n * a;
+    return [{ when: `(max-width: ${Math.round((need * 100) / w)}px)`, size: `${Math.round(need)}px` }, { size: `${w}vw` }];
+  }
+  const shape = (a * box.len.n) / w;
+  return [{ when: `(max-aspect-ratio: ${Math.round(shape * 1000)}/1000)`, size: `${r(a * box.len.n)}vh` }, { size: `${w}vw` }];
+}
+
+/**
+ * The `sizes` for a slide. Cover crops the photo to the box, so on a screen
+ * shaped differently from the photo (an upright phone at full height) it shows
+ * much wider than the screen; this asks for an image that wide, so it stays sharp.
+ */
+function slideSizes(photo: { width: number; height: number }, fit: "cover" | "contain", desktop: SlideBox, phone: SlideBox | null): string {
+  if (fit === "contain") return `${desktop.widthVw}vw`;
+  const a = photo.width > 0 && photo.height > 0 ? photo.width / photo.height : 1.5;
+  const phoneEntries = phone
+    ? coverSizes(a, phone).map((e) => `(max-width: 639px)${e.when ? ` and ${e.when}` : ""} ${e.size}`)
+    : [];
+  const desktopEntries = coverSizes(a, desktop).map((e) => (e.when ? `${e.when} ${e.size}` : e.size));
+  return [...phoneEntries, ...desktopEntries].join(", ");
+}
+
 interface HeroSlideshowClientProps {
   slug: string;
   maxPhotos: number;
   serverPhotos?: EmbedPhoto[];
   height: string;
+  phoneHeight: string;
   aspectRatio: "none" | "16:9" | "3:2" | "4:3" | "1:1";
   autoPlay: boolean;
   interval: number;
@@ -5407,6 +5486,7 @@ function HeroSlideshowClient({
   maxPhotos,
   serverPhotos,
   height,
+  phoneHeight,
   aspectRatio,
   autoPlay,
   interval,
@@ -5419,9 +5499,7 @@ function HeroSlideshowClient({
   objectFit,
   overlayOpacity,
 }: HeroSlideshowClientProps) {
-  // Normalize legacy vh values to dvh for correct mobile viewport sizing
-  const normalizedHeight = height.replace(/(\d+)vh$/, "$1dvh");
-
+  const isPriority = useImagePriority();
   const [fetchedPhotos, setFetchedPhotos] = useState<EmbedPhoto[]>([]);
   const [current, setCurrent] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
@@ -5454,18 +5532,25 @@ function HeroSlideshowClient({
     ? { marginLeft: "calc(-50vw + 50%)", marginRight: "calc(-50vw + 50%)", width: "100vw" }
     : { width: maxWidth, marginLeft: "auto", marginRight: "auto" };
 
-  const arMap: Record<string, string> = { "16:9": "16/9", "3:2": "3/2", "4:3": "4/3", "1:1": "1/1" };
-  const containerStyle: React.CSSProperties = {
+  const widthVw = fullBleed ? 100 : parseFloat(maxWidth) || 100;
+  const desktopBox = slideshowBox(height, aspectRatio === "none" ? "" : aspectRatio, widthVw);
+  const phoneBox = phoneHeight ? slideshowBox(phoneHeight, /^\d+:\d+$/.test(phoneHeight) ? phoneHeight : "", widthVw) : null;
+  const containerStyle = {
     ...fullBleedStyle,
-    ...(aspectRatio !== "none"
-      ? { aspectRatio: arMap[aspectRatio], minHeight: normalizedHeight }
-      : { height: normalizedHeight }),
-  };
+    "--ss-h": desktopBox.height,
+    "--ss-ar": desktopBox.aspect,
+    "--ss-min-h": desktopBox.minHeight,
+    "--ss-h-phone": (phoneBox ?? desktopBox).height,
+    "--ss-ar-phone": (phoneBox ?? desktopBox).aspect,
+    "--ss-min-h-phone": (phoneBox ?? desktopBox).minHeight,
+  } as React.CSSProperties;
+  const boxClass =
+    "[height:var(--ss-h)] [aspect-ratio:var(--ss-ar)] [min-height:var(--ss-min-h)] max-sm:[height:var(--ss-h-phone)] max-sm:[aspect-ratio:var(--ss-ar-phone)] max-sm:[min-height:var(--ss-min-h-phone)]";
 
   if (photos.length === 0) {
     return (
       <div
-        className="flex items-center justify-center bg-neutral-100 text-neutral-400"
+        className={`flex items-center justify-center bg-neutral-100 text-neutral-400 ${boxClass}`}
         style={containerStyle}
       >
         No photos found in this gallery
@@ -5475,32 +5560,38 @@ function HeroSlideshowClient({
 
   return (
     <div
-      className="relative overflow-hidden"
+      className={`relative overflow-hidden ${boxClass}`}
       style={containerStyle}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {photos.map((photo, i) => (
-        <div
-          key={photo.id}
-          className="absolute inset-0"
-          style={{
-            opacity: i === current ? 1 : 0,
-            transition: `opacity ${transitionDuration}ms ease-in-out`,
-            zIndex: i === current ? 1 : 0,
-          }}
-        >
-          <img
-            src={photo.url}
-            alt={photo.title ?? ""}
-            className="h-full w-full opacity-0 transition-opacity duration-300"
-            style={{ objectFit, objectPosition: `${photo.focalX ?? 50}% ${photo.focalY ?? 50}%` }}
-            loading={i === 0 ? "eager" : "lazy"}
-            ref={(el) => { if (el?.complete) el.classList.remove("opacity-0"); }}
-            onLoad={(e) => { (e.target as HTMLImageElement).classList.remove("opacity-0"); }}
-          />
-        </div>
-      ))}
+      {photos.map((photo, i) => {
+        const source = optimizedSource(photo.url, slideSizes(photo, objectFit, desktopBox, phoneBox), photo);
+        return (
+          <div
+            key={photo.id}
+            className="absolute inset-0"
+            style={{
+              opacity: i === current ? 1 : 0,
+              transition: `opacity ${transitionDuration}ms ease-in-out`,
+              zIndex: i === current ? 1 : 0,
+            }}
+          >
+            <img
+              src={source.src}
+              srcSet={source.srcSet}
+              sizes={source.sizes}
+              alt={photo.title ?? ""}
+              className="h-full w-full opacity-0 transition-opacity duration-300"
+              style={{ objectFit, objectPosition: `${photo.focalX ?? 50}% ${photo.focalY ?? 50}%` }}
+              loading={i === 0 ? "eager" : "lazy"}
+              fetchPriority={i === 0 && isPriority ? "high" : undefined}
+              ref={(el) => { if (el?.complete) el.classList.remove("opacity-0"); }}
+              onLoad={(e) => { (e.target as HTMLImageElement).classList.remove("opacity-0"); }}
+            />
+          </div>
+        );
+      })}
       {overlayOpacity > 0 && (
         <div
           className="absolute inset-0"

@@ -522,8 +522,13 @@ export const PANEL_LAYOUTS: Layouts = {
       {
         tab: "layout",
         title: "Size",
-        fields: ["height", "aspectRatio", "fullBleed", "maxWidth"],
-        summary: (p) => list(p.aspectRatio !== "none" ? p.aspectRatio : p.height, p.fullBleed ? "full bleed" : p.maxWidth),
+        fields: ["height", "aspectRatio", "phoneHeight", "fullBleed", "maxWidth"],
+        summary: (p) =>
+          list(
+            p.aspectRatio !== "none" ? p.aspectRatio : p.height,
+            p.phoneHeight && `${p.phoneHeight} on phones`,
+            p.fullBleed ? "full bleed" : p.maxWidth,
+          ),
       },
     ],
     when: {
