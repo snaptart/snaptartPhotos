@@ -516,7 +516,17 @@ export const PANEL_LAYOUTS: Layouts = {
 
   HeroSlideshow: {
     groups: [
-      { tab: "content", title: "Photos", fields: ["gallerySlug", "maxPhotos"], summary: (p) => list(p.gallerySlug || "None", `max ${p.maxPhotos}`) },
+      {
+        tab: "content",
+        title: "Photos",
+        fields: ["gallerySlug", "maxPhotos", "order"],
+        summary: (p) =>
+          list(
+            p.gallerySlug || "None",
+            `max ${p.maxPhotos}`,
+            p.order === "random-start" ? "random first" : p.order === "shuffle" && "shuffled",
+          ),
+      },
       {
         tab: "content",
         title: "Playback",
