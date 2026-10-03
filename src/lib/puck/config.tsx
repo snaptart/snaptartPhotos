@@ -258,6 +258,8 @@ type GalleryEmbedProps = {
 type HeroSlideshowProps = {
   gallerySlug: string;
   maxPhotos: number;
+  /** gallery: the collection's order · random-start: a random photo first, then on in order · shuffle: a new order each visit. */
+  order?: "gallery" | "random-start" | "shuffle";
   height: string;
   /** Phones (under 640px): a height ("70dvh", "400px") or a shape ("4:5"); "" = as on desktop. */
   phoneHeight: string;
@@ -2374,6 +2376,21 @@ export const puckConfig: Config<Components, PageRootProps> = {
           ),
         },
         maxPhotos: { type: "number", label: `Max ${siteConfig.labels.photos.toLowerCase()}`, min: 1, max: 20 },
+        order: {
+          type: "custom",
+          label: "Order",
+          render: ({ value, onChange }) => (
+            <SegmentedControl
+              options={[
+                { label: "As in gallery", value: "gallery" },
+                { label: "Random first", value: "random-start", title: "A different photo first on each visit, then on in the gallery's order" },
+                { label: "Shuffled", value: "shuffle", title: "A new order on each visit" },
+              ]}
+              value={value ?? "gallery"}
+              onChange={(v) => onChange(v as NonNullable<HeroSlideshowProps["order"]>)}
+            />
+          ),
+        },
         height: {
           type: "select",
           label: "Height",
@@ -2501,6 +2518,7 @@ export const puckConfig: Config<Components, PageRootProps> = {
       defaultProps: {
         gallerySlug: "",
         maxPhotos: 5,
+        order: "gallery",
         height: "100dvh",
         phoneHeight: "",
         aspectRatio: "none",
@@ -2515,7 +2533,7 @@ export const puckConfig: Config<Components, PageRootProps> = {
         objectFit: "cover",
         overlayOpacity: 0,
       },
-      render: ({ gallerySlug, maxPhotos, height, phoneHeight, aspectRatio, autoPlay, interval, pauseOnHover, transitionDuration, showArrows, showDots, fullBleed, maxWidth, objectFit, overlayOpacity, puck }) => {
+      render: ({ id, gallerySlug, maxPhotos, order, height, phoneHeight, aspectRatio, autoPlay, interval, pauseOnHover, transitionDuration, showArrows, showDots, fullBleed, maxWidth, objectFit, overlayOpacity, puck }) => {
         if (!gallerySlug) {
           return (
             <div className="rounded border-2 border-dashed border-neutral-300 p-8 text-center text-neutral-400">
@@ -2523,12 +2541,15 @@ export const puckConfig: Config<Components, PageRootProps> = {
             </div>
           );
         }
-        const serverPhotos = (puck?.metadata as Record<string, unknown>)?.galleryPhotos as Record<string, EmbedPhoto[]> | undefined;
+        const metadata = (puck?.metadata ?? {}) as { galleryPhotos?: Record<string, EmbedPhoto[]>; seed?: number };
         return (
           <HeroSlideshowClient
             slug={gallerySlug}
             maxPhotos={maxPhotos}
-            serverPhotos={serverPhotos?.[gallerySlug]}
+            serverPhotos={metadata.galleryPhotos?.[gallerySlug]}
+            order={order ?? "gallery"}
+            seed={metadata.seed}
+            blockId={id}
             height={height}
             phoneHeight={phoneHeight ?? ""}
             aspectRatio={aspectRatio}
@@ -5505,6 +5526,40 @@ function heroPlacement(position: Position | undefined, style: HeroProps["overlay
 
 // ----- Hero slideshow client -----
 
+/** A small seeded random generator (mulberry32): the same seed gives the same numbers on server and browser. */
+function seededRandom(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * The slides in the order the block asks for. Random orders come from the page
+ * view's seed (lib/puck/page-seed), mixed with the block's id so two slideshows
+ * on one page differ; with no seed (the editor) the gallery's order is kept.
+ */
+function orderSlides<T>(photos: T[], order: NonNullable<HeroSlideshowProps["order"]>, seed: number | undefined, blockId = ""): T[] {
+  if (order === "gallery" || seed == null || photos.length < 2) return photos;
+  let mixed = seed;
+  for (let i = 0; i < blockId.length; i++) mixed = Math.imul(mixed ^ blockId.charCodeAt(i), 16777619);
+  const random = seededRandom(mixed);
+  if (order === "random-start") {
+    const start = Math.floor(random() * photos.length);
+    return [...photos.slice(start), ...photos.slice(0, start)];
+  }
+  const out = [...photos];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 /** The slideshow's box on one kind of screen, as CSS, plus what its image sizes are worked out from. */
 type SlideBox = {
   height: string;
@@ -5567,6 +5622,10 @@ interface HeroSlideshowClientProps {
   slug: string;
   maxPhotos: number;
   serverPhotos?: EmbedPhoto[];
+  order: NonNullable<HeroSlideshowProps["order"]>;
+  /** The page view's random number; without one (the editor) the gallery's order is kept. */
+  seed?: number;
+  blockId?: string;
   height: string;
   phoneHeight: string;
   aspectRatio: "none" | "16:9" | "3:2" | "4:3" | "1:1";
@@ -5586,6 +5645,9 @@ function HeroSlideshowClient({
   slug,
   maxPhotos,
   serverPhotos,
+  order,
+  seed,
+  blockId,
   height,
   phoneHeight,
   aspectRatio,
@@ -5615,7 +5677,9 @@ function HeroSlideshowClient({
     return () => { cancelled = true; };
   }, [slug, maxPhotos, serverPhotos]);
 
-  const photos = serverPhotos ?? fetchedPhotos;
+  // The server may load more for another block on the page (lib/puck/gallery-photos).
+  const loaded = serverPhotos ? serverPhotos.slice(0, maxPhotos || undefined) : fetchedPhotos;
+  const photos = orderSlides(loaded, order, seed, blockId);
 
   useEffect(() => {
     if (!autoPlay || photos.length < 2) return;
@@ -6766,7 +6830,8 @@ function GalleryEmbedRenderer({ slug, max, layout, columns, tabletColumns, phone
     return () => { cancelled = true; };
   }, [slug, max, serverPhotos]);
 
-  const photos = serverPhotos ?? fetchedPhotos;
+  // The server loads as many as the hungriest block on the page wants (lib/puck/gallery-photos).
+  const photos = serverPhotos ? (max > 0 ? serverPhotos.slice(0, max) : serverPhotos) : fetchedPhotos;
 
   if (loading) {
     return <div className="text-center text-neutral-400 py-8">Loading gallery...</div>;

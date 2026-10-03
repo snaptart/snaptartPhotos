@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
-import { pages, galleries, siteSettings } from "@/lib/db/schema";
-import { selectPhotosForGallery } from "@/lib/db/photo-queries";
+import { pages, siteSettings } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
+import { loadGalleryPhotos } from "@/lib/puck/gallery-photos";
+import { pageSeed } from "@/lib/puck/page-seed";
 import { generateHTML } from "@tiptap/html";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
@@ -12,7 +13,7 @@ import PuckRenderer from "@/components/public/PuckRenderer";
 import { HeaderOverPhotoMark, opensWithPhoto } from "@/lib/header-over-photo";
 import { loadPickedPhotos } from "@/lib/puck/picked-photos";
 import type { Data } from "@puckeditor/core";
-import type { EmbedPhoto, FieldMapBlockData, GlobalLightboxSettings } from "@/lib/puck/config";
+import type { FieldMapBlockData, GlobalLightboxSettings } from "@/lib/puck/config";
 import siteConfig from "@/lib/site.config";
 import { fontRole } from "@/lib/theme/role-style";
 import { PAGE_SPACE, PROSE_CONTAINER } from "@/lib/theme/layout";
@@ -76,37 +77,7 @@ export default async function HomePage() {
       captionAlignment: (settingsRow?.lightboxCaptionAlignment ?? "left") as GlobalLightboxSettings["captionAlignment"],
     };
 
-    const galleryPhotos: Record<string, EmbedPhoto[]> = {};
-    const embedItems = (page.content.content ?? []).filter(
-      (item: { type: string }) => item.type === "GalleryEmbed" || item.type === "HeroSlideshow"
-    );
-    for (const item of embedItems) {
-      const props = item.props as { gallerySlug?: string; maxPhotos?: number };
-      if (!props.gallerySlug) continue;
-      const [gallery] = await db
-        .select()
-        .from(galleries)
-        .where(and(eq(galleries.slug, props.gallerySlug), eq(galleries.isPublished, true)));
-      if (!gallery) continue;
-      const galleryPhotoRows = await selectPhotosForGallery(gallery.id);
-      galleryPhotos[props.gallerySlug] = galleryPhotoRows
-        .slice(0, props.maxPhotos ?? 12)
-        .map((p) => ({
-          id: p.id,
-          url: p.url,
-          thumbnailUrl: p.thumbnailUrl ?? p.url,
-          filename: p.title ?? null,
-          title: p.title,
-          description: p.description,
-          location: p.location,
-          cameraSettings: p.cameraSettings as EmbedPhoto["cameraSettings"],
-          width: p.width ?? 800,
-          height: p.height ?? 600,
-          focalX: p.focalX ?? 50,
-          focalY: p.focalY ?? 50,
-        }));
-    }
-
+    const galleryPhotos = await loadGalleryPhotos(page.content);
     const photosById = await loadPickedPhotos(page.content);
 
     const hasFieldMap =
@@ -135,6 +106,7 @@ export default async function HomePage() {
           globalLightbox={globalLightbox}
           fieldMap={fieldMap}
           photosById={photosById}
+          seed={pageSeed()}
         />
       </PageFrame>
     );
