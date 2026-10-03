@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
 import { shareImagesOr } from "@/lib/site-icon";
-import { pages, galleries, siteSettings } from "@/lib/db/schema";
-import { selectPhotosForGallery } from "@/lib/db/photo-queries";
+import { pages, siteSettings } from "@/lib/db/schema";
+import { loadGalleryPhotos } from "@/lib/puck/gallery-photos";
+import { pageSeed } from "@/lib/puck/page-seed";
 import { eq, and, asc } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
@@ -9,7 +10,7 @@ import type { Metadata } from "next";
 import PuckRenderer from "@/components/public/PuckRenderer";
 import { loadPickedPhotos } from "@/lib/puck/picked-photos";
 import type { Data } from "@puckeditor/core";
-import type { EmbedPhoto, GlobalLightboxSettings } from "@/lib/puck/config";
+import type { GlobalLightboxSettings } from "@/lib/puck/config";
 import StoryPasswordForm from "./StoryPasswordForm";
 import StoryReadingView from "@/components/public/stories/StoryReadingView";
 
@@ -164,38 +165,7 @@ export default async function StoryPage({ params }: Props) {
     captionAlignment: (settingsRow?.lightboxCaptionAlignment ?? "left") as GlobalLightboxSettings["captionAlignment"],
   };
 
-  // Prefetch photos for any GalleryEmbed components
-  const galleryPhotos: Record<string, EmbedPhoto[]> = {};
-  const embedItems = (story.content.content ?? []).filter(
-    (item: { type: string }) => item.type === "GalleryEmbed"
-  );
-  for (const item of embedItems) {
-    const props = item.props as { gallerySlug?: string; maxPhotos?: number };
-    if (!props.gallerySlug) continue;
-    const [gallery] = await db
-      .select()
-      .from(galleries)
-      .where(and(eq(galleries.slug, props.gallerySlug), eq(galleries.isPublished, true)));
-    if (!gallery) continue;
-    const galleryPhotoRows = await selectPhotosForGallery(gallery.id);
-    galleryPhotos[props.gallerySlug] = galleryPhotoRows
-      .slice(0, props.maxPhotos ?? 12)
-      .map((p) => ({
-        id: p.id,
-        url: p.url,
-        thumbnailUrl: p.thumbnailUrl ?? p.url,
-        filename: p.title ?? null,
-        title: p.title,
-        description: p.description,
-        location: p.location,
-        cameraSettings: p.cameraSettings as EmbedPhoto["cameraSettings"],
-        width: p.width ?? 800,
-        height: p.height ?? 600,
-        focalX: p.focalX ?? 50,
-        focalY: p.focalY ?? 50,
-      }));
-  }
-
+  const galleryPhotos = await loadGalleryPhotos(story.content);
   const photosById = await loadPickedPhotos(story.content);
 
   return (
@@ -211,7 +181,7 @@ export default async function StoryPage({ params }: Props) {
       nextStory={nextStory}
       chrome={chrome}
     >
-      <PuckRenderer data={story.content} galleryPhotos={galleryPhotos} globalLightbox={globalLightbox} photosById={photosById} />
+      <PuckRenderer data={story.content} galleryPhotos={galleryPhotos} globalLightbox={globalLightbox} photosById={photosById} seed={pageSeed()} />
     </StoryReadingView>
   );
 }

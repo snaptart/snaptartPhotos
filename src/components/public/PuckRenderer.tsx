@@ -17,9 +17,11 @@ export interface PuckRendererProps {
   fieldMap?: FieldMapBlockData | null;
   /** Current library copies of photos picked into Selected Work / Photo Plate blocks. */
   photosById?: Record<string, LibraryPhoto>;
+  /** This page view's random number (lib/puck/page-seed), for blocks shown in a random order. */
+  seed?: number;
 }
 
-export default function PuckRenderer({ data, galleryPhotos, globalLightbox, storiesIndex, fieldMap, photosById }: PuckRendererProps) {
+export default function PuckRenderer({ data, galleryPhotos, globalLightbox, storiesIndex, fieldMap, photosById, seed }: PuckRendererProps) {
   const counterRef = useRef(0);
   const ctx = useRef({ next: () => counterRef.current++ });
   // The public layout only loads the theme's fonts; add any picked inside rich text.
@@ -31,7 +33,7 @@ export default function PuckRenderer({ data, galleryPhotos, globalLightbox, stor
       <Render
         config={puckConfig}
         data={data}
-        metadata={{ galleryPhotos: galleryPhotos ?? {}, globalLightbox, storiesIndex, fieldMap, photosById: photosById ?? {} }}
+        metadata={{ galleryPhotos: galleryPhotos ?? {}, globalLightbox, storiesIndex, fieldMap, photosById: photosById ?? {}, seed }}
       />
     </ImageCounterContext.Provider>
   );
