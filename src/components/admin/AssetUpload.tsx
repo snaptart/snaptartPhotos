@@ -2,6 +2,7 @@
 
 import { useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/admin/ui";
+import { uploadImage } from "@/lib/client-upload";
 
 interface AssetUploadProps {
   value: string;
@@ -16,7 +17,7 @@ interface AssetUploadProps {
   children?: ReactNode;
 }
 
-/** Uploads one site asset (icon, share image) to Blob storage via /api/upload?kind=asset. */
+/** Uploads one site asset (icon, share image) straight to Blob storage (uploadImage, kind "asset"). */
 export default function AssetUpload({ value, onChange, accept = "image/*", preview, onDimensions, children }: AssetUploadProps) {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -25,17 +26,12 @@ export default function AssetUpload({ value, onChange, accept = "image/*", previ
   async function upload(file: File) {
     setBusy(true);
     setError(null);
-    const form = new FormData();
-    form.append("file", file);
-    form.append("kind", "asset");
-    form.append("folder", "site");
-    const res = await fetch("/api/upload", { method: "POST", body: form });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok && data.url) {
+    try {
+      const data = await uploadImage(file, { folder: "site", kind: "asset" });
       onChange(data.url);
       onDimensions?.(data.width ?? null, data.height ?? null);
-    } else {
-      setError(data.error || "Upload failed.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed.");
     }
     setBusy(false);
   }
