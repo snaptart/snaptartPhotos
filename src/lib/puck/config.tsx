@@ -270,6 +270,8 @@ type HeroSlideshowProps = {
   transitionDuration: number;
   showArrows: boolean;
   showDots: boolean;
+  /** Arrow keys on desktop and a sideways swipe on phones change the photo; missing = on. */
+  keysAndSwipe?: boolean;
   fullBleed: boolean;
   maxWidth: string;
   objectFit: "cover" | "contain";
@@ -2514,6 +2516,20 @@ export const puckConfig: Config<Components, PageRootProps> = {
             { label: "No", value: false },
           ],
         },
+        keysAndSwipe: {
+          type: "custom",
+          label: "Arrow keys & swipe",
+          render: ({ value, onChange }) => (
+            <SegmentedControl
+              options={[
+                { label: "Yes", value: true, title: "Arrow keys change the photo while the slideshow is on screen; on phones, swipe sideways" },
+                { label: "No", value: false },
+              ]}
+              value={value ?? true}
+              onChange={(v) => onChange(v as boolean)}
+            />
+          ),
+        },
       },
       defaultProps: {
         gallerySlug: "",
@@ -2528,12 +2544,13 @@ export const puckConfig: Config<Components, PageRootProps> = {
         transitionDuration: 1000,
         showArrows: true,
         showDots: true,
+        keysAndSwipe: true,
         fullBleed: true,
         maxWidth: "100%",
         objectFit: "cover",
         overlayOpacity: 0,
       },
-      render: ({ id, gallerySlug, maxPhotos, order, height, phoneHeight, aspectRatio, autoPlay, interval, pauseOnHover, transitionDuration, showArrows, showDots, fullBleed, maxWidth, objectFit, overlayOpacity, puck }) => {
+      render: ({ id, gallerySlug, maxPhotos, order, height, phoneHeight, aspectRatio, autoPlay, interval, pauseOnHover, transitionDuration, showArrows, showDots, keysAndSwipe, fullBleed, maxWidth, objectFit, overlayOpacity, puck }) => {
         if (!gallerySlug) {
           return (
             <div className="rounded border-2 border-dashed border-neutral-300 p-8 text-center text-neutral-400">
@@ -2559,6 +2576,8 @@ export const puckConfig: Config<Components, PageRootProps> = {
             transitionDuration={transitionDuration}
             showArrows={showArrows}
             showDots={showDots}
+            keysAndSwipe={keysAndSwipe ?? true}
+            editing={!!puck?.isEditing}
             fullBleed={fullBleed}
             maxWidth={maxWidth}
             objectFit={objectFit}
@@ -5635,10 +5654,31 @@ interface HeroSlideshowClientProps {
   transitionDuration: number;
   showArrows: boolean;
   showDots: boolean;
+  keysAndSwipe: boolean;
+  /** In the editor the arrow keys are left alone, so they don't change the photo while you work. */
+  editing: boolean;
   fullBleed: boolean;
   maxWidth: string;
   objectFit: "cover" | "contain";
   overlayOpacity: number;
+}
+
+/** How far a finger must travel sideways, in px, for a swipe to change the photo. */
+const SWIPE_MIN = 50;
+
+/** True when a key press belongs to something else: a field being typed in, or an open dialog such as the lightbox. */
+function keyIsTaken(e: KeyboardEvent): boolean {
+  if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return true;
+  const t = e.target;
+  if (t instanceof Element && t.closest("input, textarea, select, [contenteditable=''], [contenteditable='true']")) return true;
+  return !!document.querySelector("[aria-modal='true']");
+}
+
+/** Whether at least half of `el` (or of the screen, for one taller than it) is in view. */
+function mostlyOnScreen(el: Element): boolean {
+  const r = el.getBoundingClientRect();
+  const shown = Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0);
+  return r.height > 0 && shown >= Math.min(r.height, window.innerHeight) / 2;
 }
 
 function HeroSlideshowClient({
@@ -5657,6 +5697,8 @@ function HeroSlideshowClient({
   transitionDuration,
   showArrows,
   showDots,
+  keysAndSwipe,
+  editing,
   fullBleed,
   maxWidth,
   objectFit,
@@ -5666,6 +5708,10 @@ function HeroSlideshowClient({
   const [fetchedPhotos, setFetchedPhotos] = useState<EmbedPhoto[]>([]);
   const [current, setCurrent] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
+  // Counts changes made by hand; autoplay restarts its timer on each, so the chosen photo gets a full interval.
+  const [handMoves, setHandMoves] = useState(0);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (serverPhotos) return;
@@ -5688,10 +5734,54 @@ function HeroSlideshowClient({
       setCurrent((prev) => (prev + 1) % photos.length);
     }, interval * 1000);
     return () => clearInterval(timer);
-  }, [autoPlay, interval, pauseOnHover, isHovered, photos.length]);
+  }, [autoPlay, interval, pauseOnHover, isHovered, photos.length, handMoves]);
 
-  const prev = () => setCurrent((c) => (c - 1 + photos.length) % photos.length);
-  const next = () => setCurrent((c) => (c + 1) % photos.length);
+  const count = photos.length;
+  const goTo = useCallback((i: number) => {
+    setCurrent(i);
+    setHandMoves((n) => n + 1);
+  }, []);
+  const step = useCallback((delta: number) => {
+    setCurrent((c) => (c + delta + count) % count);
+    setHandMoves((n) => n + 1);
+  }, [count]);
+  const prev = () => step(-1);
+  const next = () => step(1);
+
+  const keysOn = keysAndSwipe && !editing && count > 1;
+  const swipeOn = keysAndSwipe && count > 1;
+
+  useEffect(() => {
+    if (!keysOn) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      if (!boxRef.current || keyIsTaken(e)) return;
+      // A slideshow with focus in it answers; otherwise the first one mostly on screen, so two on a page don't both move.
+      const focused = document.activeElement?.closest("[data-slideshow-keys]");
+      const answering = focused ?? Array.from(document.querySelectorAll("[data-slideshow-keys]")).find(mostlyOnScreen);
+      if (answering !== boxRef.current) return;
+      e.preventDefault();
+      step(e.key === "ArrowRight" ? 1 : -1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [keysOn, step]);
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    touchStart.current = e.touches.length === 1 ? { x: t.clientX, y: t.clientY } : null;
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const start = touchStart.current;
+    touchStart.current = null;
+    if (!start || e.touches.length > 0) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    // Mostly sideways only, so scrolling the page past the slideshow never changes the photo.
+    if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    step(dx < 0 ? 1 : -1);
+  };
 
   const fullBleedStyle: React.CSSProperties = fullBleed
     ? { marginLeft: "calc(-50vw + 50%)", marginRight: "calc(-50vw + 50%)", width: "100vw" }
@@ -5725,16 +5815,26 @@ function HeroSlideshowClient({
 
   return (
     <div
-      className={`relative overflow-hidden ${boxClass}`}
+      ref={boxRef}
+      role="region"
+      aria-roledescription="slideshow"
+      aria-label="Slideshow"
+      tabIndex={keysOn ? 0 : undefined}
+      data-slideshow-keys={keysOn ? "" : undefined}
+      className={`relative overflow-hidden ${boxClass} ${keysOn ? "focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-white" : ""} ${swipeOn ? "[touch-action:pan-y_pinch-zoom]" : ""}`}
       style={containerStyle}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onTouchStart={swipeOn ? onTouchStart : undefined}
+      onTouchEnd={swipeOn ? onTouchEnd : undefined}
+      onTouchCancel={swipeOn ? () => { touchStart.current = null; } : undefined}
     >
       {photos.map((photo, i) => {
         const source = optimizedSource(photo.url, slideSizes(photo, objectFit, desktopBox, phoneBox), photo);
         return (
           <div
             key={photo.id}
+            aria-hidden={i !== current}
             className="absolute inset-0"
             style={{
               opacity: i === current ? 1 : 0,
@@ -5791,7 +5891,7 @@ function HeroSlideshowClient({
           {photos.map((_, i) => (
             <button
               key={i}
-              onClick={() => setCurrent(i)}
+              onClick={() => goTo(i)}
               aria-label={`Go to slide ${i + 1}`}
               className="h-2 w-2 rounded-full transition-colors"
               style={{ backgroundColor: i === current ? "white" : "rgba(255,255,255,0.45)" }}
