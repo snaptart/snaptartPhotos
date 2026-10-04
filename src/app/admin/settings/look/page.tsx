@@ -407,8 +407,26 @@ export default function LookAndFeelPage() {
                 label="Shrink once the page scrolls"
               />
             )}
+            {themeDraft.headerBehavior === "pinned" && themeDraft.headerShrink && (
+              <Check
+                checked={themeDraft.headerShrinkFillPages}
+                onChange={(v) => updateTheme("headerShrinkFillPages", v)}
+                label="Start shrunk on pages that fill the window, like the map"
+              />
+            )}
           </div>
         </Field>
+        {themeDraft.headerBehavior === "pinned" && themeDraft.headerShrink && (
+          <RangeField
+            label="Shrunk size"
+            value={themeDraft.headerShrinkSize}
+            min={40}
+            max={95}
+            unit="%"
+            hint="The logo and the space around it, once shrunk. The menu text shrinks a third as much."
+            onChange={(v) => updateTheme("headerShrinkSize", v)}
+          />
+        )}
         <Field
           label="Over a photo"
           inline
