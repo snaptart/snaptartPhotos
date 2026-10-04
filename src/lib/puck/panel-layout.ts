@@ -82,6 +82,11 @@ function list(...parts: (string | false | undefined | null)[]): string {
   return parts.filter(Boolean).join(" · ");
 }
 
+/** Galleries Index → Index list rows show a small cover. */
+function listCoverOn(p: { listCover?: string }): boolean {
+  return !!p.listCover && p.listCover !== "none";
+}
+
 function capitalise(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
@@ -239,9 +244,14 @@ export const PANEL_LAYOUTS: Layouts = {
       {
         tab: "content",
         title: "Show",
-        fields: ["showTitle", "showDescription", "showCount", "countLabel"],
+        fields: ["showTitle", "showDescription", "showCount", "countLabel", "listCover"],
         summary: (p) =>
-          list(p.layout !== "list" && p.showTitle && "Title", p.showDescription && "Description", p.showCount && "Count") || "Images only",
+          list(
+            p.layout !== "list" && p.showTitle && "Title",
+            p.showDescription && "Description",
+            p.showCount && "Count",
+            p.layout === "list" && listCoverOn(p) && `Cover ${p.listCover}`,
+          ) || "Images only",
       },
       {
         tab: "style",
@@ -254,8 +264,11 @@ export const PANEL_LAYOUTS: Layouts = {
       {
         tab: "style",
         title: "Images",
-        fields: ["aspectRatio", "borderRadius"],
-        summary: (p) => list(p.aspectRatio, `corners ${p.borderRadius ?? 0}px`),
+        fields: ["aspectRatio", "listCoverShape", "listCoverSize", "listCoverSizePhone", "borderRadius"],
+        summary: (p) =>
+          p.layout === "list"
+            ? list(p.listCoverShape ?? "square", `${p.listCoverSize ?? 64}px`, `${p.listCoverSizePhone ?? p.listCoverSize ?? 64}px on phones`)
+            : list(p.aspectRatio, `corners ${p.borderRadius ?? 0}px`),
       },
       {
         tab: "style",
@@ -299,7 +312,11 @@ export const PANEL_LAYOUTS: Layouts = {
       listTitleStyle: (p) => p.layout === "list",
       descriptionStyle: (p) => p.showDescription,
       aspectRatio: (p) => p.layout !== "list",
-      borderRadius: (p) => p.layout !== "list",
+      listCover: (p) => p.layout === "list",
+      listCoverShape: (p) => p.layout === "list" && listCoverOn(p),
+      listCoverSize: (p) => p.layout === "list" && listCoverOn(p),
+      listCoverSizePhone: (p) => p.layout === "list" && listCoverOn(p),
+      borderRadius: (p) => (p.layout === "list" ? listCoverOn(p) && p.listCoverShape !== "round" : true),
       overlayBgColor: (p) => p.layout !== "list" && p.titlePosition !== "below",
       overlayOpacity: (p) => p.layout !== "list" && p.titlePosition !== "below",
       dividerColor: (p) => p.layout === "list",

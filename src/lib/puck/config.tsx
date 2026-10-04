@@ -336,6 +336,10 @@ type CarouselProps = {
 /** Where a hand-picked collection goes instead of its own page. */
 type GalleryLink = { url: string; newTab?: boolean };
 
+/** The Index List's small cover; its width is the size, its height follows the shape. */
+type ListCoverShape = "square" | "round" | "portrait" | "landscape";
+const LIST_COVER_AR: Record<ListCoverShape, string> = { square: "1/1", round: "1/1", portrait: "4/5", landscape: "3/2" };
+
 type GalleriesIndexProps = {
   sourceMode: "all" | "manual";
   selectedSlugs: string[];
@@ -357,6 +361,11 @@ type GalleriesIndexProps = {
   // Index List gets its own title style — a row of titles wants different
   // settings from a caption under a cover.
   listTitleStyle: TextStyleValue;
+  /** Index List: a small cover at the start or end of each row. Blocks saved before it have none. */
+  listCover?: "none" | "left" | "right";
+  listCoverShape?: ListCoverShape;
+  listCoverSize?: number;
+  listCoverSizePhone?: number;
   fullBleed: boolean;
   maxWidth: number;
   aspectRatio: GalleryAspect;
@@ -1195,6 +1204,39 @@ export const puckConfig: Config<Components, PageRootProps> = {
             <TextStyleControl value={value} onChange={onChange} fallback="collectionTitle" />
           ),
         },
+        listCover: {
+          type: "radio",
+          label: "Cover image",
+          options: [
+            { label: "None", value: "none" },
+            { label: "Left", value: "left" },
+            { label: "Right", value: "right" },
+          ],
+        },
+        listCoverShape: {
+          type: "select",
+          label: "Shape",
+          options: [
+            { label: "Square", value: "square" },
+            { label: "Round", value: "round" },
+            { label: "Portrait (4:5)", value: "portrait" },
+            { label: "Landscape (3:2)", value: "landscape" },
+          ],
+        },
+        listCoverSize: {
+          type: "custom",
+          label: "Size",
+          render: ({ value, onChange }) => (
+            <SliderField value={value ?? 64} onChange={onChange} min={24} max={240} step={4} unit="px" label="Size" />
+          ),
+        },
+        listCoverSizePhone: {
+          type: "custom",
+          label: "Size on phones",
+          render: ({ value, onChange }) => (
+            <SliderField value={value ?? 48} onChange={onChange} min={24} max={240} step={4} unit="px" label="Size on phones" />
+          ),
+        },
         gap: {
           type: "custom",
           label: "Gap",
@@ -1360,6 +1402,10 @@ export const puckConfig: Config<Components, PageRootProps> = {
         titleRule: false,
         dividerColor: "#e5e5e5",
         listTitleStyle: { style: "collectionTitle", size: 20 },
+        listCover: "none",
+        listCoverShape: "square",
+        listCoverSize: 64,
+        listCoverSizePhone: 48,
         fullBleed: false,
         maxWidth: 100,
         aspectRatio: "4:5",
@@ -4844,8 +4890,31 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
   }
 
   if (layout === "list") {
+    const coverSide = props.listCover ?? "none";
+    const coverShape = props.listCoverShape ?? "square";
+    const coverSize = props.listCoverSize ?? 64;
+    const coverSizePhone = props.listCoverSizePhone ?? coverSize;
+    // Phones are measured by the list's own width, as the cover grid's columns are.
+    const coverVars = { "--list-cover": `${coverSize}px`, "--list-cover-phone": `${coverSizePhone}px` } as React.CSSProperties;
+    const coverEl = (g: GalleryRow) => {
+      const url = g.coverImageUrl || g.firstPhotoUrl;
+      const source = url ? optimizedSource(url, `${Math.max(coverSize, coverSizePhone)}px`) : null;
+      return (
+        <span
+          className="block shrink-0 overflow-hidden [width:var(--list-cover-phone)] @min-[32rem]:[width:var(--list-cover)]"
+          style={{ aspectRatio: LIST_COVER_AR[coverShape], borderRadius: coverShape === "round" ? "50%" : `${borderRadius}px` }}
+        >
+          {source ? (
+            <img {...source} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          ) : (
+            <span className="block h-full w-full" style={{ background: "var(--theme-color-surface, #f2efe9)" }} aria-hidden="true" />
+          )}
+        </span>
+      );
+    };
+
     return (
-      <div style={wrapperStyle}>
+      <div style={{ ...wrapperStyle, ...coverVars }} className="@container">
         {limited.map((g, i) => {
           const hovered = hoveredId === g.id;
           return (
@@ -4856,7 +4925,8 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
               onMouseLeave={() => setHoveredId(null)}
               style={{
                 display: "flex",
-                alignItems: "baseline",
+                // Titles share a baseline with the count; beside a cover they centre on it.
+                alignItems: coverSide === "none" ? "baseline" : "center",
                 justifyContent: "space-between",
                 gap: 24,
                 textDecoration: "none",
@@ -4867,7 +4937,8 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
                 opacity: hovered ? 0.7 : 1,
               }}
             >
-              <span style={{ minWidth: 0 }}>
+              {coverSide === "left" && coverEl(g)}
+              <span style={{ minWidth: 0, flex: "1 1 auto" }}>
                 <span
                   style={{
                     ...textStyleCss(listTitleStyle, "collectionTitle"),
@@ -4897,6 +4968,7 @@ function GalleriesIndexRender(props: GalleriesIndexProps) {
                   {twoDigits(g.photoCount)}
                 </span>
               )}
+              {coverSide === "right" && coverEl(g)}
             </a>
           );
         })}
