@@ -58,6 +58,8 @@ async function handleGet(req: Request) {
       return NextResponse.json(items);
     }
 
+    // The whole library includes photos in unpublished galleries and in none, so it's admin-only.
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const items = await db.select().from(photos).orderBy(asc(photos.createdAt));
     return NextResponse.json(items);
   } catch {

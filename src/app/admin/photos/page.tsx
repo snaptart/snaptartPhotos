@@ -34,6 +34,7 @@ import {
   ArrowDownUp,
   ChevronRight,
   MapPin,
+  FileText,
 } from "lucide-react";
 import { SortableGridItem } from "@/components/admin/SortableGridItem";
 import FocalPointPicker from "@/components/admin/FocalPointPicker";
@@ -83,7 +84,13 @@ interface Gallery {
   href?: string;
 }
 
-type Filter = "all" | "needs-title" | "needs-location";
+/** From /api/photos/usage. */
+interface PhotoUsage {
+  galleryCount: number;
+  pages: { id: string; title: string; kind: "page" | "story"; editHref: string }[];
+}
+
+type Filter = "all" | "needs-title" | "needs-location" | "no-gallery";
 type SortKey =
   | "position"
   | "newest"
@@ -139,6 +146,7 @@ export default function PhotosPage() {
   const galleryIdParam = searchParams.get("galleryId");
 
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const [usage, setUsage] = useState<Record<string, PhotoUsage>>({});
   const [galleries, setGalleries] = useState<Gallery[]>([]);
   const [selectedGallery, setSelectedGallery] = useState<string>(
     galleryIdParam ?? ALL,
@@ -204,6 +212,8 @@ export default function PhotosPage() {
 
   useEffect(() => {
     clearSelection();
+    // "No gallery" only exists in All photos.
+    setFilter((f) => (f === "no-gallery" ? "all" : f));
   }, [selectedGallery, clearSelection]);
 
   const fetchGalleries = useCallback(async () => {
@@ -239,10 +249,15 @@ export default function PhotosPage() {
       setLoading(false);
       return;
     }
-    const res = await fetch(selectedGallery === ALL ? "/api/photos" : `/api/photos?galleryId=${selectedGallery}`);
+    const [res, usageRes] = await Promise.all([
+      fetch(selectedGallery === ALL ? "/api/photos" : `/api/photos?galleryId=${selectedGallery}`),
+      fetch("/api/photos/usage"),
+    ]);
     const data = await res.json();
     // The library comes oldest first; show the newest uploads first.
     setPhotos(Array.isArray(data) ? (selectedGallery === ALL ? [...data].reverse() : data) : []);
+    // Without usage the page still works; it just can't say where photos are used.
+    setUsage(usageRes.ok ? await usageRes.json() : {});
     setLoading(false);
   }, [selectedGallery]);
 
@@ -408,10 +423,14 @@ export default function PhotosPage() {
   }
 
   async function handleDelete(id: string) {
+    const usedOn = usage[id]?.pages ?? [];
     if (
       !confirm(
         `Delete this ${siteConfig.labels.photo.toLowerCase()} from your library? ` +
-          `It's removed from every ${siteConfig.labels.gallery.toLowerCase()} it's in, and can't be undone.`,
+          `It's removed from every ${siteConfig.labels.gallery.toLowerCase()} it's in, and can't be undone.` +
+          (usedOn.length > 0
+            ? `\n\nIt's used on ${usedOn.map((p) => `"${p.title}"`).join(", ")}, which will show a missing image.`
+            : ""),
       )
     )
       return;
@@ -483,6 +502,8 @@ export default function PhotosPage() {
       list = list.filter((p) => !p.title || p.title.trim() === "");
     } else if (filter === "needs-location") {
       list = list.filter((p) => !p.location || p.location.trim() === "");
+    } else if (filter === "no-gallery") {
+      list = list.filter((p) => usage[p.id] && !usage[p.id].galleryCount);
     }
 
     if (activeTag) {
@@ -499,7 +520,7 @@ export default function PhotosPage() {
     }
 
     return sortPhotos(list, sortKey);
-  }, [photos, filter, activeTag, search, sortKey]);
+  }, [photos, usage, filter, activeTag, search, sortKey]);
 
   const needsTitleCount = photos.filter(
     (p) => !p.title || p.title.trim() === "",
@@ -507,6 +528,9 @@ export default function PhotosPage() {
   const needsLocationCount = photos.filter(
     (p) => !p.location || p.location.trim() === "",
   ).length;
+  const noGalleryCount = isAll
+    ? photos.filter((p) => usage[p.id] && !usage[p.id].galleryCount).length
+    : 0;
 
   const selectedPhotos = useMemo(
     () => photos.filter((p) => selected.has(p.id)),
@@ -516,13 +540,18 @@ export default function PhotosPage() {
   async function handleBulkDelete() {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
+    const inUse = ids.filter((id) => (usage[id]?.pages.length ?? 0) > 0);
+    const pageTitles = [...new Set(inUse.flatMap((id) => usage[id].pages.map((p) => `"${p.title}"`)))];
     if (
       !confirm(
         `Delete ${ids.length} ${
           ids.length === 1
             ? siteConfig.labels.photo.toLowerCase()
             : siteConfig.labels.photos.toLowerCase()
-        }? This cannot be undone.`,
+        }? This cannot be undone.` +
+          (inUse.length > 0
+            ? `\n\n${ids.length === 1 ? "It's" : `${inUse.length} of them ${inUse.length === 1 ? "is" : "are"}`} used on ${pageTitles.join(", ")}, which will show a missing image.`
+            : ""),
       )
     )
       return;
@@ -715,6 +744,14 @@ export default function PhotosPage() {
                   label={`No location · ${needsLocationCount}`}
                 />
               )}
+              {/* Stays while active, so assigning the last ones doesn't strand the filter. */}
+              {(noGalleryCount > 0 || filter === "no-gallery") && (
+                <FilterChip
+                  active={filter === "no-gallery"}
+                  onClick={() => setFilter("no-gallery")}
+                  label={`No ${siteConfig.labels.gallery.toLowerCase()} · ${noGalleryCount}`}
+                />
+              )}
               {uniqueTags.length > 0 && (
                 <>
                   <div className="mx-1 h-4 w-px bg-admin-border" />
@@ -837,6 +874,7 @@ export default function PhotosPage() {
                   <SortablePhotoTile
                     key={photo.id}
                     photo={photo}
+                    usedOn={usage[photo.id]?.pages}
                     selected={selected.has(photo.id)}
                     selecting={selected.size > 0}
                     onToggleSelect={() => toggleSelected(photo.id)}
@@ -854,6 +892,7 @@ export default function PhotosPage() {
               <PhotoTile
                 key={photo.id}
                 photo={photo}
+                usedOn={usage[photo.id]?.pages}
                 selected={selected.has(photo.id)}
                 selecting={selected.size > 0}
                 onToggleSelect={() => toggleSelected(photo.id)}
@@ -875,6 +914,7 @@ export default function PhotosPage() {
           onFocalChange={(x, y) => setEditingFocal({ x, y })}
           galleries={galleries}
           galleryIds={editingGalleryIds}
+          usedOn={usage[editingId]?.pages}
           onToggleGallery={(id) => {
             setEditingGalleriesDirty(true);
             setEditingGalleryIds((prev) => {
@@ -972,6 +1012,8 @@ function FilterChip({
 
 interface PhotoTileProps {
   photo: Photo;
+  /** Pages and stories that show this photo. */
+  usedOn?: PhotoUsage["pages"];
   selected: boolean;
   /** Something is already selected: a click adds to the selection instead of opening the editor. */
   selecting: boolean;
@@ -1004,6 +1046,7 @@ type DragHandle = {
 
 function PhotoTileInner({
   photo,
+  usedOn,
   selected,
   selecting,
   onToggleSelect,
@@ -1106,8 +1149,20 @@ function PhotoTileInner({
         <span className="truncate font-medium">
           {photo.title || photo.filename || "Untitled"}
         </span>
-        <span className="opacity-70 shrink-0">
-          {photo.width}×{photo.height}
+        <span className="flex items-center gap-2 shrink-0">
+          {usedOn && usedOn.length > 0 && (
+            <span
+              className="pointer-events-auto inline-flex items-center gap-0.5"
+              title={`Used on ${usedOn.map((p) => p.title).join(", ")}`}
+              aria-label={`Used on ${usedOn.length} ${usedOn.length === 1 ? "page" : "pages"}`}
+            >
+              <FileText className="h-3 w-3" />
+              {usedOn.length}
+            </span>
+          )}
+          <span className="opacity-70">
+            {photo.width}×{photo.height}
+          </span>
         </span>
       </div>
     </div>
@@ -1150,6 +1205,7 @@ function EditPhotoModal({
   onFocalChange,
   galleries,
   galleryIds,
+  usedOn,
   onToggleGallery,
   onSubmit,
   onClose,
@@ -1160,6 +1216,8 @@ function EditPhotoModal({
   onFocalChange: (x: number, y: number) => void;
   galleries: Gallery[];
   galleryIds: Set<string>;
+  /** Undefined while unknown (usage didn't load). */
+  usedOn?: PhotoUsage["pages"];
   onToggleGallery: (id: string) => void;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   onClose: () => void;
@@ -1362,6 +1420,31 @@ function EditPhotoModal({
                 ))}
               </div>
             </Field>
+            {usedOn && (
+              <Field label="Used on">
+                {usedOn.length === 0 ? (
+                  <p className="text-[13px] text-admin-ink-soft">No pages or stories.</p>
+                ) : (
+                  <ul className="flex flex-col gap-1">
+                    {usedOn.map((p) => (
+                      <li key={p.id}>
+                        <Link
+                          href={p.editHref}
+                          target="_blank"
+                          className="inline-flex items-center gap-1.5 text-[13px] text-admin-ink hover:underline"
+                        >
+                          <FileText className="h-3 w-3 shrink-0 text-admin-ink-soft" />
+                          <span className="truncate">{p.title}</span>
+                          {p.kind === "story" && (
+                            <span className="text-[11px] text-admin-ink-soft">story</span>
+                          )}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Field>
+            )}
             <div className="flex gap-2 pt-2">
               <Button type="submit" kind="primary">
                 Update
