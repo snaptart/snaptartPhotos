@@ -530,8 +530,9 @@ export const PANEL_LAYOUTS: Layouts = {
       {
         tab: "content",
         title: "Playback",
-        fields: ["autoPlay", "interval", "pauseOnHover", "transitionDuration", "showArrows", "showDots"],
-        summary: (p) => list(p.autoPlay ? `Auto every ${p.interval}s` : "Manual", p.showArrows && "arrows", p.showDots && "dots"),
+        fields: ["autoPlay", "interval", "pauseOnHover", "transitionDuration", "showArrows", "showDots", "keysAndSwipe"],
+        summary: (p) =>
+          list(p.autoPlay ? `Auto every ${p.interval}s` : "Manual", p.showArrows && "arrows", p.showDots && "dots", p.keysAndSwipe !== false && "keys & swipe"),
       },
       {
         tab: "style",
