@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -33,6 +33,7 @@ import {
   GripVertical,
   ArrowDownUp,
   ChevronRight,
+  MapPin,
 } from "lucide-react";
 import { SortableGridItem } from "@/components/admin/SortableGridItem";
 import FocalPointPicker from "@/components/admin/FocalPointPicker";
@@ -41,6 +42,7 @@ import { useMessage } from "@/lib/hooks/useMessage";
 import siteConfig from "@/lib/site.config";
 import { parseFilenameForTakenAt } from "@/lib/photo-metadata";
 import { uploadImage } from "@/lib/client-upload";
+import { googleMapsUrl, hasCoordinates, locationFromCoordinates } from "@/lib/coordinates";
 import { cn } from "@/lib/utils";
 import {
   Button,
@@ -867,6 +869,7 @@ export default function PhotosPage() {
       {/* Edit modal */}
       {editingId && editingPhoto && (
         <EditPhotoModal
+          key={editingId}
           photo={editingPhoto}
           focal={editingFocal}
           onFocalChange={(x, y) => setEditingFocal({ x, y })}
@@ -1162,6 +1165,18 @@ function EditPhotoModal({
   onClose: () => void;
   onCopyUrl: () => void;
 }) {
+  const locationRef = useRef<HTMLInputElement>(null);
+  const [latText, setLatText] = useState(photo.latitude == null ? "" : String(photo.latitude));
+  const [lngText, setLngText] = useState(photo.longitude == null ? "" : String(photo.longitude));
+  const lat = latText.trim() === "" ? null : Number(latText);
+  const lng = lngText.trim() === "" ? null : Number(lngText);
+  const coords = hasCoordinates(lat, lng) ? { lat: lat as number, lng: lng as number } : null;
+
+  const onLocationFromCoords = () => {
+    if (!coords || !locationRef.current) return;
+    locationRef.current.value = locationFromCoordinates(coords.lat, coords.lng);
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
@@ -1253,13 +1268,72 @@ function EditPhotoModal({
                 defaultValue={photo.description ?? ""}
               />
             </Field>
-            <Field label="Location" htmlFor="p-location" hint="Human-readable name (e.g. 'Paris, France')">
-              <Input
-                id="p-location"
-                name="location"
-                defaultValue={photo.location ?? ""}
-              />
+            <Field
+              label="Location"
+              htmlFor="p-location"
+              hint="A place name (e.g. 'Paris, France') or a link: [text](url)"
+            >
+              <div className="flex gap-2">
+                <Input
+                  ref={locationRef}
+                  id="p-location"
+                  name="location"
+                  defaultValue={photo.location ?? ""}
+                  className="flex-1 min-w-0"
+                />
+                <Button
+                  kind="ghost"
+                  size="sm"
+                  type="button"
+                  onClick={onLocationFromCoords}
+                  disabled={!coords}
+                  title={coords ? "Fill in the coordinates, linked to Google Maps" : "Add a latitude and longitude first"}
+                  className="shrink-0"
+                >
+                  <MapPin className="h-3 w-3" />
+                  From coordinates
+                </Button>
+              </div>
             </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Latitude" htmlFor="p-lat" hint="Decimal (e.g. 48.8566)">
+                <Input
+                  id="p-lat"
+                  name="latitude"
+                  type="number"
+                  step="any"
+                  min={-90}
+                  max={90}
+                  defaultValue={photo.latitude ?? ""}
+                  onChange={(e) => setLatText(e.target.value)}
+                  placeholder=""
+                />
+              </Field>
+              <Field label="Longitude" htmlFor="p-lng" hint="Decimal (e.g. 2.3522)">
+                <Input
+                  id="p-lng"
+                  name="longitude"
+                  type="number"
+                  step="any"
+                  min={-180}
+                  max={180}
+                  defaultValue={photo.longitude ?? ""}
+                  onChange={(e) => setLngText(e.target.value)}
+                  placeholder=""
+                />
+              </Field>
+            </div>
+            {coords && (
+              <a
+                href={googleMapsUrl(coords.lat, coords.lng)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="-mt-2 inline-flex items-center gap-1 self-start text-[12px] text-admin-ink-soft hover:text-admin-ink"
+              >
+                <ExternalLink className="h-3 w-3" />
+                View on Google Maps
+              </a>
+            )}
             <Field label="Tags" htmlFor="p-tags" hint="Comma-separated (e.g. 'Paris, France, Europe')">
               <Input
                 id="p-tags"
@@ -1288,32 +1362,6 @@ function EditPhotoModal({
                 ))}
               </div>
             </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Latitude" htmlFor="p-lat" hint="Decimal (e.g. 48.8566)">
-                <Input
-                  id="p-lat"
-                  name="latitude"
-                  type="number"
-                  step="any"
-                  min={-90}
-                  max={90}
-                  defaultValue={photo.latitude ?? ""}
-                  placeholder=""
-                />
-              </Field>
-              <Field label="Longitude" htmlFor="p-lng" hint="Decimal (e.g. 2.3522)">
-                <Input
-                  id="p-lng"
-                  name="longitude"
-                  type="number"
-                  step="any"
-                  min={-180}
-                  max={180}
-                  defaultValue={photo.longitude ?? ""}
-                  placeholder=""
-                />
-              </Field>
-            </div>
             <div className="flex gap-2 pt-2">
               <Button type="submit" kind="primary">
                 Update
