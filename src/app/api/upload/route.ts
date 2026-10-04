@@ -1,87 +1,28 @@
 import { NextResponse } from "next/server";
+import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { getAdminSession } from "@/lib/auth";
-import { put } from "@vercel/blob";
-import sharp from "sharp";
-import { extractPhotoMetadata } from "@/lib/photo-exif";
+import { allowedTypes, MAX_UPLOAD_BYTES } from "@/lib/upload-rules";
 
-const THUMBNAIL_WIDTH = 800;
-
+// Issues the short-lived token the browser uses to upload a file straight to Blob
+// (see uploadImage in src/lib/client-upload.ts). Files never pass through here, so
+// Vercel's 4.5MB request limit doesn't apply. The thumbnail and EXIF step runs after
+// the upload, in /api/upload/process.
 export async function POST(req: Request) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const formData = await req.formData();
-  const file = formData.get("file") as File | null;
-  if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
-
-  // "asset" uploads (site icons, share images) skip the thumbnail and photo metadata, and may be SVG.
-  const isAsset = formData.get("kind") === "asset";
-  const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"];
-  if (isAsset) ALLOWED_TYPES.push("image/svg+xml");
-  const MAX_SIZE = 20 * 1024 * 1024; // 20MB
-  if (!ALLOWED_TYPES.includes(file.type)) {
-    return NextResponse.json({ error: `Invalid file type. Only JPEG, PNG, WebP, GIF${isAsset ? ", AVIF and SVG" : " and AVIF"} are allowed.` }, { status: 400 });
-  }
-  if (file.size > MAX_SIZE) {
-    return NextResponse.json({ error: "File too large (max 20MB)" }, { status: 400 });
-  }
-
-  if (isAsset) {
-    try {
-      const folder = (formData.get("folder") as string) || "site";
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const buffer = Buffer.from(await file.arrayBuffer());
-      const blob = await put(`${folder}/${Date.now()}-${safeName}`, buffer, { access: "public", contentType: file.type });
-      const { width = null, height = null } = await sharp(buffer).metadata().catch(() => ({ width: null, height: null }));
-      return NextResponse.json({ url: blob.url, width, height });
-    } catch {
-      return NextResponse.json({ error: "Upload failed" }, { status: 500 });
-    }
-  }
-
   try {
-    const folder = (formData.get("folder") as string) || (process.env.UPLOAD_FOLDER || "uploads");
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const timestamp = Date.now();
-    const filename = `${folder}/${timestamp}-${safeName}`;
-
-    const buffer = Buffer.from(await file.arrayBuffer());
-
-    // Upload full-res image
-    const blob = await put(filename, buffer, { access: "public", contentType: file.type });
-
-    // Extract EXIF / IPTC / XMP metadata + dimensions
-    const metadata = await extractPhotoMetadata(buffer);
-
-    // Generate and upload thumbnail
-    const thumbnailBuffer = await sharp(buffer)
-      .rotate() // honor EXIF orientation so thumbs aren't sideways
-      .resize({ width: THUMBNAIL_WIDTH, withoutEnlargement: true })
-      .jpeg({ quality: 80 })
-      .toBuffer();
-
-    const thumbFilename = `${folder}/thumbs/${timestamp}-${safeName.replace(/\.[^.]+$/, ".jpg")}`;
-    const thumbBlob = await put(thumbFilename, thumbnailBuffer, {
-      access: "public",
-      contentType: "image/jpeg",
+    const body = (await req.json()) as HandleUploadBody;
+    const result = await handleUpload({
+      body,
+      request: req,
+      onBeforeGenerateToken: async (_pathname, clientPayload) => ({
+        allowedContentTypes: allowedTypes(clientPayload === "asset" ? "asset" : "photo"),
+        maximumSizeInBytes: MAX_UPLOAD_BYTES,
+      }),
     });
-
-    return NextResponse.json({
-      blobUrl: blob.url,
-      url: blob.url,
-      thumbnailUrl: thumbBlob.url,
-      width: metadata.width,
-      height: metadata.height,
-      takenAt: metadata.takenAt?.toISOString() ?? null,
-      latitude: metadata.latitude,
-      longitude: metadata.longitude,
-      location: metadata.location,
-      title: metadata.title,
-      description: metadata.description,
-      tags: metadata.tags,
-      cameraSettings: metadata.cameraSettings,
-    });
-  } catch {
-    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+    return NextResponse.json(result);
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Upload failed" }, { status: 400 });
   }
 }
