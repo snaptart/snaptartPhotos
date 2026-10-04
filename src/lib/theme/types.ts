@@ -84,6 +84,10 @@ export interface ChromeSettings {
   colorHeaderRule: string;
   /** Pinned headers only: smaller once the page scrolls. */
   headerShrink: boolean;
+  /** % of its full size the header shrinks to (the logo and padding; the menu text a third as much). */
+  headerShrinkSize: number;
+  /** With headerShrink: pages that fill the window and don't scroll (the Field Map) open with the header shrunk. */
+  headerShrinkFillPages: boolean;
   /** On pages that open with a full-width photo, the header sits over it, transparent. */
   headerOverPhoto: boolean;
   /** The header's text over the photo. "" = the hero overlay text colour. */
@@ -149,6 +153,8 @@ export const CHROME_DEFAULTS: ChromeSettings = {
   headerRule: true,
   colorHeaderRule: "",
   headerShrink: false,
+  headerShrinkSize: 72,
+  headerShrinkFillPages: false,
   headerOverPhoto: false,
   colorHeaderOverPhoto: "",
   headerOverPhotoLogo: "original",

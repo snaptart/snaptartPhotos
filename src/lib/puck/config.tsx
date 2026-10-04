@@ -3172,6 +3172,8 @@ export const puckConfig: Config<Components, PageRootProps> = {
               rel="stylesheet"
               href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
             />
+            {/* The map fills the window and the page doesn't scroll, so a shrinking header can start shrunk. */}
+            {isFill && <span data-fills-window="" hidden />}
             <div className="relative w-full" style={{ ...fillStyle, backgroundColor: cssColor(backgroundColor) }}>
               <FieldMap
                 regions={injected.regions}
