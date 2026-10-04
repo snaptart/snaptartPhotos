@@ -85,11 +85,11 @@ export function SiteHeader({ theme, siteTitle, logoUrl, items, instagramUrl, pre
 
   const menuType: CSSProperties = {
     ...fontRole("navMenu", { tracking: "0.025em" }),
-    fontSize: `var(--theme-font-nav-menu-size, ${theme.menuFontSize}px)`,
+    fontSize: `calc(var(--theme-font-nav-menu-size, ${theme.menuFontSize}px) * var(--site-menu-scale))`,
     gap: "var(--theme-menu-gap)",
   };
   const menu = (list: HeaderMenuItem[], withInstagram: boolean) => (
-    <div className="flex items-center" style={menuType}>
+    <div className="site-menu flex items-center" style={menuType}>
       {list.map((item) => (
         <NavLink
           key={item.id}
@@ -115,7 +115,7 @@ export function SiteHeader({ theme, siteTitle, logoUrl, items, instagramUrl, pre
     // Logo above the menu, both aligned to the logo's position.
     const across = { left: "items-start", center: "items-center", right: "items-end" }[theme.logoPosition];
     desktop = (
-      <div className={`flex flex-col ${across}`} style={{ gap: theme.logoGap }}>
+      <div className={`site-header-stack flex flex-col ${across}`} style={{ gap: scaled(theme.logoGap) }}>
         {logo(false)}
         {menu(items, true)}
       </div>
@@ -161,6 +161,7 @@ export function SiteHeader({ theme, siteTitle, logoUrl, items, instagramUrl, pre
       className="site-header"
       data-pinned={pinned && !preview ? "" : undefined}
       data-shrink={pinned && theme.headerShrink ? "" : undefined}
+      data-shrink-fill={pinned && theme.headerShrink && theme.headerShrinkFillPages ? "" : undefined}
       data-over-photo={theme.headerOverPhoto ? "" : undefined}
       data-photo-logo={theme.headerOverPhotoLogo}
       data-menu-hover={theme.menuHover}

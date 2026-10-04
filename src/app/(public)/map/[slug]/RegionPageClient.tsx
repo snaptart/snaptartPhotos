@@ -154,6 +154,8 @@ export default function RegionPageClient({
 
   return (
     <div ref={containerRef} className="relative flex-1 overflow-hidden">
+      {/* Fills the window and doesn't scroll, so a shrinking header can start shrunk. */}
+      <span data-fills-window="" hidden />
       {/* faded field map behind. Filter/opacity live on this wrapper so
           they can animate in parallel with the room-shrink on close. */}
       <div
