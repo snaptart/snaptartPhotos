@@ -5,6 +5,7 @@ import Image from "next/image";
 import Lightbox from "@/components/public/Lightbox";
 import type { LightboxSettings } from "@/components/public/Lightbox";
 import { fontRole } from "@/lib/theme/role-style";
+import { parseLinks } from "@/lib/parseLinks";
 import { galleryAspectCss, type GalleryAspect } from "@/lib/theme/aspect";
 
 interface Photo {
@@ -105,7 +106,7 @@ export default function GalleryGrid({
                       className="mt-1 text-[11px] uppercase tracking-[0.1em]"
                       style={{ color: "var(--theme-color-gallery-captions)" }}
                     >
-                      {meta}
+                      {parseLinks(meta)}
                     </div>
                   )}
                 </figcaption>

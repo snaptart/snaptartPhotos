@@ -7,6 +7,7 @@ import { textStyleCss, type TextStyleValue } from "@/lib/theme/text-style-value"
 import { responsiveGrid, type PhoneColumns, type TabletColumns } from "@/lib/puck/responsive";
 import { freshPhoto, type LibraryPhoto, type PhotoRef } from "@/lib/puck/photo-ref";
 import { Editable } from "@/components/puck/inline/Editable";
+import { parseLinks } from "@/lib/parseLinks";
 
 /**
  * Photograph blocks from the design canvas:
@@ -151,7 +152,7 @@ export function PhotoPlateRender({ library, lightbox, editing, ...p }: PhotoPlat
           </span>
           {meta && (
             <span style={textStyleCss(p.metaStyle, "meta")}>
-              <Editable path="meta" value={p.meta} fallback={photo.location ?? ""} />
+              {editing ? <Editable path="meta" value={p.meta} fallback={photo.location ?? ""} /> : parseLinks(meta)}
             </span>
           )}
         </figcaption>
