@@ -40,6 +40,7 @@ import { PhotoBulkEditDrawer } from "@/components/admin/PhotoBulkEditDrawer";
 import { useMessage } from "@/lib/hooks/useMessage";
 import siteConfig from "@/lib/site.config";
 import { parseFilenameForTakenAt } from "@/lib/photo-metadata";
+import { uploadImage } from "@/lib/client-upload";
 import { cn } from "@/lib/utils";
 import {
   Button,
@@ -317,19 +318,13 @@ export default function PhotosPage() {
     let uploaded = 0;
 
     for (const file of files) {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("folder", "galleries");
-
-      const uploadRes = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-      if (!uploadRes.ok) {
-        showError(`Failed to upload ${file.name}`);
+      let uploaded_;
+      try {
+        uploaded_ = await uploadImage(file, { folder: "galleries" });
+      } catch (err) {
+        showError(`Failed to upload ${file.name}: ${err instanceof Error ? err.message : "Upload failed."}`);
         continue;
       }
-      const uploaded_ = await uploadRes.json();
 
       // Server-side EXIF wins; fall back to filename for takenAt when missing.
       const takenAt =

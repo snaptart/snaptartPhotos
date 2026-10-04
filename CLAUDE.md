@@ -54,7 +54,7 @@ src/
 │       ├── menu-items/route.ts             # GET/POST/PUT/DELETE + bulk reorder
 │       ├── galleries/route.ts              # GET/POST/PUT/DELETE + bulk reorder
 │       ├── photos/route.ts                 # GET/POST/PUT/DELETE + bulk reorder
-│       ├── upload/route.ts                 # POST file upload → Cloudinary
+│       ├── upload/route.ts                 # POST Blob client-upload token (+ upload/process: thumbnail/EXIF)
 │       ├── pages/route.ts                  # (planned)
 │       └── stories/verify/route.ts         # (planned)
 ├── components/
@@ -115,7 +115,7 @@ Tables defined with Drizzle ORM:
 - Menu items API: GET (public) / POST+PUT+DELETE (auth required), PUT supports bulk reorder via `{ items: [{ id, position }] }`
 - Galleries API: GET (public) / POST+PUT+DELETE (auth required), PUT supports bulk reorder, auto-generates slug from title
 - Photos API: GET (public, filterable by `galleryId` or `gallerySlug`; admin-only `?id=X` returns photo + galleryIds) / POST+PUT+DELETE (auth required). POST accepts `galleryIds: string[]` (or legacy single `galleryId`). PUT single accepts `galleryIds` to replace memberships; PUT bulk patch accepts `galleryId` (move = replace) or `addToGalleryId` (add). DELETE without `galleryId` deletes the photo and its blob; DELETE with `galleryId` removes only that membership and garbage-collects the photo if it has no remaining memberships.
-- Upload API: POST (auth required) — accepts multipart file, uploads to Vercel Blob, returns blobUrl/url. `kind=asset` (site icons) skips the thumbnail/EXIF step and also accepts SVG.
+- Uploads go **straight from the browser to Vercel Blob** (`uploadImage` in `src/lib/client-upload.ts`), so Vercel's 4.5MB function request limit doesn't apply. `/api/upload` POST (auth required) only issues the Blob client token (type/size rules from `src/lib/upload-rules.ts`, max 20MB); `/api/upload/process` POST `{ url, kind }` then reads the file back (`head()` limits it to this site's store), makes the thumbnail + EXIF metadata and returns blobUrl/url/thumbnailUrl/metadata, deleting the original if processing fails. `kind: "asset"` (site icons) skips the thumbnail/EXIF step and also accepts SVG. No `onUploadCompleted` callback is used (it can't reach localhost).
 - Pages/Stories API: POST `{ duplicateId }` copies a page/story (unpublished, unique slug). PUT changes `slug` only when sent (409 with a message if taken/reserved).
 - `/api/pages/copy-blocks` POST `{ targetId, fragment }` appends blocks (with nested zones, fresh ids) to another page; `/api/pages/revisions` GET `?pageId=` / POST `{ revisionId | batchId }` restores.
 - `/api/block-defaults` GET/PUT; `/api/block-defaults/apply` POST (dry run or apply, returns `batchId` for undo). All admin-only.
