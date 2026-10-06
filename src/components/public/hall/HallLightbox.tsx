@@ -19,6 +19,27 @@ type HallLightboxProps = {
   stampFont?: string | null;
 };
 
+/*
+ * Colours follow the theme (Look → Colours). The single-slide views (with or
+ * without the info drawer) are a page: the site's background and text.
+ * Fullscreen, and the phone view, are the lightbox: the theme's lightbox colours,
+ * as on the site's other lightbox.
+ */
+const PAGE_BG = "var(--theme-color-site-bg, #fff)";
+const LIGHTBOX_BG = "var(--theme-color-lightbox-bg, #000)";
+/** The page's text colour at `pct`% strength, for controls and hints on the page background. */
+const pageInk = (pct: number) => `color-mix(in srgb, var(--theme-color-text, #000) ${pct}%, transparent)`;
+/** The lightbox text colour at `pct`% strength, for controls and hints in fullscreen. */
+const lightboxInk = (pct: number) => `color-mix(in srgb, var(--theme-color-lightbox-text, #fff) ${pct}%, transparent)`;
+/** The info drawer: a card in the theme's surface and text colours. */
+const DRAWER_COLORS = {
+  background: "var(--theme-color-surface, #fff)",
+  "--ex-paper": "var(--theme-color-surface, #fff)",
+  "--ex-ink": "var(--theme-color-text, #2a2620)",
+  "--ex-ink-soft": "var(--theme-color-text-soft, #6b6258)",
+  "--ex-ink-faint": "var(--theme-color-muted, #9b9286)",
+} as React.CSSProperties;
+
 // Dispatcher — picks the desktop or mobile implementation based on viewport.
 // The two variants differ enough (3-mode vs immersive-only, crossfade vs
 // drag-to-slide, side drawer vs bottom sheet) that keeping them as separate
@@ -343,7 +364,6 @@ function HallLightboxDesktop({
     : "";
 
   const onLightBg = mode !== "immersive";
-  const backdropColor = onLightBg ? "#ffffff" : "#000";
 
   const content = (
     <div
@@ -352,7 +372,7 @@ function HallLightboxDesktop({
         position: "fixed",
         inset: 0,
         zIndex: 100,
-        background: shown ? backdropColor : "transparent",
+        background: shown ? (onLightBg ? PAGE_BG : LIGHTBOX_BG) : "transparent",
         backdropFilter: shown ? (onLightBg ? "blur(4px)" : "blur(16px)") : "blur(0)",
         transition: "background 320ms ease-out, backdrop-filter 320ms",
       }}
@@ -370,9 +390,9 @@ function HallLightboxDesktop({
             width: 28,
             height: 28,
             borderRadius: "50%",
-            border: "1px solid rgba(255,255,255,0.2)",
-            background: "rgba(255,255,255,0.05)",
-            color: "rgba(255,255,255,0.6)",
+            border: `1px solid ${lightboxInk(20)}`,
+            background: lightboxInk(5),
+            color: lightboxInk(60),
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
@@ -629,13 +649,13 @@ function HallLightboxDesktop({
           <div
             key={`drawer-${photo.id}`}
             style={{
-              background: "#ffffff",
+              ...DRAWER_COLORS,
               padding: 32,
               overflowY: "auto",
               transform: shown ? "translateX(0)" : "translateX(20px)",
               transition: "transform 400ms cubic-bezier(.2,.9,.3,1)",
               borderRadius: 2,
-              border: "1px solid rgba(0,0,0,0.08)",
+              border: "1px solid color-mix(in srgb, var(--theme-color-text, #000) 8%, transparent)",
               boxShadow: "0 14px 40px rgba(60,50,35,0.10), 0 2px 6px rgba(60,50,35,0.05)",
               display: "flex",
               flexDirection: "column",
@@ -667,7 +687,7 @@ function HallLightboxDesktop({
             ...fontRole("labels"),
             fontSize: 9,
             letterSpacing: 2,
-            color: onLightBg ? "rgba(0,0,0,0.45)" : "rgba(255,255,255,0.5)",
+            color: onLightBg ? pageInk(45) : lightboxInk(50),
             display: "flex",
             gap: 20,
             alignItems: "center",
@@ -853,7 +873,7 @@ function HallLightboxMobile({
         position: "fixed",
         inset: 0,
         zIndex: 100,
-        background: shown ? "#000" : "transparent",
+        background: shown ? LIGHTBOX_BG : "transparent",
         backdropFilter: shown ? "blur(16px)" : "blur(0)",
         transition: "background 320ms ease-out, backdrop-filter 320ms",
       }}
@@ -1186,14 +1206,12 @@ function ChromeButton({
         width: 36,
         height: 36,
         borderRadius: "50%",
-        border: onLight
-          ? "1px solid rgba(0,0,0,0.15)"
-          : "1px solid rgba(255,255,255,0.35)",
+        border: `1px solid ${onLight ? pageInk(15) : lightboxInk(35)}`,
         background: onLight
-          ? active ? "rgba(0,0,0,0.10)" : "rgba(0,0,0,0.04)"
-          : active ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.08)",
+          ? active ? pageInk(10) : pageInk(4)
+          : active ? lightboxInk(25) : lightboxInk(8),
         cursor: "pointer",
-        color: onLight ? "rgba(0,0,0,0.65)" : "#fff",
+        color: onLight ? pageInk(65) : lightboxInk(100),
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -1240,17 +1258,17 @@ function NavArrow({
         height: 56,
         borderRadius: "50%",
         border: visible
-          ? onLight ? "1px solid rgba(0,0,0,0.15)" : "1px solid rgba(255,255,255,0.3)"
+          ? `1px solid ${onLight ? pageInk(15) : lightboxInk(30)}`
           : "1px solid transparent",
         background: disabled
-          ? onLight ? "rgba(0,0,0,0.02)" : "rgba(255,255,255,0.02)"
+          ? onLight ? pageInk(2) : lightboxInk(2)
           : visible
-            ? onLight ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.08)"
+            ? onLight ? pageInk(5) : lightboxInk(8)
             : "transparent",
         backdropFilter: visible ? "blur(8px)" : "none",
         color: disabled
-          ? onLight ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)"
-          : onLight ? "rgba(0,0,0,0.65)" : "#fff",
+          ? onLight ? pageInk(20) : lightboxInk(20)
+          : onLight ? pageInk(65) : lightboxInk(100),
         cursor: disabled ? "not-allowed" : "pointer",
         display: "flex",
         alignItems: "center",
