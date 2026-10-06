@@ -415,7 +415,9 @@ export default function FieldMap({
   }, [clampScale, clampView]);
 
   const onDown = (e: React.PointerEvent) => {
-    if ((e.target as HTMLElement).closest("[data-region]")) return;
+    // A press on one of the map's own controls (zoom, filters, the year scrubber)
+    // isn't a drag. Capturing it would send its click to the map instead.
+    if ((e.target as HTMLElement).closest("[data-region], button, [data-map-control]")) return;
     // Capture the pointer so we keep getting move/up events even if the
     // finger slides off the viewport (touch dragging the map off-screen).
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -1114,6 +1116,7 @@ function YearScrubber({ years, setYears, bounds, regions, palette, mapStyle }: Y
 
   return (
     <div
+      data-map-control=""
       style={{
         position: "absolute",
         bottom: 24,
