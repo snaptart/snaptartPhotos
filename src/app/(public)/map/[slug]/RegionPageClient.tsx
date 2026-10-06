@@ -11,6 +11,10 @@ import type { MapStyle } from "@/components/public/fieldmap/types";
 type RegionPageClientProps = {
   fieldMapData: FieldMapData;
   mapStyle: MapStyle;
+  /** The Field Map block's background colour; "" = the map style's own. */
+  mapBackground: string;
+  /** The page the Field Map is on, which closing the room returns to. */
+  mapHref: string;
   siteTitle: string;
   slug: string;
   galleryTitle: string;
@@ -55,6 +59,8 @@ type AnimState = "pre-enter" | "entering" | "resting" | "leaving";
 export default function RegionPageClient({
   fieldMapData,
   mapStyle,
+  mapBackground,
+  mapHref,
   siteTitle,
   slug,
   galleryTitle,
@@ -127,7 +133,7 @@ export default function RegionPageClient({
       setViewport({ w: rect.width, h: rect.height });
     }
     setAnimState("leaving");
-    setTimeout(() => router.push("/"), ANIM_MS);
+    setTimeout(() => router.push(mapHref), ANIM_MS);
   };
 
   const cx = viewport.w / 2;
@@ -171,6 +177,7 @@ export default function RegionPageClient({
           yearBounds={fieldMapData.yearBounds}
           filters={fieldMapData.filters}
           mapStyle={mapStyle}
+          backgroundColor={mapBackground || undefined}
           siteTitle={siteTitle}
           mode="background"
           highlightSlug={slug}
@@ -202,7 +209,7 @@ export default function RegionPageClient({
           filmStamp={filmStamp}
           handwritingFont={handwritingFont}
           stampFont={stampFont}
-          backHref="/"
+          backHref={mapHref}
           backLabel="Back to map"
           returnLabel="Return to map"
           onBack={handleClose}
