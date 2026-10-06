@@ -5745,7 +5745,13 @@ function keyIsTaken(e: KeyboardEvent): boolean {
   if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return true;
   const t = e.target;
   if (t instanceof Element && t.closest("input, textarea, select, [contenteditable=''], [contenteditable='true']")) return true;
-  return !!document.querySelector("[aria-modal='true']");
+  // Only a dialog that is showing: one that stays on the page while closed doesn't count.
+  return Array.from(document.querySelectorAll("[aria-modal='true']")).some(isShowing);
+}
+
+function isShowing(el: Element): boolean {
+  if (typeof el.checkVisibility === "function") return el.checkVisibility({ visibilityProperty: true });
+  return el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
 }
 
 /** Whether at least half of `el` (or of the screen, for one taller than it) is in view. */
