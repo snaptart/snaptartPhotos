@@ -142,7 +142,8 @@ export function MobileMenu({ items, instagramUrl, menuFontSize, side, menuStyle 
               visibility: open ? "visible" : "hidden",
             }}
             role="dialog"
-            aria-modal="true"
+            // It stays on the page to slide in and out, so it's modal only while open.
+            aria-modal={open ? "true" : undefined}
             aria-label="Menu"
           >
             {closeRow}
