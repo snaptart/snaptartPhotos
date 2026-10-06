@@ -7,9 +7,9 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { DEFAULT_ROOM_CAPTION_FIELDS, type RoomPhoto } from "@/components/public/hall/RoomView";
 import siteConfig from "@/lib/site.config";
-import { getFieldMapData } from "@/lib/fieldmap/query";
+import { cssColor } from "@/lib/theme/color";
+import { getFieldMapData, getFieldMapPage } from "@/lib/fieldmap/query";
 import RegionPageClient from "./RegionPageClient";
-import type { MapStyle } from "@/components/public/fieldmap/types";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -46,7 +46,7 @@ export default async function FieldMapRegionPage({ params }: Props) {
   if (!gallery) notFound();
 
   const [settingsRow] = await db.select().from(siteSettings).limit(1);
-  const fieldMapData = await getFieldMapData();
+  const [fieldMapData, mapPage] = await Promise.all([getFieldMapData(), getFieldMapPage()]);
 
   const rows = await selectPhotosForGallery(gallery.id);
 
@@ -66,8 +66,6 @@ export default async function FieldMapRegionPage({ params }: Props) {
     createdAt: p.createdAt.toISOString(),
   }));
 
-  const mapStyle: MapStyle = "modern";
-
   return (
     <>
       <link
@@ -76,7 +74,9 @@ export default async function FieldMapRegionPage({ params }: Props) {
       />
       <RegionPageClient
         fieldMapData={fieldMapData}
-        mapStyle={mapStyle}
+        mapStyle={mapPage?.mapStyle ?? "modern"}
+        mapBackground={cssColor(mapPage?.backgroundColor)}
+        mapHref={mapPage?.href ?? "/"}
         siteTitle={settingsRow?.siteTitle ?? siteConfig.siteName}
         slug={gallery.slug}
         galleryTitle={gallery.title}
