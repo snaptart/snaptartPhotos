@@ -1,8 +1,8 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { galleries, galleryPhotos, photos } from "@/lib/db/schema";
-import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
-import type { FieldMapFilter, FieldMapRegion } from "@/components/public/fieldmap/types";
+import { galleries, galleryPhotos, pages, photos, siteSettings } from "@/lib/db/schema";
+import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import type { FieldMapFilter, FieldMapRegion, MapStyle } from "@/components/public/fieldmap/types";
 
 // Muted, gallery-appropriate palette used when a gallery has no accent_color.
 // Picked deterministically by position so pins look distinct without admin input.
@@ -138,4 +138,58 @@ export async function getFieldMapData(): Promise<FieldMapData> {
     yearBounds: [globalMin, globalMax],
     filters: DEFAULT_FIELD_MAP_FILTERS,
   };
+}
+
+/** The page the Field Map is on, and how its block draws the map. */
+export type FieldMapPage = {
+  href: string;
+  mapStyle: MapStyle;
+  /** The block's background colour, as stored ("" = the map style's own). */
+  backgroundColor: string;
+};
+
+/**
+ * Finds the published page with a Field Map block, so a gallery's map page
+ * returns to it and draws the same map behind the photos. The homepage wins
+ * when it has one; otherwise the first such page. null when no page has one.
+ */
+export async function getFieldMapPage(): Promise<FieldMapPage | null> {
+  const [settings] = await db.select({ homepageId: siteSettings.homepageId }).from(siteSettings).limit(1);
+  const rows = await db
+    .select({ id: pages.id, slug: pages.slug, content: pages.content })
+    .from(pages)
+    .where(and(eq(pages.isPublished, true), sql`${pages.content}::text like '%"FieldMap"%'`))
+    .orderBy(asc(pages.position));
+  const withMap = rows
+    .map((row) => ({ row, block: findFieldMapBlock(row.content) }))
+    .filter((m): m is { row: (typeof rows)[number]; block: Record<string, unknown> } => m.block !== null);
+  const found = withMap.find((m) => m.row.id === settings?.homepageId) ?? withMap[0];
+  if (!found) return null;
+  const props = found.block;
+  return {
+    href: found.row.id === settings?.homepageId ? "/" : `/${found.row.slug}`,
+    mapStyle: (typeof props.mapStyle === "string" ? props.mapStyle : "modern") as MapStyle,
+    backgroundColor: typeof props.backgroundColor === "string" ? props.backgroundColor : "",
+  };
+}
+
+/** The props of the first Field Map block anywhere in a page's content, nested blocks included. */
+function findFieldMapBlock(node: unknown): Record<string, unknown> | null {
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const found = findFieldMapBlock(item);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (typeof node !== "object" || node === null) return null;
+  const obj = node as Record<string, unknown>;
+  if (obj.type === "FieldMap" && typeof obj.props === "object" && obj.props !== null) {
+    return obj.props as Record<string, unknown>;
+  }
+  for (const value of Object.values(obj)) {
+    const found = findFieldMapBlock(value);
+    if (found) return found;
+  }
+  return null;
 }
